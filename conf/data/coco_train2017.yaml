@@ -1,0 +1,6 @@
+defaults:
+  - base_data
+  - _self_
+
+source: coco
+root: data/raw

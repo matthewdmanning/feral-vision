@@ -39,6 +39,11 @@ DICE_SMOOTH: float = 1.0  # Laplace smoothing for dice numerator/denominator
 DEFAULT_DATA_SOURCE: str = "local"
 DEFAULT_VAL_SPLIT: float = 0.2
 
+# COCO train2017 download
+COCO_ANNOTATIONS_URL: str = "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
+COCO_IMAGE_URL_TEMPLATE: str = "http://images.cocodataset.org/train2017/{file_name}"
+COCO_SUPERCATEGORY_FILTER: str = "animal"
+
 # --- Augmentation -----------------------------------------------------------
 DEFAULT_ROTATE90_K: int = 1  # number of counter-clockwise 90-degree turns
 DEFAULT_BRIGHTNESS_SHIFT: float = 0.1  # additive shift on [0, 1] normalized images

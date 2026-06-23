@@ -14,6 +14,7 @@ dependencies = [
     "omegaconf",
     "opencv-python>=4.13.0.92",
     "torch>=2.12.1",
+    "pycocotools>=2.0",
     "ultralytics>=8.3",
 ]
 
