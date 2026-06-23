@@ -24,6 +24,7 @@ from feral_segmentor.config.schema import (
     HubModelConfig,
     InferenceConfig,
     ScriptModelConfig,
+    TeacherModelConfig,
     TrackingConfig,
     TrainConfig,
 )
@@ -35,6 +36,7 @@ _SCHEMAS: tuple[tuple[str, str, type], ...] = (
     ("model", "base_hub", HubModelConfig),
     ("model", "base_script", ScriptModelConfig),
     ("model", "base_config_source", ConfigModelConfig),
+    ("model", "base_teacher", TeacherModelConfig),
     ("train", "base_train", TrainConfig),
     ("inference", "base_inference", InferenceConfig),
     ("tracking", "base_tracking", TrackingConfig),
