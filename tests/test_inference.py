@@ -54,7 +54,14 @@ def _model():
 
 def _cfg(tta=False):
     return OmegaConf.create(
-        {"inference": {"threshold": 0.0, "device": "cpu", "tta": tta, "min_box_area": 1}}
+        {
+            "inference": {
+                "threshold": 0.0,
+                "device": "cpu",
+                "tta": tta,
+                "min_box_area": 1,
+            }
+        }
     )
 
 

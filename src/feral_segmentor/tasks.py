@@ -6,9 +6,9 @@ from enum import StrEnum
 
 
 class CVTask(StrEnum):
-    SEG_INSTANCE = "seg_instance"    # bounding box per instance
-    SEG_SEMANTIC = "seg_semantic"    # pixel-level class mask
-    DETECTION = "detection"          # binary present/absent
+    SEG_INSTANCE = "seg_instance"  # bounding box per instance
+    SEG_SEMANTIC = "seg_semantic"  # pixel-level class mask
+    DETECTION = "detection"  # binary present/absent
     CLASSIFICATION = "classification"
     POSE = "pose"
 

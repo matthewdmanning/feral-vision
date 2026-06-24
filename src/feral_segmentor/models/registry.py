@@ -7,7 +7,7 @@ canonical image size). ``build_model`` and ``get_model`` call-sites unchanged.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from omegaconf import DictConfig
 
@@ -21,10 +21,10 @@ DEFAULT_ARCH: str = "student"
 class ModelProfile:
     """All static metadata for a registered model architecture."""
 
-    arch_cls: type | None        # resolved lazily to avoid circular imports
+    arch_cls: type | None  # resolved lazily to avoid circular imports
     tasks: list[CVTask]
-    annotation_format: str       # e.g. "mask", "yolo_seg", "yolo_det"
-    image_size: int              # canonical square side length
+    annotation_format: str  # e.g. "mask", "yolo_seg", "yolo_det"
+    image_size: int  # canonical square side length
 
 
 _MODEL_PROFILES: dict[str, ModelProfile] = {
@@ -53,9 +53,11 @@ def _resolve_arch_cls(name: str) -> type:
     """Resolve arch class lazily to avoid circular imports at module load."""
     if name == "student":
         from feral_segmentor.models.segmentation import StudentSegmenter
+
         return StudentSegmenter
     if name in ("teacher", "yolo11n-seg"):
         from feral_segmentor.models.teacher import TeacherModel
+
         return TeacherModel
     raise KeyError(f"no class resolver for {name!r}")
 

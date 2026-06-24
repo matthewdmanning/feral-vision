@@ -48,6 +48,7 @@ class Image:
     def load(self):
         """Return (H, W, C) numpy array in RGB."""
         import cv2
+
         img = cv2.imread(str(self.path), cv2.IMREAD_COLOR)
         if img is None:
             raise FileNotFoundError(f"failed to read image: {self.path}")
@@ -150,7 +151,10 @@ class FeralDataset:
                 tasks = list(profile.tasks)
             logger.info(
                 "target_model=%r tasks=%s annotation_format=%s image_size=%d",
-                target_model, tasks, profile.annotation_format, profile.image_size,
+                target_model,
+                tasks,
+                profile.annotation_format,
+                profile.image_size,
             )
 
         self.tasks: list[CVTask] = tasks or []
@@ -225,6 +229,7 @@ class FeralDataset:
 
         if CVTask.CLASSIFICATION in self.tasks:
             import json
+
             p = d / f"{stem}.json"
             if p.exists():
                 with p.open() as f:
@@ -247,13 +252,16 @@ class FeralDataset:
 
     def _eager_augment(self) -> None:
         import cv2
+
         self.out_dir.mkdir(parents=True, exist_ok=True)
         for sample in self.samples:
             result = self._run_compose(sample)
             out_path = self.out_dir / sample.image.path.name
             cv2.imwrite(str(out_path), cv2.cvtColor(result["image"], cv2.COLOR_RGB2BGR))
             self._augmented.append(out_path)
-        logger.info("eager augmentation: %d images -> %s", len(self._augmented), self.out_dir)
+        logger.info(
+            "eager augmentation: %d images -> %s", len(self._augmented), self.out_dir
+        )
 
     def _merge(self, datasets: list["FeralDataset"]) -> list[Sample]:
         seen: set[Path] = set()

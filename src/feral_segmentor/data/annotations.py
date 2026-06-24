@@ -33,6 +33,7 @@ class MaskAnnotation(Annotation):
     def load(self) -> "MaskAnnotation":
         if self.mask is None:
             import cv2
+
             self.mask = cv2.imread(str(self.path), cv2.IMREAD_GRAYSCALE)
             if self.mask is None:
                 raise FileNotFoundError(f"failed to read mask: {self.path}")

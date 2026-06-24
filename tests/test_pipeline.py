@@ -127,7 +127,9 @@ def test_segment_loads_checkpoint_when_present(monkeypatch, wired, tmp_path):
     wired["source"]._checkpoint = str(ckpt)
 
     sentinel_state = {"weights": 1}
-    monkeypatch.setattr(pipeline.torch, "load", lambda p, map_location=None: sentinel_state)
+    monkeypatch.setattr(
+        pipeline.torch, "load", lambda p, map_location=None: sentinel_state
+    )
 
     cfg = _make_cfg()
     pipeline.segment(cfg)

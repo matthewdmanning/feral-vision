@@ -24,9 +24,25 @@ feral-segmentor = "feral_segmentor:main"
 requires = ["uv_build>=0.11.7,<0.12.0"]
 build-backend = "uv_build"
 
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+# Pre-existing errors tracked separately; CI enforces no regressions on new code.
+exclude = [
+    "src/feral_segmentor/data/creator\\.py",
+    "src/feral_segmentor/models/example_export\\.py",
+    "src/feral_segmentor/models/registry\\.py",
+    "src/feral_segmentor/models/source\\.py",
+    "src/feral_segmentor/pipeline\\.py",
+    "src/feral_segmentor/training/optim\\.py",
+    "src/feral_segmentor/training/trainer\\.py",
+]
+
 [dependency-groups]
 dev = [
     "coverage>=7.14.2",
+    "mypy>=1.10.0",
+    "types-PyYAML>=6.0.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
 ]

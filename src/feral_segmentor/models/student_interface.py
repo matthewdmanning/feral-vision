@@ -1,5 +1,6 @@
 import torch.nn as nn
 
+
 class StudentModelInterface(nn.Module):
     """
     Wrapper expectation for user-supplied student model.

@@ -127,16 +127,16 @@ def main(cfg: DictConfig) -> None:
     metrics = {"mean_iou": _DEFAULT_METRIC_VALUE, "dice_score": _DEFAULT_METRIC_VALUE}
 
     if not ckpt_path.exists():
-        logger.warning(
-            "checkpoint %s not found; writing default metrics", ckpt_path
-        )
+        logger.warning("checkpoint %s not found; writing default metrics", ckpt_path)
         write_json(metrics, metrics_path)
         return
 
     try:
         payload = torch.load(ckpt_path, map_location=C.DEFAULT_DEVICE)
     except Exception as exc:  # noqa: BLE001 - robustness for the DVC stage
-        logger.warning("failed to load %s (%s); writing default metrics", ckpt_path, exc)
+        logger.warning(
+            "failed to load %s (%s); writing default metrics", ckpt_path, exc
+        )
         write_json(metrics, metrics_path)
         return
 
