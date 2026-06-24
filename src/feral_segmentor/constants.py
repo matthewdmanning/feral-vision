@@ -43,6 +43,7 @@ DEFAULT_VAL_SPLIT: float = 0.2
 DEFAULT_ROTATE90_K: int = 1  # number of counter-clockwise 90-degree turns
 DEFAULT_BRIGHTNESS_SHIFT: float = 0.1  # additive shift on [0, 1] normalized images
 DEFAULT_GAMMA: float = 1.2  # gamma correction exponent (>1 darkens midtones)
+DEFAULT_MOTION_BLUR_KERNEL: int = 15  # motion blur kernel size (odd, pixels)
 
 # --- Inference / post-processing -------------------------------------------
 DEFAULT_DEVICE: str = "cpu"

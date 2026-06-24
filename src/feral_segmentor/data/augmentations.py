@@ -121,6 +121,27 @@ class GammaAdjust(Augmentation):
         return {"gamma": self.gamma}
 
 
+class MotionBlur(Augmentation):
+    """Simulate camera/subject motion via a horizontal linear blur kernel."""
+
+    def __init__(self, inner: "Augmentation | None" = None, kernel_size: int = C.DEFAULT_MOTION_BLUR_KERNEL):
+        super().__init__(inner)
+        if kernel_size % 2 == 0:
+            raise ValueError(f"kernel_size must be odd, got {kernel_size}")
+        self.kernel_size = kernel_size
+
+    def _apply(self, sample: np.ndarray) -> np.ndarray:
+        import cv2
+        kernel = np.zeros((self.kernel_size, self.kernel_size), dtype=np.float64)
+        kernel[self.kernel_size // 2, :] = 1.0 / self.kernel_size
+        img = (np.clip(sample, 0.0, 1.0) * 255.0).astype(np.uint8)
+        blurred = cv2.filter2D(img, -1, kernel)
+        return blurred.astype(np.float64) / 255.0
+
+    def _own_params(self) -> dict[str, str | float]:
+        return {"kernel_size": self.kernel_size}
+
+
 # --- Registry ---------------------------------------------------------------
 _AUGMENTATIONS: dict[str, type[Augmentation]] = {
     "Identity": Identity,
@@ -128,6 +149,7 @@ _AUGMENTATIONS: dict[str, type[Augmentation]] = {
     "RandomRotate90": RandomRotate90,
     "BrightnessShift": BrightnessShift,
     "GammaAdjust": GammaAdjust,
+    "MotionBlur": MotionBlur,
 }
 
 
