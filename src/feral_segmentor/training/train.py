@@ -30,7 +30,7 @@ def _resolve_callable(dotted: str) -> Callable | None:
     return getattr(module, attr)
 
 
-def _write_data_yaml(cfg: DictConfig, data_dir: str) -> Path:
+def _write_data_yaml(cfg: DictConfig, data_dir: str | Path) -> Path:
     """Generate a YOLO data.yaml from Hydra DataConfig and return its path."""
     data_dir = Path(data_dir)
     names_path = data_dir / "labels" / "names.yaml"
