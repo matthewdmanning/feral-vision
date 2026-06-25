@@ -16,20 +16,24 @@ from feral_segmentor.data.augmentations import (
 )
 
 CHAINS = {
-    "original":        Identity(),
-    "hflip":           HorizontalFlip(),
-    "rot90":           RandomRotate90(),
-    "brightness":      BrightnessShift(shift=0.1),
-    "gamma_dark":      GammaAdjust(gamma=2.0),
-    "gamma_bright":    GammaAdjust(gamma=0.5),
-    "hflip_brightness":BrightnessShift(inner=HorizontalFlip()),
-    "hflip_gamma":     GammaAdjust(gamma=2.0, inner=HorizontalFlip()),
-    "motion_blur":     MotionBlur(),
+    "original": Identity(),
+    "hflip": HorizontalFlip(),
+    "rot90": RandomRotate90(),
+    "brightness": BrightnessShift(shift=0.1),
+    "gamma_dark": GammaAdjust(gamma=2.0),
+    "gamma_bright": GammaAdjust(gamma=0.5),
+    "hflip_brightness": BrightnessShift(inner=HorizontalFlip()),
+    "hflip_gamma": GammaAdjust(gamma=2.0, inner=HorizontalFlip()),
+    "motion_blur": MotionBlur(),
 }
 
 
 def run(
-    src: Path, dst: Path, ops: list[str], brightness_shift: float, gamma: float,
+    src: Path,
+    dst: Path,
+    ops: list[str],
+    brightness_shift: float,
+    gamma: float,
     motion_blur_kernel: int = 15,
 ) -> None:
     out_images = dst / "images"
@@ -38,15 +42,17 @@ def run(
     # out_masks.mkdir(parents=True, exist_ok=True)
 
     chains = {
-        "original":        Identity(),
-        "hflip":           HorizontalFlip(),
-        "rot90":           RandomRotate90(),
-        "brightness":      BrightnessShift(shift=brightness_shift),
-        "gamma_dark":      GammaAdjust(gamma=gamma),
-        "gamma_bright":    GammaAdjust(gamma=1.0 / gamma),
-        "hflip_brightness":BrightnessShift(shift=brightness_shift, inner=HorizontalFlip()),
-        "hflip_gamma":     GammaAdjust(gamma=gamma, inner=HorizontalFlip()),
-        "motion_blur":     MotionBlur(kernel_size=motion_blur_kernel),
+        "original": Identity(),
+        "hflip": HorizontalFlip(),
+        "rot90": RandomRotate90(),
+        "brightness": BrightnessShift(shift=brightness_shift),
+        "gamma_dark": GammaAdjust(gamma=gamma),
+        "gamma_bright": GammaAdjust(gamma=1.0 / gamma),
+        "hflip_brightness": BrightnessShift(
+            shift=brightness_shift, inner=HorizontalFlip()
+        ),
+        "hflip_gamma": GammaAdjust(gamma=gamma, inner=HorizontalFlip()),
+        "motion_blur": MotionBlur(kernel_size=motion_blur_kernel),
     }
     selected = {k: v for k, v in chains.items() if k in ops}
 

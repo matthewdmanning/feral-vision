@@ -102,7 +102,9 @@ def _build_names_yaml(ann_path: str | Path, out_path: str | Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ann", required=True, help="Path to COCO annotations JSON")
-    parser.add_argument("--out", required=True, help="Output directory for YOLO .txt files")
+    parser.add_argument(
+        "--out", required=True, help="Output directory for YOLO .txt files"
+    )
     parser.add_argument(
         "--names",
         default=None,

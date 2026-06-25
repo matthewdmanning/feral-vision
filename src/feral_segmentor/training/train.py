@@ -30,7 +30,7 @@ def _resolve_callable(dotted: str) -> Callable | None:
     return getattr(module, attr)
 
 
-def _write_data_yaml(cfg: DictConfig, data_dir: str) -> Path:
+def _write_data_yaml(cfg: DictConfig, data_dir: str | Path) -> Path:
     """Generate a YOLO data.yaml from Hydra DataConfig and return its path."""
     data_dir = Path(data_dir)
     names_path = data_dir / "labels" / "names.yaml"
@@ -44,7 +44,9 @@ def _write_data_yaml(cfg: DictConfig, data_dir: str) -> Path:
         # Fallback: generic class names based on similarity list length.
         n = len(cfg.data.class_similarity) or cfg.model.num_classes
         names = [f"class{i}" for i in range(n)]
-        logger.warning("names.yaml not found at %s; using generic class names", names_path)
+        logger.warning(
+            "names.yaml not found at %s; using generic class names", names_path
+        )
 
     payload = {
         "path": str(data_dir),
