@@ -1,4 +1,9 @@
-"""Model-weight acquisition sources (discriminated by ``cfg.source``).
+"""Model weight-acquisition sources (discriminated by ``cfg.model.source``).
+
+Skeleton owned by the models unit; implemented post-merge. The pipeline depends
+only on the ``build_model_source(model_cfg) -> source`` factory and the returned
+object's ``acquire(model_cfg) -> checkpoint path | None`` method.
+Model-weight acquisition sources (discriminated by ``cfg.source``).
 
 Each :class:`ModelSource` knows how to materialise a model's weights on disk and
 return the produced paths. ``build_model_source`` dispatches on the model
@@ -8,8 +13,8 @@ config's ``source`` field.
 from __future__ import annotations
 
 import importlib
-from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any, Protocol
 
 import torch
 from omegaconf import DictConfig
@@ -18,16 +23,14 @@ from feral_segmentor.models.hub_fetch import pull_model
 from feral_segmentor.models.registry import build_model
 from feral_segmentor.utils import get_logger
 
-log = get_logger(__name__)
 
-
-class ModelSource(ABC):
-    """Strategy for acquiring a model's weights from a model config."""
-
-    @abstractmethod
-    def acquire(self, cfg: DictConfig) -> list[Path]:
-        """Materialise weights described by ``cfg`` and return their paths."""
+class ModelSource(Protocol):
+    def acquire(self, model_cfg: Any) -> Any:
+        """Make weights available and return a checkpoint path (or ``None``)."""
         ...
+
+
+log = get_logger(__name__)
 
 
 class HubModelSource(ModelSource):

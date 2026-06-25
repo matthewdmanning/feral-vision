@@ -72,19 +72,17 @@ class StudentSegmenter(nn.Module, SegmentationModel):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         h, w = x.shape[-2], x.shape[-1]
 
-        e1 = self.enc1(x)  # (B, c1, H, W)
+        e1 = self.enc1(x)          # (B, c1, H, W)
         e2 = self.enc2(self.pool(e1))  # (B, c2, H/2, W/2)
-        bottom = self.pool(e2)  # (B, c2, H/4, W/4)
+        bottom = self.pool(e2)     # (B, c2, H/4, W/4)
 
         d2 = self.dec2(self.up2(bottom))  # (B, c1, ~H/2, ~W/2)
-        d1 = self.dec1(self.up1(d2))  # (B, c1, ~H, ~W)
+        d1 = self.dec1(self.up1(d2))      # (B, c1, ~H, ~W)
 
         logits = self.head(d1)
         # Guard against odd input dims where transposed conv under/overshoots.
         if logits.shape[-2] != h or logits.shape[-1] != w:
-            logits = F.interpolate(
-                logits, size=(h, w), mode="bilinear", align_corners=False
-            )
+            logits = F.interpolate(logits, size=(h, w), mode="bilinear", align_corners=False)
         return logits
 
     @torch.no_grad()
@@ -93,12 +91,12 @@ class StudentSegmenter(nn.Module, SegmentationModel):
         was_training = self.training
         self.eval()
         try:
-            batched = image.unsqueeze(0)  # (1, C, H, W)
-            logits = self.forward(batched)  # (1, num_classes, H, W)
-            probs = torch.softmax(logits, dim=1)[0]  # (num_classes, H, W)
+            batched = image.unsqueeze(0)              # (1, C, H, W)
+            logits = self.forward(batched)            # (1, num_classes, H, W)
+            probs = torch.softmax(logits, dim=1)[0]   # (num_classes, H, W)
 
             # Foreground probability = 1 - P(background).
-            fg_prob = 1.0 - probs[BACKGROUND_CLASS]  # (H, W)
+            fg_prob = 1.0 - probs[BACKGROUND_CLASS]   # (H, W)
             fg_mask = fg_prob >= DEFAULT_MASK_THRESHOLD
 
             boxes = masks_to_boxes(fg_mask, min_box_area=DEFAULT_MIN_BOX_AREA)
@@ -106,7 +104,7 @@ class StudentSegmenter(nn.Module, SegmentationModel):
             scores_list: list[float] = []
             labels_list: list[int] = []
             # Per-pixel dominant class, used to label each box.
-            class_map = probs.argmax(dim=0)  # (H, W)
+            class_map = probs.argmax(dim=0)           # (H, W)
             for box in boxes:
                 x1, y1, x2, y2 = (int(v) for v in box.tolist())
                 region_prob = fg_prob[y1:y2, x1:x2]
@@ -116,9 +114,7 @@ class StudentSegmenter(nn.Module, SegmentationModel):
                     region_classes = class_map[y1:y2, x1:x2][region_mask]
                     labels_list.append(int(torch.mode(region_classes).values))
                 else:
-                    scores_list.append(
-                        float(region_prob.mean()) if region_prob.numel() else 0.0
-                    )
+                    scores_list.append(float(region_prob.mean()) if region_prob.numel() else 0.0)
                     labels_list.append(BACKGROUND_CLASS)
 
             scores = torch.tensor(scores_list, dtype=torch.float32)

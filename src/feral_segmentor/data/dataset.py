@@ -39,9 +39,7 @@ class SegmentationDataset(Dataset):
             raise FileNotFoundError(f"masks directory not found: {self.masks_dir}")
 
         # Index image files; require a matching mask (by stem) for each.
-        masks_by_stem = {
-            p.stem: p for p in sorted(self.masks_dir.iterdir()) if p.is_file()
-        }
+        masks_by_stem = {p.stem: p for p in sorted(self.masks_dir.iterdir()) if p.is_file()}
         self.samples: list[tuple[Path, Path]] = []
         for image_path in sorted(self.images_dir.iterdir()):
             if not image_path.is_file():

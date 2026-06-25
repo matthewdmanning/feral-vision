@@ -28,24 +28,16 @@ def _maybe_load_weights(model: SegmentationModel, cfg: DictConfig) -> None:
     source = build_model_source(cfg.model)
     checkpoint = source.acquire(cfg.model)
     if checkpoint is None:
-        logger.info(
-            "no checkpoint available for model '%s'; using initial weights",
-            cfg.model.name,
-        )
+        logger.info("no checkpoint available for model '%s'; using initial weights", cfg.model.name)
         return
     checkpoint_path = Path(checkpoint)
     if not checkpoint_path.exists():
-        logger.info(
-            "checkpoint path '%s' does not exist; using initial weights",
-            checkpoint_path,
-        )
+        logger.info("checkpoint path '%s' does not exist; using initial weights", checkpoint_path)
         return
     state_dict = torch.load(checkpoint_path, map_location="cpu")
     load_state_dict = getattr(model, "load_state_dict", None)
     if load_state_dict is None:
-        logger.warning(
-            "model '%s' does not support load_state_dict; skipping", cfg.model.name
-        )
+        logger.warning("model '%s' does not support load_state_dict; skipping", cfg.model.name)
         return
     load_state_dict(state_dict)
     logger.info("loaded weights from '%s'", checkpoint_path)

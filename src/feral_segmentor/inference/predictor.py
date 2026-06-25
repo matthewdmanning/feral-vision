@@ -33,9 +33,7 @@ class Predictor:
             flipped = torch.flip(image, dims=[-1])
             flipped_out = self.model.predict(flipped)
             # Average the per-pixel logits of the (un-flipped) flip pass.
-            avg_logits = (
-                output.mask_logits + torch.flip(flipped_out.mask_logits, dims=[-1])
-            ) / 2.0
+            avg_logits = (output.mask_logits + torch.flip(flipped_out.mask_logits, dims=[-1])) / 2.0
             output = SegmentationOutput(
                 mask_logits=avg_logits,
                 boxes=output.boxes,
@@ -43,23 +41,13 @@ class Predictor:
                 labels=output.labels,
             )
 
-        threshold = (
-            float(getattr(inf, "threshold", DEFAULT_MASK_THRESHOLD))
-            if inf is not None
-            else DEFAULT_MASK_THRESHOLD
-        )
-        min_box_area = (
-            int(getattr(inf, "min_box_area", DEFAULT_MIN_BOX_AREA))
-            if inf is not None
-            else DEFAULT_MIN_BOX_AREA
-        )
+        threshold = float(getattr(inf, "threshold", DEFAULT_MASK_THRESHOLD)) if inf is not None else DEFAULT_MASK_THRESHOLD
+        min_box_area = int(getattr(inf, "min_box_area", DEFAULT_MIN_BOX_AREA)) if inf is not None else DEFAULT_MIN_BOX_AREA
 
         return self._filter(output, threshold, min_box_area)
 
     @staticmethod
-    def _filter(
-        output: SegmentationOutput, threshold: float, min_box_area: int
-    ) -> SegmentationOutput:
+    def _filter(output: SegmentationOutput, threshold: float, min_box_area: int) -> SegmentationOutput:
         boxes = output.boxes
         if boxes.numel() == 0:
             return output

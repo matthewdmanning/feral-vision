@@ -31,10 +31,7 @@ class Augmentation(abc.ABC):
         return {}
 
     def to_params(self, index: int = 0) -> dict[str, str | float]:
-        flat = {
-            f"{index}.{type(self).__name__}.{k}": v
-            for k, v in self._own_params().items()
-        }
+        flat = {f"{index}.{type(self).__name__}.{k}": v for k, v in self._own_params().items()}
         if self.inner is not None:
             flat |= self.inner.to_params(index=index + 1)
         return flat
@@ -55,9 +52,7 @@ class FunctionAugmentation(Augmentation):
         self.kwargs = kwargs
 
     def _apply(self, sample: Any) -> Any:
-        raise NotImplementedError(
-            "backend call convention not yet chosen (albumentations vs torchvision)"
-        )
+        raise NotImplementedError("backend call convention not yet chosen (albumentations vs torchvision)")
 
     def _own_params(self) -> dict[str, str | float]:
         return {"fn": type(self.fn).__name__, **self.kwargs}
@@ -86,9 +81,7 @@ class HorizontalFlip(Augmentation):
 class RandomRotate90(Augmentation):
     """Rotate by a fixed multiple of 90 degrees (deterministic given ``k``)."""
 
-    def __init__(
-        self, inner: "Augmentation | None" = None, k: int = C.DEFAULT_ROTATE90_K
-    ):
+    def __init__(self, inner: "Augmentation | None" = None, k: int = C.DEFAULT_ROTATE90_K):
         super().__init__(inner)
         self.k = k
 
@@ -102,11 +95,7 @@ class RandomRotate90(Augmentation):
 class BrightnessShift(Augmentation):
     """Add a constant offset, clipping to the valid [0, 1] range."""
 
-    def __init__(
-        self,
-        inner: "Augmentation | None" = None,
-        shift: float = C.DEFAULT_BRIGHTNESS_SHIFT,
-    ):
+    def __init__(self, inner: "Augmentation | None" = None, shift: float = C.DEFAULT_BRIGHTNESS_SHIFT):
         super().__init__(inner)
         self.shift = shift
 
@@ -120,9 +109,7 @@ class BrightnessShift(Augmentation):
 class GammaAdjust(Augmentation):
     """Apply gamma correction ``out = in ** gamma`` on [0, 1] images."""
 
-    def __init__(
-        self, inner: "Augmentation | None" = None, gamma: float = C.DEFAULT_GAMMA
-    ):
+    def __init__(self, inner: "Augmentation | None" = None, gamma: float = C.DEFAULT_GAMMA):
         super().__init__(inner)
         self.gamma = gamma
 
@@ -134,27 +121,6 @@ class GammaAdjust(Augmentation):
         return {"gamma": self.gamma}
 
 
-class MotionBlur(Augmentation):
-    """Simulate camera/subject motion via a horizontal linear blur kernel."""
-
-    def __init__(self, inner: "Augmentation | None" = None, kernel_size: int = C.DEFAULT_MOTION_BLUR_KERNEL):
-        super().__init__(inner)
-        if kernel_size % 2 == 0:
-            raise ValueError(f"kernel_size must be odd, got {kernel_size}")
-        self.kernel_size = kernel_size
-
-    def _apply(self, sample: np.ndarray) -> np.ndarray:
-        import cv2
-        kernel = np.zeros((self.kernel_size, self.kernel_size), dtype=np.float64)
-        kernel[self.kernel_size // 2, :] = 1.0 / self.kernel_size
-        img = (np.clip(sample, 0.0, 1.0) * 255.0).astype(np.uint8)
-        blurred = cv2.filter2D(img, -1, kernel)
-        return blurred.astype(np.float64) / 255.0
-
-    def _own_params(self) -> dict[str, str | float]:
-        return {"kernel_size": self.kernel_size}
-
-
 # --- Registry ---------------------------------------------------------------
 _AUGMENTATIONS: dict[str, type[Augmentation]] = {
     "Identity": Identity,
@@ -162,7 +128,6 @@ _AUGMENTATIONS: dict[str, type[Augmentation]] = {
     "RandomRotate90": RandomRotate90,
     "BrightnessShift": BrightnessShift,
     "GammaAdjust": GammaAdjust,
-    "MotionBlur": MotionBlur,
 }
 
 
@@ -182,9 +147,7 @@ def build_chain(cfg: DictConfig) -> Augmentation:
         try:
             cls = _AUGMENTATIONS[name]
         except KeyError as exc:
-            raise KeyError(
-                f"unknown augmentation op {name!r}; registered: {sorted(_AUGMENTATIONS)}"
-            ) from exc
+            raise KeyError(f"unknown augmentation op {name!r}; registered: {sorted(_AUGMENTATIONS)}") from exc
         chain = cls(inner=chain)
     assert chain is not None  # guaranteed: ops is non-empty
     return chain
@@ -199,16 +162,8 @@ def run_augment_stage(cfg: DictConfig) -> None:
     chain = build_chain(cfg.augmentation)
     log.info("built augmentation chain: %s", chain.variant_label())
 
-    raw_dir = (
-        Path(getattr(cfg.data, "root", "data")) / "raw"
-        if "data" in cfg
-        else Path("data/raw")
-    )
-    out_dir = (
-        Path(getattr(cfg.data, "root", "data")) / "augmented"
-        if "data" in cfg
-        else Path("data/augmented")
-    )
+    raw_dir = Path(getattr(cfg.data, "root", "data")) / "raw" if "data" in cfg else Path("data/raw")
+    out_dir = Path(getattr(cfg.data, "root", "data")) / "augmented" if "data" in cfg else Path("data/augmented")
 
     if not raw_dir.exists():
         log.info("raw dir %s absent; nothing to augment", raw_dir)

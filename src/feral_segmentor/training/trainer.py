@@ -58,9 +58,7 @@ class Trainer:
         device: torch.device | str | None = None,
         best_model_path: str | Path = DEFAULT_BEST_MODEL_PATH,
     ) -> None:
-        self.device = (
-            torch.device(device) if device is not None else torch.device("cpu")
-        )
+        self.device = torch.device(device) if device is not None else torch.device("cpu")
         self.model = model.to(self.device)
         self.optimizer = optimizer
         self.loss_fn = loss_fn
