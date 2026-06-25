@@ -15,6 +15,7 @@ from feral_segmentor.data.dataset import SegmentationDataset
 # Basic loading
 # ---------------------------------------------------------------------------
 
+
 def test_fixture_dataset_length(fixture_dataset):
     assert len(fixture_dataset) == 8
 
@@ -50,12 +51,15 @@ def test_fixture_dataset_mask_binary(fixture_dataset):
     for i in range(len(fixture_dataset)):
         _, mask = fixture_dataset[i]
         unique = mask.unique().tolist()
-        assert set(unique).issubset({0, 1}), f"sample {i} has unexpected mask values: {unique}"
+        assert set(unique).issubset({0, 1}), (
+            f"sample {i} has unexpected mask values: {unique}"
+        )
 
 
 # ---------------------------------------------------------------------------
 # All samples loadable
 # ---------------------------------------------------------------------------
+
 
 def test_fixture_dataset_all_samples_load(fixture_dataset):
     for i in range(len(fixture_dataset)):
@@ -67,6 +71,7 @@ def test_fixture_dataset_all_samples_load(fixture_dataset):
 # ---------------------------------------------------------------------------
 # DataLoader integration
 # ---------------------------------------------------------------------------
+
 
 def test_fixture_dataset_dataloader_batch(fixture_dataset):
     loader = DataLoader(fixture_dataset, batch_size=4, shuffle=False)
@@ -91,6 +96,7 @@ def test_fixture_dataset_dataloader_shuffle_same_count(fixture_dataset):
 # Custom image_size
 # ---------------------------------------------------------------------------
 
+
 def test_fixture_dataset_custom_size(fixture_dataset_root):
     ds = SegmentationDataset(str(fixture_dataset_root), image_size=128)
     img, mask = ds[0]
@@ -101,6 +107,7 @@ def test_fixture_dataset_custom_size(fixture_dataset_root):
 # ---------------------------------------------------------------------------
 # Error handling
 # ---------------------------------------------------------------------------
+
 
 def test_dataset_missing_root_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
@@ -121,6 +128,7 @@ def test_dataset_missing_images_dir_raises(tmp_path):
 
 def test_dataset_unmatched_image_raises(tmp_path):
     import cv2
+
     (tmp_path / "images").mkdir()
     (tmp_path / "masks").mkdir()
     img = np.zeros((32, 32, 3), dtype=np.uint8)

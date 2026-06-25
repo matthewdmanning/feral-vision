@@ -32,6 +32,7 @@ def _aug_cfg(ops):
 # Identity
 # ---------------------------------------------------------------------------
 
+
 def test_identity_preserves_fixture_image(fixture_dataset_root):
     img = _load_normalized(fixture_dataset_root)
     out = Identity().augment(img)
@@ -41,6 +42,7 @@ def test_identity_preserves_fixture_image(fixture_dataset_root):
 # ---------------------------------------------------------------------------
 # HorizontalFlip
 # ---------------------------------------------------------------------------
+
 
 def test_horizontal_flip_shape_preserved(fixture_dataset_root):
     img = _load_normalized(fixture_dataset_root)
@@ -65,6 +67,7 @@ def test_horizontal_flip_pixel_position(fixture_dataset_root):
 # RandomRotate90
 # ---------------------------------------------------------------------------
 
+
 def test_rotate90_shape_preserved_square(fixture_dataset_root):
     img = _load_normalized(fixture_dataset_root)
     # Crop to square so shape is guaranteed preserved after 90° rotation.
@@ -88,6 +91,7 @@ def test_rotate90_four_times_is_identity(fixture_dataset_root):
 # BrightnessShift
 # ---------------------------------------------------------------------------
 
+
 def test_brightness_shift_raises_mean(fixture_dataset_root):
     img = _load_normalized(fixture_dataset_root)
     out = BrightnessShift(shift=0.1).augment(img)
@@ -110,6 +114,7 @@ def test_negative_brightness_shift_lowers_mean(fixture_dataset_root):
 # ---------------------------------------------------------------------------
 # GammaAdjust
 # ---------------------------------------------------------------------------
+
 
 def test_gamma_gt1_darkens_midtones(fixture_dataset_root):
     img = _load_normalized(fixture_dataset_root)
@@ -142,6 +147,7 @@ def test_gamma_boundary_pixels_unchanged(fixture_dataset_root):
 # Chained augmentations on fixture images
 # ---------------------------------------------------------------------------
 
+
 def test_chain_flip_then_brightness_on_fixture(fixture_dataset_root):
     img = _load_normalized(fixture_dataset_root)
     chain = build_chain(_aug_cfg(["HorizontalFlip", "BrightnessShift"]))
@@ -155,7 +161,9 @@ def test_chain_all_ops_on_fixture(fixture_dataset_root):
     img = _load_normalized(fixture_dataset_root)
     side = min(img.shape[:2])
     sq = np.ascontiguousarray(img[:side, :side])
-    chain = build_chain(_aug_cfg(["HorizontalFlip", "RandomRotate90", "BrightnessShift", "GammaAdjust"]))
+    chain = build_chain(
+        _aug_cfg(["HorizontalFlip", "RandomRotate90", "BrightnessShift", "GammaAdjust"])
+    )
     out = chain.augment(sq)
     assert out.shape == sq.shape
     assert float(out.min()) >= 0.0
@@ -169,15 +177,18 @@ def test_run_augment_stage_writes_files(fixture_dataset_root, tmp_path):
 
     # Mirror fixture images into a tmp raw dir.
     import shutil
+
     raw_dir = tmp_path / "raw"
     raw_dir.mkdir()
     for img_path in sorted((fixture_dataset_root / "images").iterdir()):
         shutil.copy(img_path, raw_dir / img_path.name)
 
-    cfg = OmegaConf.create({
-        "augmentation": {"name": "test", "ops": ["HorizontalFlip"]},
-        "data": {"root": str(tmp_path)},
-    })
+    cfg = OmegaConf.create(
+        {
+            "augmentation": {"name": "test", "ops": ["HorizontalFlip"]},
+            "data": {"root": str(tmp_path)},
+        }
+    )
     run_augment_stage(cfg)
 
     out_dir = tmp_path / "augmented"
