@@ -14,6 +14,10 @@ class TeacherModel(nn.Module):
         self.yolo = YOLO(model_id)
 
     @classmethod
+    def from_config(cls, cfg) -> "TeacherModel":
+        return cls(model_id=str(cfg.get("model_id", "yolo11x-seg.pt")))
+
+    @classmethod
     def from_path(cls, path: str | Path) -> "TeacherModel":
         obj = cls.__new__(cls)
         super(TeacherModel, obj).__init__()
