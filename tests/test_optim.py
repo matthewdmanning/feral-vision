@@ -39,7 +39,7 @@ def test_build_optimizer_sgd_has_momentum(module):
 
 def test_build_optimizer_unknown_raises(module):
     cfg = OmegaConf.structured(TrainConfig(optimizer="rmsprop"))
-    with pytest.raises(ValueError, match="Unknown optimizer"):
+    with pytest.raises(ValueError, match="unknown optimizer"):
         build_optimizer(module.parameters(), cfg)
 
 
@@ -69,5 +69,5 @@ def test_build_scheduler_cosine(module):
 def test_build_scheduler_unknown_raises(module):
     cfg = OmegaConf.structured(TrainConfig(scheduler="exponential"))
     opt = build_optimizer(module.parameters(), cfg)
-    with pytest.raises(ValueError, match="Unknown scheduler"):
+    with pytest.raises(ValueError, match="unknown scheduler"):
         build_scheduler(opt, cfg)

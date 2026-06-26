@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import torch
@@ -25,10 +24,3 @@ class SegmentationOutput:
     boxes: torch.Tensor
     scores: torch.Tensor
     labels: torch.Tensor
-
-
-class SegmentationModel(ABC):
-    @abstractmethod
-    def predict(self, image: torch.Tensor) -> SegmentationOutput:
-        """Run inference on a single preprocessed image tensor (C, H, W)."""
-        ...

@@ -38,10 +38,9 @@ def test_unknown_key_rejected_by_struct_schema():
         _compose(["train.nope=1"])
 
 
-def test_default_model_is_config_source():
+def test_default_model_is_net_arch():
     cfg = _compose()
-    assert cfg.model.source == "config"
-    assert cfg.model.num_classes >= 1
+    assert cfg.model.arch == "net"
 
 
 def test_hub_model_variant_has_fetch_fields():

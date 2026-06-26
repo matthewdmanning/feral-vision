@@ -1,94 +1,49 @@
-"""Model-weight acquisition sources (discriminated by ``cfg.source``).
+"""Weight-source adapter registry.
 
-Each :class:`ModelSource` knows how to materialise a model's weights on disk and
-return the produced paths. ``build_model_source`` dispatches on the model
-config's ``source`` field.
+Each source is an Adapter that normalises a different external system
+(HuggingFace Hub, PyTorch Hub, etc.) to the common WeightSource Protocol.
+``load_model`` dispatches by cfg.source.
 """
 
 from __future__ import annotations
 
-import importlib
-from abc import ABC, abstractmethod
-from pathlib import Path
+from typing import Any, Callable, Protocol, TypeVar
 
-import torch
 from omegaconf import DictConfig
-
-from feral_segmentor.models.hub_fetch import pull_model
-from feral_segmentor.models.registry import build_model
-from feral_segmentor.utils import get_logger
-
-log = get_logger(__name__)
+from torch import nn
 
 
-class ModelSource(ABC):
-    """Strategy for acquiring a model's weights from a model config."""
+class WeightSource(Protocol):
+    """Protocol for weight-source adapters."""
 
-    @abstractmethod
-    def acquire(self, cfg: DictConfig) -> list[Path]:
-        """Materialise weights described by ``cfg`` and return their paths."""
+    def load(self, cfg: DictConfig) -> nn.Module:
+        """Load and return a fully initialised model from the config."""
         ...
 
 
-class HubModelSource(ModelSource):
-    """Download weights from the Hugging Face Hub."""
+# Values are Any so the TypeVar-based decorator can assign without a cast.
+_SOURCES: dict[str, Any] = {}
 
-    def acquire(self, cfg: DictConfig) -> list[Path]:
-        return pull_model(cfg)
-
-
-class ScriptModelSource(ModelSource):
-    """Run an imported ``module:function`` entrypoint that produces weights."""
-
-    def acquire(self, cfg: DictConfig) -> list[Path]:
-        entrypoint = str(cfg.entrypoint)
-        if ":" not in entrypoint:
-            raise ValueError(
-                f"entrypoint must be 'module:function', got {entrypoint!r}"
-            )
-        module_name, _, func_name = entrypoint.partition(":")
-        if not module_name or not func_name:
-            raise ValueError(
-                f"entrypoint must be 'module:function', got {entrypoint!r}"
-            )
-        module = importlib.import_module(module_name)
-        try:
-            func = getattr(module, func_name)
-        except AttributeError as exc:
-            raise AttributeError(
-                f"module {module_name!r} has no attribute {func_name!r}"
-            ) from exc
-        log.info("Running script entrypoint %s", entrypoint)
-        return func(cfg)
+_S = TypeVar("_S")
 
 
-class ConfigModelSource(ModelSource):
-    """Build a model from config and save its initialised state_dict."""
+def register_source(name: str) -> Callable[[_S], _S]:
+    """Decorator to register a weight-source adapter class under ``name``."""
 
-    def acquire(self, cfg: DictConfig) -> list[Path]:
-        model = build_model(cfg)
-        weights_dir = Path(cfg.weights_dir)
-        weights_dir.mkdir(parents=True, exist_ok=True)
-        path = weights_dir / f"{cfg.name}.pt"
-        torch.save(model.state_dict(), path)
-        log.info("Saved config-built model to %s", path)
-        return [path]
+    def decorator(cls: _S) -> _S:
+        _SOURCES[name] = cls
+        return cls
+
+    return decorator
 
 
-_SOURCES: dict[str, type[ModelSource]] = {
-    "hub": HubModelSource,
-    "script": ScriptModelSource,
-    "config": ConfigModelSource,
-}
-
-
-def build_model_source(cfg: DictConfig) -> ModelSource:
-    """Return the :class:`ModelSource` for ``cfg.source``."""
-    source = str(cfg.source)
+def load_model(cfg: DictConfig) -> nn.Module:
+    """Load a model via the source named by cfg.source."""
+    name = str(cfg.source)
     try:
-        source_cls = _SOURCES[source]
-    except KeyError as exc:
+        cls = _SOURCES[name]
+    except KeyError:
         raise KeyError(
-            f"unknown model source {source!r}; registered: {sorted(_SOURCES)}"
-        ) from exc
-    return source_cls()
+            f"unknown source {name!r}; registered: {sorted(_SOURCES)}"
+        ) from None
+    return cls().load(cfg)

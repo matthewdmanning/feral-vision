@@ -1,120 +1,122 @@
-"""Optimizer and LR-scheduler builders (registry/adapter pattern).
+"""Optimizer and LR-scheduler builders.
 
-Each public builder dispatches on a name read from the :class:`TrainConfig`
-node against a module-level registry mapping ``name -> builder fn``. Adding a
-new optimizer or scheduler is a single registry entry; logic stays branch-free.
-Hyperparameters are read from the config (which itself defaults to constants), so
-no magic numbers appear here.
+Registries map config names directly to PyTorch classes. Per-variant config
+dataclasses declare the hyperparameters each class expects; ``build_optimizer``
+and ``build_scheduler`` pull matching fields from the Hydra TrainConfig.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+import dataclasses
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Any
 
 import torch
 from torch import nn
 
-# A ``TrainConfig`` is accessed both as a dataclass and as a struct-mode
-# ``DictConfig`` after OmegaConf composition; attribute access works for both.
-
-OptimizerBuilder = Callable[[Iterable[nn.Parameter], object], torch.optim.Optimizer]
-SchedulerBuilder = Callable[
-    [torch.optim.Optimizer, object],
-    "torch.optim.lr_scheduler.LRScheduler | None",
-]
+from feral_segmentor import constants as C
 
 
-def _build_adam(params: Iterable[nn.Parameter], cfg: object) -> torch.optim.Optimizer:
-    return torch.optim.Adam(params, lr=cfg.lr, weight_decay=cfg.weight_decay)
+# --- Per-variant config dataclasses -----------------------------------------
 
 
-def _build_sgd(params: Iterable[nn.Parameter], cfg: object) -> torch.optim.Optimizer:
-    return torch.optim.SGD(
-        params,
-        lr=cfg.lr,
-        weight_decay=cfg.weight_decay,
-        momentum=cfg.momentum,
-    )
+@dataclass
+class AdamConfig:
+    lr: float = C.DEFAULT_LR
+    weight_decay: float = C.DEFAULT_WEIGHT_DECAY
 
 
-_OPTIMIZERS: dict[str, OptimizerBuilder] = {
-    "adam": _build_adam,
-    "sgd": _build_sgd,
+@dataclass
+class SGDConfig:
+    lr: float = C.DEFAULT_LR
+    weight_decay: float = C.DEFAULT_WEIGHT_DECAY
+    momentum: float = C.DEFAULT_MOMENTUM
+
+
+@dataclass
+class StepLRConfig:
+    step_size: int = C.DEFAULT_SCHEDULER_STEP_SIZE
+    gamma: float = C.DEFAULT_SCHEDULER_GAMMA
+
+
+@dataclass
+class CosineAnnealingLRConfig:
+    T_max: int = C.DEFAULT_EPOCHS
+
+
+# --- Registries: name → PyTorch class ---------------------------------------
+
+_OPTIMIZERS: dict[str, type[torch.optim.Optimizer]] = {
+    "adam": torch.optim.Adam,
+    "sgd": torch.optim.SGD,
+}
+
+_OPTIMIZER_CONFIGS: dict[str, type] = {
+    "adam": AdamConfig,
+    "sgd": SGDConfig,
+}
+
+_SCHEDULERS: dict[str, type[torch.optim.lr_scheduler.LRScheduler]] = {
+    "step": torch.optim.lr_scheduler.StepLR,
+    "cosine": torch.optim.lr_scheduler.CosineAnnealingLR,
+}
+
+_SCHEDULER_CONFIGS: dict[str, type] = {
+    "step": StepLRConfig,
+    "cosine": CosineAnnealingLRConfig,
+}
+
+# cfg field name → constructor kwarg name for cases that differ
+_SCHEDULER_FIELD_MAP: dict[str, dict[str, str]] = {
+    "cosine": {"T_max": "epochs"},  # CosineAnnealingLR.T_max ← cfg.epochs
 }
 
 
-def build_optimizer(
-    params: Iterable[nn.Parameter], cfg: object
-) -> torch.optim.Optimizer:
-    """Construct the optimizer named by ``cfg.optimizer``.
+# --- Public builders --------------------------------------------------------
 
-    Args:
-        params: Parameters to optimize (e.g. ``model.parameters()``).
-        cfg: A ``TrainConfig`` (dataclass or struct-mode ``DictConfig``)
-            providing ``optimizer``, ``lr``, ``weight_decay`` and ``momentum``.
 
-    Raises:
-        ValueError: If ``cfg.optimizer`` is not a registered name.
-    """
-    name = cfg.optimizer
+def build_optimizer(params: Iterable[nn.Parameter], cfg: Any) -> torch.optim.Optimizer:
+    """Construct the optimizer named by ``cfg.optimizer``."""
+    name = str(cfg.optimizer)
     try:
-        builder = _OPTIMIZERS[name]
+        cls = _OPTIMIZERS[name]
+        cfg_cls = _OPTIMIZER_CONFIGS[name]
     except KeyError:
         raise ValueError(
-            f"Unknown optimizer {name!r}; expected one of {sorted(_OPTIMIZERS)}."
+            f"unknown optimizer {name!r}; choose from {sorted(_OPTIMIZERS)}"
         ) from None
-    return builder(params, cfg)
-
-
-def _build_no_scheduler(optimizer: torch.optim.Optimizer, cfg: object) -> None:
-    return None
-
-
-def _build_step_scheduler(
-    optimizer: torch.optim.Optimizer, cfg: object
-) -> torch.optim.lr_scheduler.LRScheduler:
-    return torch.optim.lr_scheduler.StepLR(
-        optimizer,
-        step_size=cfg.scheduler_step_size,
-        gamma=cfg.scheduler_gamma,
-    )
-
-
-def _build_cosine_scheduler(
-    optimizer: torch.optim.Optimizer, cfg: object
-) -> torch.optim.lr_scheduler.LRScheduler:
-    return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.epochs)
-
-
-_SCHEDULERS: dict[str, SchedulerBuilder] = {
-    "none": _build_no_scheduler,
-    "step": _build_step_scheduler,
-    "cosine": _build_cosine_scheduler,
-}
+    kwargs: dict[str, Any] = {
+        f.name: v
+        for f in dataclasses.fields(cfg_cls)
+        if (v := getattr(cfg, f.name, f.default)) is not dataclasses.MISSING
+    }
+    return cls(params, **kwargs)
 
 
 def build_scheduler(
-    optimizer: torch.optim.Optimizer, cfg: object
+    optimizer: torch.optim.Optimizer, cfg: Any
 ) -> torch.optim.lr_scheduler.LRScheduler | None:
     """Construct the LR scheduler named by ``cfg.scheduler``.
 
-    Returns ``None`` for the ``"none"`` policy so callers can simply skip
-    ``scheduler.step()`` when the result is falsy.
-
-    Args:
-        optimizer: The optimizer whose learning rate is scheduled.
-        cfg: A ``TrainConfig`` providing ``scheduler`` plus the relevant
-            schedule hyperparameters (``scheduler_step_size``,
-            ``scheduler_gamma``, ``epochs``).
-
-    Raises:
-        ValueError: If ``cfg.scheduler`` is not a registered name.
+    Returns ``None`` for ``"none"`` so callers can skip ``scheduler.step()``
+    when the result is falsy.
     """
-    name = cfg.scheduler
+    name = str(cfg.scheduler)
+    if name == "none":
+        return None
     try:
-        builder = _SCHEDULERS[name]
+        cls = _SCHEDULERS[name]
+        cfg_cls = _SCHEDULER_CONFIGS[name]
     except KeyError:
         raise ValueError(
-            f"Unknown scheduler {name!r}; expected one of {sorted(_SCHEDULERS)}."
+            f"unknown scheduler {name!r}; choose from {sorted(_SCHEDULERS)}"
         ) from None
-    return builder(optimizer, cfg)
+    field_map = _SCHEDULER_FIELD_MAP.get(name, {})
+    kwargs: dict[str, Any] = {
+        f.name: v
+        for f in dataclasses.fields(cfg_cls)
+        if (v := getattr(cfg, field_map.get(f.name, f.name), f.default))
+        is not dataclasses.MISSING
+    }
+    return cls(optimizer, **kwargs)

@@ -55,23 +55,6 @@ class HubModelConfig(ModelConfig):
     weights_dir: str = MISSING
 
 
-@dataclass
-class ScriptModelConfig(ModelConfig):
-    """Weights produced by an imported Python entrypoint (``module:function``)."""
-
-    source: str = "script"
-    entrypoint: str = MISSING
-    weights_dir: str = MISSING
-
-
-@dataclass
-class ConfigModelConfig(ModelConfig):
-    """Model built entirely from config (architecture fields) and saved."""
-
-    source: str = "config"
-    weights_dir: str = MISSING
-
-
 # --- Training ---------------------------------------------------------------
 @dataclass
 class TrainConfig:

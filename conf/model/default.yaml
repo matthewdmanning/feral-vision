@@ -1,7 +1,2 @@
-defaults:
-  - base_config_source
-  - _self_
-
-name: student_default
-source: config
-weights_dir: models/checkpoints/student_default
+name: net
+arch: net

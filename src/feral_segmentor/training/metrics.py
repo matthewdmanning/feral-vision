@@ -1,4 +1,4 @@
-"""Semantic-segmentation metrics (IoU / Dice) and the DVC ``evaluate`` entrypoint.
+"""Semantic-segmentation metrics: mean IoU and Dice score.
 
 Both metrics accept either predicted class indices ``(B, H, W)`` or raw logits
 ``(B, C, H, W)`` (reduced via ``argmax`` over the channel dim). Targets are long
@@ -8,26 +8,10 @@ appear in either prediction or target, so empty classes never dilute the mean.
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
-import hydra
 import torch
-from omegaconf import DictConfig
-
-from feral_segmentor import constants as C
-from feral_segmentor.config.store import register_configs
-from feral_segmentor.io_utils import write_json
-from feral_segmentor.utils import get_logger
-
-logger = get_logger(__name__)
 
 # Logits carry a class dimension, so a 4-D input is (B, C, H, W).
 _LOGITS_NDIM = 4
-# Metric value written when evaluation inputs are unavailable.
-_DEFAULT_METRIC_VALUE: float = 0.0
-# Output filename for the DVC ``evaluate`` stage (see dvc.yaml).
-_METRICS_FILENAME = "metrics.json"
 
 
 def _to_class_indices(pred: torch.Tensor) -> torch.Tensor:
@@ -108,55 +92,3 @@ def dice_score(
         num_classes: Number of classes; inferred from the data when ``None``.
     """
     return _per_class_scores(pred, target, num_classes, dice=True)
-
-
-@hydra.main(version_base=None, config_path="../../conf", config_name="config")
-def main(cfg: DictConfig) -> None:
-    register_configs()
-
-    # Hydra changes the working directory; resolve paths relative to the
-    # original cwd so the DVC dep/output paths match.
-    try:
-        orig_cwd = Path(hydra.utils.get_original_cwd())
-    except ValueError:
-        orig_cwd = Path(os.getcwd())
-
-    ckpt_path = orig_cwd / "models" / "registry" / "best.pt"
-    metrics_path = orig_cwd / _METRICS_FILENAME
-
-    metrics = {"mean_iou": _DEFAULT_METRIC_VALUE, "dice_score": _DEFAULT_METRIC_VALUE}
-
-    if not ckpt_path.exists():
-        logger.warning("checkpoint %s not found; writing default metrics", ckpt_path)
-        write_json(metrics, metrics_path)
-        return
-
-    try:
-        payload = torch.load(ckpt_path, map_location=C.DEFAULT_DEVICE)
-    except Exception as exc:  # noqa: BLE001 - robustness for the DVC stage
-        logger.warning(
-            "failed to load %s (%s); writing default metrics", ckpt_path, exc
-        )
-        write_json(metrics, metrics_path)
-        return
-
-    preds = payload.get("preds") if isinstance(payload, dict) else None
-    targets = payload.get("targets") if isinstance(payload, dict) else None
-
-    if preds is None or targets is None:
-        logger.warning(
-            "checkpoint lacks 'preds'/'targets'; cannot evaluate, writing defaults"
-        )
-        write_json(metrics, metrics_path)
-        return
-
-    preds = torch.as_tensor(preds)
-    targets = torch.as_tensor(targets)
-    metrics["mean_iou"] = mean_iou(preds, targets)
-    metrics["dice_score"] = dice_score(preds, targets)
-    logger.info("metrics: %s", metrics)
-    write_json(metrics, metrics_path)
-
-
-if __name__ == "__main__":
-    main()
