@@ -1,70 +1,47 @@
+import numpy as np
 import pytest
+import albumentations as A
+from omegaconf import OmegaConf
 
-from feral_segmentor.data.augmentations import Augmentation, FunctionAugmentation
-
-
-class AppendTag(Augmentation):
-    def __init__(self, tag: str, inner: Augmentation | None = None):
-        super().__init__(inner)
-        self.tag = tag
-
-    def _apply(self, sample: list) -> list:
-        return sample + [self.tag]
-
-    def _own_params(self) -> dict:
-        return {"tag": self.tag}
+from feral_segmentor.data.augmentations import compose_augmentations
 
 
-class Double(Augmentation):
-    def _apply(self, sample: list) -> list:
-        return sample + sample
+def _aug_cfg(ops):
+    return OmegaConf.create({"name": "test", "ops": ops})
 
 
-def test_bare_augmentation_calls_apply_directly():
-    aug = AppendTag("a")
-    assert aug.augment([]) == ["a"]
+def _uint8_image():
+    rng = np.random.default_rng(0)
+    return rng.integers(0, 256, (64, 64, 3), dtype=np.uint8)
 
 
-def test_constructor_chaining_runs_inner_first():
-    chain = AppendTag("outer", inner=AppendTag("inner"))
-    assert chain.augment([]) == ["inner", "outer"]
+def test_empty_ops_returns_compose():
+    pipeline = compose_augmentations(_aug_cfg([]))
+    assert isinstance(pipeline, A.Compose)
 
 
-def test_nested_chaining_three_deep():
-    chain = AppendTag("c", inner=AppendTag("b", inner=AppendTag("a")))
-    assert chain.augment([]) == ["a", "b", "c"]
+def test_empty_ops_passes_image_unchanged():
+    pipeline = compose_augmentations(_aug_cfg([]))
+    image = _uint8_image()
+    result = pipeline(image=image)["image"]
+    np.testing.assert_array_equal(result, image)
 
 
-def test_to_params_recurses_through_chain():
-    chain = AppendTag("outer", inner=Double())
-    assert chain.to_params() == {"0.AppendTag.tag": "outer"}
+def test_known_short_name_preserves_shape():
+    ops = [{"name": "HorizontalFlip", "p": 1.0}]
+    pipeline = compose_augmentations(_aug_cfg(ops))
+    image = _uint8_image()
+    result = pipeline(image=image)["image"]
+    assert result.shape == image.shape
 
 
-def test_to_params_indexes_same_class_repeated_in_chain():
-    chain = AppendTag("outer", inner=AppendTag("inner"))
-    assert chain.to_params() == {"0.AppendTag.tag": "outer", "1.AppendTag.tag": "inner"}
+def test_unknown_name_raises_value_error():
+    ops = [{"name": "CompletelyFakeTransform"}]
+    with pytest.raises(ValueError, match="unknown augmentation"):
+        compose_augmentations(_aug_cfg(ops))
 
 
-def test_variant_label_joins_chain_in_order():
-    chain = AppendTag("outer", inner=Double())
-    assert chain.variant_label() == "Double_AppendTag"
-
-
-def test_function_augmentation_apply_raises():
-    aug = FunctionAugmentation(fn=lambda x: x)
-    with pytest.raises(NotImplementedError):
-        aug.augment("sample")
-
-
-def test_function_augmentation_params_expose_fn_name():
-    aug = FunctionAugmentation(fn=lambda x: x)
-    assert aug.to_params() == {"0.FunctionAugmentation.fn": "function"}
-
-
-def test_function_augmentation_spreads_kwargs_into_params():
-    aug = FunctionAugmentation(fn=lambda x: x, angle=30, p=0.5)
-    assert aug.to_params() == {
-        "0.FunctionAugmentation.fn": "function",
-        "0.FunctionAugmentation.angle": 30,
-        "0.FunctionAugmentation.p": 0.5,
-    }
+def test_near_typo_name_suggests_did_you_mean():
+    ops = [{"name": "HorizontalFlipp"}]
+    with pytest.raises(ValueError, match="did you mean"):
+        compose_augmentations(_aug_cfg(ops))
