@@ -38,7 +38,9 @@ def clean_mask(mask: torch.Tensor) -> torch.Tensor:
     return torch.from_numpy(closed.astype(bool))
 
 
-def masks_to_boxes(mask: torch.Tensor, min_box_area: int = DEFAULT_MIN_BOX_AREA) -> torch.Tensor:
+def masks_to_boxes(
+    mask: torch.Tensor, min_box_area: int = DEFAULT_MIN_BOX_AREA
+) -> torch.Tensor:
     """Derive xyxy boxes from a binary foreground mask via connected components.
 
     Each connected blob in the (H, W) boolean mask becomes one box. Boxes with
@@ -48,7 +50,9 @@ def masks_to_boxes(mask: torch.Tensor, min_box_area: int = DEFAULT_MIN_BOX_AREA)
     bool_mask = _to_bool_hw(mask)
     np_mask = bool_mask.numpy().astype(np.uint8)
 
-    num_labels, _labels, stats, _centroids = cv2.connectedComponentsWithStats(np_mask, connectivity=8)
+    num_labels, _labels, stats, _centroids = cv2.connectedComponentsWithStats(
+        np_mask, connectivity=8
+    )
 
     boxes: list[list[float]] = []
     # Label 0 is the background component; skip it.

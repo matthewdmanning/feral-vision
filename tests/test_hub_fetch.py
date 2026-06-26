@@ -12,7 +12,9 @@ def test_pull_model_downloads_each_file(tmp_path, monkeypatch):
         calls.append((repo_id, filename, local_dir))
         return str(Path(local_dir) / filename)
 
-    monkeypatch.setattr("feral_segmentor.models.hub_fetch.hf_hub_download", fake_download)
+    monkeypatch.setattr(
+        "feral_segmentor.models.hub_fetch.hf_hub_download", fake_download
+    )
 
     cfg = OmegaConf.create(
         {

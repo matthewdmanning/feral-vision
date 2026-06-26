@@ -16,7 +16,9 @@ def pull_model(cfg: DictConfig) -> list[Path]:
     paths = []
     for filename in cfg.files:
         log.info("Fetching %s from %s", filename, cfg.repo_id)
-        downloaded = hf_hub_download(repo_id=cfg.repo_id, filename=filename, local_dir=weights_dir)
+        downloaded = hf_hub_download(
+            repo_id=cfg.repo_id, filename=filename, local_dir=weights_dir
+        )
         paths.append(Path(downloaded))
     return paths
 

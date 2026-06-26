@@ -24,17 +24,11 @@ SchedulerBuilder = Callable[
 ]
 
 
-def _build_adam(
-    params: Iterable[nn.Parameter], cfg: object
-) -> torch.optim.Optimizer:
-    return torch.optim.Adam(
-        params, lr=cfg.lr, weight_decay=cfg.weight_decay
-    )
+def _build_adam(params: Iterable[nn.Parameter], cfg: object) -> torch.optim.Optimizer:
+    return torch.optim.Adam(params, lr=cfg.lr, weight_decay=cfg.weight_decay)
 
 
-def _build_sgd(
-    params: Iterable[nn.Parameter], cfg: object
-) -> torch.optim.Optimizer:
+def _build_sgd(params: Iterable[nn.Parameter], cfg: object) -> torch.optim.Optimizer:
     return torch.optim.SGD(
         params,
         lr=cfg.lr,
@@ -67,15 +61,12 @@ def build_optimizer(
         builder = _OPTIMIZERS[name]
     except KeyError:
         raise ValueError(
-            f"Unknown optimizer {name!r}; expected one of "
-            f"{sorted(_OPTIMIZERS)}."
+            f"Unknown optimizer {name!r}; expected one of {sorted(_OPTIMIZERS)}."
         ) from None
     return builder(params, cfg)
 
 
-def _build_no_scheduler(
-    optimizer: torch.optim.Optimizer, cfg: object
-) -> None:
+def _build_no_scheduler(optimizer: torch.optim.Optimizer, cfg: object) -> None:
     return None
 
 
@@ -92,9 +83,7 @@ def _build_step_scheduler(
 def _build_cosine_scheduler(
     optimizer: torch.optim.Optimizer, cfg: object
 ) -> torch.optim.lr_scheduler.LRScheduler:
-    return torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=cfg.epochs
-    )
+    return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.epochs)
 
 
 _SCHEDULERS: dict[str, SchedulerBuilder] = {
@@ -126,7 +115,6 @@ def build_scheduler(
         builder = _SCHEDULERS[name]
     except KeyError:
         raise ValueError(
-            f"Unknown scheduler {name!r}; expected one of "
-            f"{sorted(_SCHEDULERS)}."
+            f"Unknown scheduler {name!r}; expected one of {sorted(_SCHEDULERS)}."
         ) from None
     return builder(optimizer, cfg)

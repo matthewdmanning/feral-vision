@@ -99,12 +99,8 @@ def segmentation_loss(
 
     if cfg.distill_weight > 0:
         if teacher_logits is None:
-            raise ValueError(
-                "teacher_logits is required when cfg.distill_weight > 0"
-            )
-        distill = _distillation_loss(
-            logits, teacher_logits, cfg.distill_temperature
-        )
+            raise ValueError("teacher_logits is required when cfg.distill_weight > 0")
+        distill = _distillation_loss(logits, teacher_logits, cfg.distill_temperature)
         loss = loss + cfg.distill_weight * distill
 
     return loss

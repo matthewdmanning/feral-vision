@@ -26,9 +26,15 @@ def _arch_fields():
 
 
 def test_build_model_source_dispatch():
-    assert isinstance(build_model_source(OmegaConf.create({"source": "hub"})), HubModelSource)
-    assert isinstance(build_model_source(OmegaConf.create({"source": "script"})), ScriptModelSource)
-    assert isinstance(build_model_source(OmegaConf.create({"source": "config"})), ConfigModelSource)
+    assert isinstance(
+        build_model_source(OmegaConf.create({"source": "hub"})), HubModelSource
+    )
+    assert isinstance(
+        build_model_source(OmegaConf.create({"source": "script"})), ScriptModelSource
+    )
+    assert isinstance(
+        build_model_source(OmegaConf.create({"source": "config"})), ConfigModelSource
+    )
 
 
 def test_build_model_source_unknown_raises():
@@ -43,7 +49,9 @@ def test_hub_source_calls_pull_model(tmp_path, monkeypatch):
         calls.append((repo_id, filename, local_dir))
         return str(Path(local_dir) / filename)
 
-    monkeypatch.setattr("feral_segmentor.models.hub_fetch.hf_hub_download", fake_download)
+    monkeypatch.setattr(
+        "feral_segmentor.models.hub_fetch.hf_hub_download", fake_download
+    )
 
     cfg = OmegaConf.create(
         {
@@ -82,7 +90,10 @@ def test_script_source_bad_entrypoint_format_raises(tmp_path):
 
 def test_script_source_missing_attr_raises(tmp_path):
     cfg = OmegaConf.create(
-        {"source": "script", "entrypoint": "feral_segmentor.models.example_export:does_not_exist"}
+        {
+            "source": "script",
+            "entrypoint": "feral_segmentor.models.example_export:does_not_exist",
+        }
     )
     with pytest.raises(AttributeError):
         build_model_source(cfg).acquire(cfg)
