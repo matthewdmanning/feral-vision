@@ -1,12 +1,9 @@
-from pathlib import Path
-
-import cv2
+import numpy as np
 import pytest
-
-OXFORD_PET_DIR = Path(r"C:\GitHub\data\oxford_seg\oxford-iiit-pet")
 
 
 @pytest.fixture
 def tiny_image():
-    path = OXFORD_PET_DIR / "images" / "Abyssinian_1.jpg"
-    return cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    """Synthetic 64x64 BGR image; no real files required."""
+    rng = np.random.default_rng(0)
+    return rng.integers(0, 256, (64, 64, 3), dtype=np.uint8)
