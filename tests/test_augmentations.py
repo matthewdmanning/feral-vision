@@ -37,7 +37,7 @@ def test_known_short_name_preserves_shape():
 
 def test_unknown_name_raises_value_error():
     ops = [{"name": "CompletelyFakeTransform"}]
-    with pytest.raises(ValueError, match="unknown augmentation"):
+    with pytest.raises(ValueError, match="unknown transform"):
         compose_augmentations(_aug_cfg(ops))
 
 

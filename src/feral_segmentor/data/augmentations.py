@@ -1,7 +1,6 @@
 import difflib
-import importlib
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import albumentations as A
 import hydra
@@ -12,6 +11,133 @@ from feral_segmentor.config.store import register_configs
 from feral_segmentor.utils import get_logger, to_dtype
 
 log = get_logger(__name__)
+
+# Static registry of every instantiable Albumentations transform.
+# Enumerated from the archived release; update only if the library is replaced.
+_TRANSFORMS: dict[str, type[A.BasicTransform]] = {
+    "AdditiveNoise": A.AdditiveNoise,
+    "AdvancedBlur": A.AdvancedBlur,
+    "Affine": A.Affine,
+    "AtLeastOneBBoxRandomCrop": A.AtLeastOneBBoxRandomCrop,
+    "AutoContrast": A.AutoContrast,
+    "BBoxSafeRandomCrop": A.BBoxSafeRandomCrop,
+    "Blur": A.Blur,
+    "CLAHE": A.CLAHE,
+    "CenterCrop": A.CenterCrop,
+    "CenterCrop3D": A.CenterCrop3D,
+    "ChannelDropout": A.ChannelDropout,
+    "ChannelShuffle": A.ChannelShuffle,
+    "ChromaticAberration": A.ChromaticAberration,
+    "CoarseDropout": A.CoarseDropout,
+    "CoarseDropout3D": A.CoarseDropout3D,
+    "ColorJitter": A.ColorJitter,
+    "ConstrainedCoarseDropout": A.ConstrainedCoarseDropout,
+    "Crop": A.Crop,
+    "CropAndPad": A.CropAndPad,
+    "CropNonEmptyMaskIfExists": A.CropNonEmptyMaskIfExists,
+    "CubicSymmetry": A.CubicSymmetry,
+    "D4": A.D4,
+    "Defocus": A.Defocus,
+    "Downscale": A.Downscale,
+    "ElasticTransform": A.ElasticTransform,
+    "Emboss": A.Emboss,
+    "Equalize": A.Equalize,
+    "Erasing": A.Erasing,
+    "FDA": A.FDA,
+    "FancyPCA": A.FancyPCA,
+    "FrequencyMasking": A.FrequencyMasking,
+    "FromFloat": A.FromFloat,
+    "GaussNoise": A.GaussNoise,
+    "GaussianBlur": A.GaussianBlur,
+    "GlassBlur": A.GlassBlur,
+    "GridDistortion": A.GridDistortion,
+    "GridDropout": A.GridDropout,
+    "GridElasticDeform": A.GridElasticDeform,
+    "HEStain": A.HEStain,
+    "HistogramMatching": A.HistogramMatching,
+    "HorizontalFlip": A.HorizontalFlip,
+    "HueSaturationValue": A.HueSaturationValue,
+    "ISONoise": A.ISONoise,
+    "Illumination": A.Illumination,
+    "ImageCompression": A.ImageCompression,
+    "InvertImg": A.InvertImg,
+    "Lambda": A.Lambda,
+    "LongestMaxSize": A.LongestMaxSize,
+    "MaskDropout": A.MaskDropout,
+    "MedianBlur": A.MedianBlur,
+    "Morphological": A.Morphological,
+    "Mosaic": A.Mosaic,
+    "MotionBlur": A.MotionBlur,
+    "MultiplicativeNoise": A.MultiplicativeNoise,
+    "NoOp": A.NoOp,
+    "Normalize": A.Normalize,
+    "OpticalDistortion": A.OpticalDistortion,
+    "OverlayElements": A.OverlayElements,
+    "Pad": A.Pad,
+    "Pad3D": A.Pad3D,
+    "PadIfNeeded": A.PadIfNeeded,
+    "PadIfNeeded3D": A.PadIfNeeded3D,
+    "Perspective": A.Perspective,
+    "PiecewiseAffine": A.PiecewiseAffine,
+    "PixelDistributionAdaptation": A.PixelDistributionAdaptation,
+    "PixelDropout": A.PixelDropout,
+    "PlanckianJitter": A.PlanckianJitter,
+    "PlasmaBrightnessContrast": A.PlasmaBrightnessContrast,
+    "PlasmaShadow": A.PlasmaShadow,
+    "Posterize": A.Posterize,
+    "RGBShift": A.RGBShift,
+    "RandomBrightnessContrast": A.RandomBrightnessContrast,
+    "RandomCrop": A.RandomCrop,
+    "RandomCrop3D": A.RandomCrop3D,
+    "RandomCropFromBorders": A.RandomCropFromBorders,
+    "RandomCropNearBBox": A.RandomCropNearBBox,
+    "RandomFog": A.RandomFog,
+    "RandomGamma": A.RandomGamma,
+    "RandomGravel": A.RandomGravel,
+    "RandomGridShuffle": A.RandomGridShuffle,
+    "RandomRain": A.RandomRain,
+    "RandomResizedCrop": A.RandomResizedCrop,
+    "RandomRotate90": A.RandomRotate90,
+    "RandomScale": A.RandomScale,
+    "RandomShadow": A.RandomShadow,
+    "RandomSizedBBoxSafeCrop": A.RandomSizedBBoxSafeCrop,
+    "RandomSizedCrop": A.RandomSizedCrop,
+    "RandomSnow": A.RandomSnow,
+    "RandomSunFlare": A.RandomSunFlare,
+    "RandomToneCurve": A.RandomToneCurve,
+    "Resize": A.Resize,
+    "RingingOvershoot": A.RingingOvershoot,
+    "Rotate": A.Rotate,
+    "SafeRotate": A.SafeRotate,
+    "SaltAndPepper": A.SaltAndPepper,
+    "Sharpen": A.Sharpen,
+    "ShiftScaleRotate": A.ShiftScaleRotate,
+    "ShotNoise": A.ShotNoise,
+    "SmallestMaxSize": A.SmallestMaxSize,
+    "Solarize": A.Solarize,
+    "Spatter": A.Spatter,
+    "SquareSymmetry": A.SquareSymmetry,
+    "Superpixels": A.Superpixels,
+    "TextImage": A.TextImage,
+    "ThinPlateSpline": A.ThinPlateSpline,
+    "TimeMasking": A.TimeMasking,
+    "TimeReverse": A.TimeReverse,
+    "ToFloat": A.ToFloat,
+    "ToGray": A.ToGray,
+    "ToRGB": A.ToRGB,
+    "ToSepia": A.ToSepia,
+    "ToTensor3D": A.ToTensor3D,
+    "ToTensorV2": A.ToTensorV2,
+    "Transpose": A.Transpose,
+    "UnsharpMask": A.UnsharpMask,
+    "VerticalFlip": A.VerticalFlip,
+    "XYMasking": A.XYMasking,
+    "ZoomBlur": A.ZoomBlur,
+}
+
+
+def _suggest(name: str) -> list[str]:
+    return difflib.get_close_matches(name, _TRANSFORMS.keys(), n=3, cutoff=0.6)
 
 
 def compose_augmentations(cfg: DictConfig) -> A.Compose:
@@ -32,14 +158,7 @@ def compose_augmentations(cfg: DictConfig) -> A.Compose:
     Raises
     ------
     ValueError
-        If a transform name is not found in the albumentations namespace, with
-        fuzzy suggestions sourced from the live module.
-
-    Notes
-    -----
-    Short names (no dot) are resolved via ``getattr(albumentations, name)``.
-    Fully qualified names (containing a dot) are resolved via ``importlib``,
-    so any transform reachable by import path is supported without a registry.
+        If a transform name is not found in ``_TRANSFORMS``.
     """
     ops = list(cfg.ops) if cfg.ops else []
     transforms = [_instantiate_transform(op) for op in ops]
@@ -49,31 +168,14 @@ def compose_augmentations(cfg: DictConfig) -> A.Compose:
 def _instantiate_transform(op: Any) -> A.BasicTransform:
     name = op["name"] if hasattr(op, "__getitem__") else op.name
     kwargs = {k: v for k, v in op.items() if k != "name"}
-
-    if "." not in name:
-        cls = getattr(A, name, None)
-        if cls is None:
-            _raise_unknown_transform(name)
-        return cls(**kwargs)
-
-    module_path, _, attr = name.rpartition(".")
-    try:
-        module = importlib.import_module(module_path)
-        cls = getattr(module, attr)
-        return cls(**kwargs)
-    except (ImportError, AttributeError):
-        _raise_unknown_transform(name)
+    if name not in _TRANSFORMS:
+        _unknown_transform(name)
+    return _TRANSFORMS[name](**kwargs)
 
 
-def _raise_unknown_transform(name: str) -> None:
-    candidates = [
-        k
-        for k in dir(A)
-        if isinstance(getattr(A, k, None), type)
-        and issubclass(getattr(A, k), A.BasicTransform)
-    ]
-    suggestions = difflib.get_close_matches(name, candidates, n=3, cutoff=0.6)
-    msg = f"unknown augmentation {name!r}"
+def _unknown_transform(name: str) -> NoReturn:
+    suggestions = _suggest(name)
+    msg = f"unknown transform {name!r}"
     if suggestions:
         msg += f"; did you mean: {', '.join(suggestions)}?"
     raise ValueError(msg)

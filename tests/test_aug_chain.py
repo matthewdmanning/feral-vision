@@ -16,13 +16,8 @@ def test_short_name_with_kwarg_returns_correct_type():
     assert isinstance(transform, A.RandomBrightnessContrast)
 
 
-def test_fully_qualified_name_returns_correct_type():
-    transform = _instantiate_transform({"name": "albumentations.HorizontalFlip"})
-    assert isinstance(transform, A.HorizontalFlip)
-
-
 def test_unknown_short_name_raises_value_error():
-    with pytest.raises(ValueError, match="unknown augmentation"):
+    with pytest.raises(ValueError, match="unknown transform"):
         _instantiate_transform({"name": "NotARealTransform"})
 
 

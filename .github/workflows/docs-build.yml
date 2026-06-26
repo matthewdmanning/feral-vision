@@ -43,7 +43,7 @@ jobs:
         if: steps.detect.outputs.builder != 'none'
         uses: astral-sh/setup-uv@v7.2.0
         with:
-          python-version: "{{ cookiecutter.python_version }}"
+          python-version: "3.12"
           enable-cache: true
 
       - name: Sync dependencies (locked)
