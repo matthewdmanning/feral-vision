@@ -39,6 +39,11 @@ DICE_SMOOTH: float = 1.0  # Laplace smoothing for dice numerator/denominator
 DEFAULT_DATA_SOURCE: str = "local"
 DEFAULT_VAL_SPLIT: float = 0.2
 
+# --- Augmentation -----------------------------------------------------------
+DEFAULT_ROTATE90_K: int = 1  # number of counter-clockwise 90-degree turns
+DEFAULT_BRIGHTNESS_SHIFT: float = 0.1  # additive shift on [0, 1] normalized images
+DEFAULT_GAMMA: float = 1.2  # gamma correction exponent (>1 darkens midtones)
+
 # --- Inference / post-processing -------------------------------------------
 DEFAULT_DEVICE: str = "cpu"
 DEFAULT_MASK_THRESHOLD: float = 0.5  # sigmoid/softmax prob cutoff for foreground

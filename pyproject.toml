@@ -16,6 +16,7 @@ dependencies = [
     "opencv-python>=4.13.0.92",
     "lightning>=2.0",
     "torch>=2.12.1",
+    "pycocotools>=2.0",
     "ultralytics>=8.3",
 ]
 
@@ -31,6 +32,11 @@ python_version = "3.12"
 ignore_missing_imports = true
 
 [dependency-groups]
+docs-sphinx = [
+    "sphinx>=8.0",
+    "furo>=2024.0",
+    "sphinx-copybutton>=0.5",
+]
 dev = [
     "coverage>=7.14.2",
     "mypy>=1.10.0",

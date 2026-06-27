@@ -16,31 +16,26 @@ on:
       - "**/*.dvc"
       - ".github/workflows/dvc-check.yml"
 
+concurrency:
+  group: dvc-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   dvc-health:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6.0.1
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7.2.0
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
           enable-cache: true
-
       - name: DVC doctor
-        run: |
-          uvx --from dvc --with dvc-s3 dvc doctor
-
-      - name: DVC pipeline graph (if dvc.yaml exists)
+        run: uvx --from dvc --with dvc-s3 dvc doctor
+      - name: DVC pipeline graph
         run: |
           if [ -f "dvc.yaml" ]; then
             uvx --from dvc --with dvc-s3 dvc dag
-          else
-            echo "No dvc.yaml found, skipping pipeline graph check."
           fi

@@ -26,6 +26,9 @@ class DataConfig:
     root: str = "data"
     image_size: int = C.DEFAULT_IMAGE_SIZE
     val_split: float = C.DEFAULT_VAL_SPLIT
+    # Per-class morphological similarity to the target species (cat=1.0 anchor).
+    # Length must match num_classes in the dataset. Empty list = uniform weights.
+    class_similarity: list[float] = field(default_factory=list)
 
 
 # --- Model: architecture (shared) + acquisition source (discriminated) ------
@@ -72,6 +75,12 @@ class TrainConfig:
     bce_weight: float = C.DEFAULT_BCE_WEIGHT
     distill_weight: float = C.DEFAULT_DISTILL_WEIGHT
     distill_temperature: float = C.DEFAULT_DISTILL_TEMPERATURE
+    # Similarity-weighted training. Set use_similarity=true to activate.
+    # similarity_loss / similarity_sampler are dotted import paths to callables
+    # resolved at runtime via importlib; "none" disables each respectively.
+    use_similarity: bool = False
+    similarity_loss: str = "none"
+    similarity_sampler: str = "none"
 
 
 # --- Inference --------------------------------------------------------------

@@ -1,0 +1,21 @@
+defaults:
+  - base_data
+  - _self_
+
+source: coco
+root: data/raw
+
+# Morphological similarity to feral cat (cat=1.0 anchor).
+# Order: bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe
+# (COCO animal supercategory IDs 16-25 in sorted order)
+class_similarity:
+  - 0.2   # bird
+  - 1.0   # cat
+  - 0.8   # dog
+  - 0.4   # horse
+  - 0.4   # sheep
+  - 0.4   # cow
+  - 0.3   # elephant
+  - 0.6   # bear
+  - 0.3   # zebra
+  - 0.2   # giraffe
