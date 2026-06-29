@@ -18,7 +18,7 @@ This group covers:
 
 ## Recommended structure
 
-```text
+~~~text
 config/trainer/
   README.md
   base.yaml
@@ -28,7 +28,7 @@ config/trainer/
     README.md
     base.yaml              # standard callbacks
     minimal.yaml           # optional: fewer callbacks
-```
+~~~
 
 ---
 
@@ -66,7 +66,7 @@ Examples:
 
 ## Usage examples
 
-```bash
+~~~bash
 # Default training configuration
 python -m src.feral-segmentor.core.train
 
@@ -75,4 +75,4 @@ python -m src.feral-segmentor.core.train trainer=fast_dev
 
 # Override runtime parameters
 python -m src.feral-segmentor.core.train trainer.max_epochs=50 trainer.precision=16
-```
+~~~

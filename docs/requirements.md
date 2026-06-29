@@ -11,8 +11,7 @@ Detect and segment feral cats in images captured on mobile devices. Output pixel
 ### 2.1 Data Acquisition
 
 | ID | Requirement |
-|----|-------------|
-| D-01 | System shall download COCO train2017 images belonging to the `animal` supercategory (10 classes: bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe). |
+|----|-------------|-| D-01 | System shall download COCO train2017 images belonging to the `animal` supercategory (10 classes: bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe). |
 | D-02 | Download shall be idempotent — already-present files shall be skipped. |
 | D-03 | Filtered instance annotations shall be saved as `instances_train2017_animals.json`. |
 | D-04 | System shall convert COCO polygon segmentation annotations to YOLO segmentation format (normalised flat polygon `.txt` files, one per image). |
@@ -22,8 +21,7 @@ Detect and segment feral cats in images captured on mobile devices. Output pixel
 ### 2.2 Augmentation
 
 | ID | Requirement |
-|----|-------------|
-| A-01 | Augmentation pipeline shall be composable via a fluent chain (each transform wraps an inner transform). |
+|----|-------------|-| A-01 | Augmentation pipeline shall be composable via a fluent chain (each transform wraps an inner transform). |
 | A-02 | Supported transforms: Identity, HorizontalFlip, RandomRotate90, BrightnessShift, GammaAdjust. |
 | A-03 | Active augmentation chain shall be specified in Hydra config (`augmentation.ops`). |
 | A-04 | Augmented images shall be written to `data/augmented/` with the chain name appended to the filename stem. |
@@ -31,8 +29,7 @@ Detect and segment feral cats in images captured on mobile devices. Output pixel
 ### 2.3 Model
 
 | ID | Requirement |
-|----|-------------|
-| M-01 | Student model shall be YOLO11n-seg (nano segmentation head) — optimised for mobile inference. |
+|----|-------------|-| M-01 | Student model shall be YOLO11n-seg (nano segmentation head) — optimised for mobile inference. |
 | M-02 | Teacher model shall be YOLO11x-seg (extra-large) for knowledge distillation. |
 | M-03 | Model weights shall be fetchable from local path, Hugging Face Hub, or a Python script entrypoint; source is specified in Hydra config. |
 | M-04 | Number of output classes shall be configurable (`model.num_classes`). |
@@ -40,7 +37,7 @@ Detect and segment feral cats in images captured on mobile devices. Output pixel
 ### 2.4 Training
 
 | ID | Requirement |
-|----|-------------|
+|----|-------------|-
 | T-01 | Training shall use the ultralytics Python API (`YOLO.train()`). |
 | T-02 | All hyperparameters (epochs, lr, batch size, optimizer, scheduler, weight decay, momentum) shall be Hydra-configurable. |
 | T-03 | Loss shall support combined Dice + BCE weighting (`train.dice_weight`, `train.bce_weight`). |
@@ -53,7 +50,7 @@ Detect and segment feral cats in images captured on mobile devices. Output pixel
 ### 2.5 Infrastructure
 
 | ID | Requirement |
-|----|-------------|
+|----|-------------|-
 | I-01 | Training shall run in a Docker container on a GCE T4 GPU instance. |
 | I-02 | Base image: `nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04`. |
 | I-03 | Container image shall be stored in Google Artifact Registry. |
@@ -66,7 +63,7 @@ Detect and segment feral cats in images captured on mobile devices. Output pixel
 ### 2.6 Inference
 
 | ID | Requirement |
-|----|-------------|
+|----|-------------|-
 | N-01 | Predictor shall accept a single image tensor and return bounding boxes + masks. |
 | N-02 | Mask threshold, device, TTA flag, and minimum box area shall be configurable. |
 | N-03 | Target deployment: mobile device (model exported to TorchScript or ONNX after training). |
@@ -76,7 +73,7 @@ Detect and segment feral cats in images captured on mobile devices. Output pixel
 ## 3. Non-Functional Requirements
 
 | ID | Requirement |
-|----|-------------|
+|----|-------------|-
 | NF-01 | All numeric defaults shall be defined in `feral_segmentor/constants.py`; no magic numbers in logic or config schema. |
 | NF-02 | Hydra `base.yaml` and `default.yaml` files shall not be modified; experiment variants shall use named yaml copies. |
 | NF-03 | Data download and augmentation stages shall be idempotent and re-runnable. |
@@ -98,8 +95,7 @@ Detect and segment feral cats in images captured on mobile devices. Output pixel
 ## 5. Key Configuration Files
 
 | File | Purpose |
-|------|---------|
-| `conf/data/coco_train2017.yaml` | COCO dataset source, paths, class similarity weights |
+|------|---------|-| `conf/data/coco_train2017.yaml` | COCO dataset source, paths, class similarity weights |
 | `conf/train/default.yaml` | Hyperparameters and similarity weighting toggles |
 | `conf/model/default.yaml` | Model source, architecture dims, num classes |
 | `conf/augmentation/default.yaml` | Augmentation chain ops |

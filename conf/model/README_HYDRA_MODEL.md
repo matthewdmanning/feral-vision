@@ -34,7 +34,7 @@ Trainer/runtime concerns (epochs, devices, precision, etc.) must not live here.
 Every model config inherits from the `base_model` structured schema (defined in
 `src/feral_segmentor/config/schema.py`) via `defaults: [base_model, _self_]`.
 
-```yaml
+~~~yaml
 defaults:
   - _self_
 
@@ -51,13 +51,12 @@ weights:               # null = pretrained included in architecture, or random i
   id:
     - weights.pt       # list of filenames or asset identifiers
   location: models/checkpoints/<name>
-```
+~~~
 
 ### Field reference
 
 | Field | Required | Notes |
-|---|---|---|
-| `model_tasks` | no | Empty list is valid; required for `FeralDataset(target_model=...)` |
+|---|---|---|-| `model_tasks` | no | Empty list is valid; required for `FeralDataset(target_model=...)` |
 | `architecture.source` | yes | Discriminator consumed by source adapter registry |
 | `architecture.id` | yes | Interpreted by source adapter — not necessarily a filename |
 | `architecture.location` | yes | Local cache dir for fetched architecture files |
@@ -67,8 +66,7 @@ weights:               # null = pretrained included in architecture, or random i
 ### Source adapters
 
 | `source` value | Adapter | Notes |
-|---|---|---|
-| `hf_hub` | `HubSource` | Downloads via `hf_hub_download`; `id` is a HF repo ID |
+|---|---|---|-| `hf_hub` | `HubSource` | Downloads via `hf_hub_download`; `id` is a HF repo ID |
 | `yolo_hub` | *(add adapter)* | `id` is a YOLO model name e.g. `yolo11m-seg` |
 | `local` | *(add adapter)* | `id` is a dotted Python class path |
 | `url` | *(add adapter)* | `id` is a direct download URL |
@@ -124,7 +122,7 @@ This allows the training entrypoint to remain generic and fully config-driven.
 
 Example for a HF Hub model:
 
-```yaml
+~~~yaml
 defaults:
   - base_model
   - _self_
@@ -143,7 +141,7 @@ weights:
   id:
     - model.pt
   location: models/checkpoints/my_model
-```
+~~~
 
 ## Best practices
 

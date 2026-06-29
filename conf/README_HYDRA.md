@@ -57,17 +57,17 @@ When creating a new project from this template:
 
 Edit `config/config.yaml`:
 
-```yaml
+~~~yaml
 project:
   name: "YOUR_PROJECT_NAME"
   env: "local"
-```
+~~~
 
 ### 2. Ensure a baseline variant exists for each group
 
 Minimum expected files:
 
-```text
+~~~text
 config/
   config.yaml
 
@@ -85,23 +85,23 @@ config/
 
   mlflow/
     base.yaml
-```
+~~~
 
 ### 3. Required conventions
 
 - **Model configs must define a name**:
 
-```yaml
+~~~yaml
 # config/model/base.yaml
 name: "my_model"
-```
+~~~
 
 - **Data configs should define a dataset identifier**:
 
-```yaml
+~~~yaml
 # config/data/base.yaml
 name: "my_dataset"
-```
+~~~
 
 These identifiers are used for:
 
@@ -113,7 +113,7 @@ These identifiers are used for:
 
 - Add additional variants as the project grows:
 
-```text
+~~~text
 config/model/
   small.yaml
   large.yaml
@@ -124,7 +124,7 @@ config/data/
 
 config/trainer/
   fast_dev.yaml
-```
+~~~
 
 - Add reusable experiment presets under `config/experiment/` when useful.
 

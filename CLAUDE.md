@@ -2,35 +2,29 @@
 
 At beginning of ever session, check the operating system. Check that gh CLI is installed, git remote origin is set, and MCP servers respond, and any scripts I rely on. For each broken or missing tool, either auto-install it or give me a one-line fix. Report any missing prerequisites and stop if something is broken.
 
-## Commands
+Pytest: ALWAYS use: `uv run python -m pytest` on Windows
 
-# Tests (NOTE: uv run pytest fails on Windows — use -m flag)
+## DVC pipeline
 
-``` bash
-uv run python -m pytest
-uv run python -m pytest tests/test_augmentations.py -v
-``` bash
-
-# DVC pipeline
-``` bash
+~~~ bash
 dvc repro          # run all stages
 dvc pull           # fetch artifacts from remote
-``` bash
+~~~ bash
 
 # Augmentation script
-``` bash
+~~~ bash
 uv run python scripts/augment.py --src tests/fixtures --dst data/augmented/coco_train17 --ops motion_blur original
-``` bash
+~~~ bash
 
 # GCP training (requires GCP_PROJECT and GCS_BUCKET env vars)
-``` bash
+~~~ bash
 GCP_PROJECT=my-proj GCS_BUCKET=my-bucket bash scripts/gcp_train.sh
-``` bash
-```
+~~~ bash
+~~~
 
 ## Architecture
 
-``` tree
+~~~ tree
 src/feral_segmentor/
   config/          # Hydra structured configs (schema.py, store.py)
   data/            # dataset loading, transforms, augmentation
@@ -46,13 +40,13 @@ conf/              # Hydra config groups: model/, train/, data/, augmentation/
   schemas/         # appearance.yaml (converted from draft_appearance_schema.json)
 docker/            # Dockerfile, entrypoint.sh, USER_STEPS.md
 docs/              # requirements.md
-```
+~~~
 
 ## Dataset Folder Schema
 
 All datasets use a canonical two-directory layout:
 
-``` tree
+~~~ tree
 <root>/
   images/          # raw image files (.jpg, .jpeg, .png, .bmp)
   annotations/     # annotation files matched by stem to images/
@@ -60,7 +54,7 @@ All datasets use a canonical two-directory layout:
                    #   <stem>.txt                -- YOLO bbox (SEG_INSTANCE)
                    #   <stem>.json               -- classification labels
                    #   names.yaml                -- class index reference
-```
+~~~
 
 Source identifiers:
 
@@ -98,7 +92,8 @@ Runs as a DVC stage during training loop.
   `cfg.weights.location=None` Weights are not saved to files.
 
 ### Model Registering
-Offline/setup workflow — not called by the training loop.
+
+Offline/setup workflow — called prior to training loop.
 
 - `inspect(cfg, *, fetch_if_needed=False) -> ModelProperties` — returns
   `ModelProperties(n_classes, model_outputs)`; checks model registry first. Next, uses source metadata.
@@ -108,12 +103,12 @@ Offline/setup workflow — not called by the training loop.
 - `load_model_registry(name) -> ModelProperties` — reads it back.
 
 `ModelProperties.model_outputs` is the authoritative list of what the architecture
-produces (`CVTask` values, optional: []`n_classes`, bounding box, segmentation masks and logits, keypoints).
+produces (`CVTask` values, optional: bounding box, segmentation masks, logits, keypoints).
 
 ## Documentations
 
-Attempt to find documentation yourself. Check version with install version. If Use context7 mcp to fetch latest documentation.
+Attempt to find documentation yourself by web search. Verify the exact version with install version in pyproject.toml. If Use context7 mcp to fetch latest documentation.
 
 ## SCOPING
 
-Scope strictly to the task at hand. Do not touch anything else or expand the plan.
+Scope strictly to the task at hand. Do modify files that are not directly affected by the plan. Insert a #TODO for any dependencies or breaking changes that result from changes.
