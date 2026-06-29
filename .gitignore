@@ -34,3 +34,11 @@ coverage.xml
 example_augment.txt
 docs/_build/
 CLAUDE.md
+src/feral_segmentor/models/registry.py
+src/feral_segmentor/models/source.py
+src/feral_segmentor/models/properties.py
+src/feral_segmentor/models/sources/hub.py
+src/feral_segmentor/models/sources/HFHubAdapter.py
+src/feral_segmentor/models/sources/HubAdapter.py
+yolo11n-seg.pt
+.vscode/tasks.json

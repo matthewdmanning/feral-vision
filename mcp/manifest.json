@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "model-inspector",
+  "version": "0.1.0",
+  "description": "Inspect AI model metadata and manage source adapters for feral-segmentor.",
+  "author": { "name": "Matthew Manning" },
+  "server": {
+    "type": "python",
+    "entry_point": "server/main.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "${user_config.projectDir}",
+        "python",
+        "${__dirname}/server/main.py"
+      ],
+      "env": {
+        "PROJECT_ROOT": "${user_config.projectDir}"
+      }
+    }
+  },
+  "user_config": {
+    "projectDir": {
+      "type": "directory",
+      "title": "feral-segmentor project root",
+      "description": "Root directory of your feral-segmentor checkout (must contain pyproject.toml).",
+      "required": true
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": ["darwin", "win32", "linux"]
+  }
+}

@@ -7,19 +7,22 @@ authors = [
 ]
 requires-python = ">=3.12,<3.14"
 dependencies = [
+    "albumentations>=2.0",
     "dvc",
     "huggingface-hub>=1.20.1",
     "hydra-core",
     "mlflow",
     "omegaconf",
     "opencv-python>=4.13.0.92",
+    "lightning>=2.0",
     "torch>=2.12.1",
     "pycocotools>=2.0",
     "ultralytics>=8.3",
+    "mcp>=1.0",
 ]
 
 [project.scripts]
-feral-segmentor = "feral_segmentor:main"
+feral-segmentor = "feral_segmentor.pipelines.base_segmentation_pipeline:main"
 
 [build-system]
 requires = ["uv_build>=0.11.7,<0.12.0"]
@@ -28,16 +31,6 @@ build-backend = "uv_build"
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true
-# Pre-existing errors tracked separately; CI enforces no regressions on new code.
-exclude = [
-    "src/feral_segmentor/data/creator\\.py",
-    "src/feral_segmentor/models/example_export\\.py",
-    "src/feral_segmentor/models/registry\\.py",
-    "src/feral_segmentor/models/source\\.py",
-    "src/feral_segmentor/pipeline\\.py",
-    "src/feral_segmentor/training/optim\\.py",
-    "src/feral_segmentor/training/trainer\\.py",
-]
 
 [dependency-groups]
 docs-sphinx = [
@@ -52,4 +45,9 @@ dev = [
     "types-PyYAML>=6.0.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
+    "furo>=2025.12.19",
+    "dvc-gs>=3.1.0",
+    "dvc>=3.67.1",
+    "acquire>=3.22",
+    "sphinx>=9.1.0",
 ]

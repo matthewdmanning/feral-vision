@@ -21,12 +21,11 @@ from pathlib import Path
 from typing import Any
 
 from feral_segmentor.data.annotations import (
-    Annotation,
     BBoxAnnotation,
     ClassificationAnnotation,
     MaskAnnotation,
 )
-from feral_segmentor.models.registry import get_profile
+from feral_segmentor.models.register_model import load_model_registry
 from feral_segmentor.tasks import CVTask
 from feral_segmentor.utils import get_logger
 
@@ -60,7 +59,7 @@ class Sample:
     """One dataset sample: an image reference and its annotation dict."""
 
     image: Image
-    annotations: dict[CVTask, Annotation] = field(default_factory=dict)
+    annotations: dict[CVTask, Any] = field(default_factory=dict)
     # Deterministic per-sample aug seed (lazy mode only).
     aug_params: dict[str, Any] | None = None
 
@@ -146,16 +145,12 @@ class FeralDataset:
         self._augmented: list[Path] = []
 
         if target_model is not None:
-            profile = get_profile(target_model)  # KeyError if unknown — fail early
+            profile = load_model_registry(
+                target_model
+            )  # KeyError if unknown — fail early
             if tasks is None:
-                tasks = list(profile.tasks)
-            logger.info(
-                "target_model=%r tasks=%s annotation_format=%s image_size=%d",
-                target_model,
-                tasks,
-                profile.annotation_format,
-                profile.image_size,
-            )
+                tasks = list(profile.model_outputs)
+            logger.info("target_model=%r tasks=%s", target_model, tasks)
 
         self.tasks: list[CVTask] = tasks or []
         _validate_tasks(self.tasks)
@@ -253,6 +248,7 @@ class FeralDataset:
     def _eager_augment(self) -> None:
         import cv2
 
+        assert self.out_dir is not None
         self.out_dir.mkdir(parents=True, exist_ok=True)
         for sample in self.samples:
             result = self._run_compose(sample)
@@ -276,6 +272,7 @@ class FeralDataset:
         return merged
 
     def _run_compose(self, sample: Sample) -> dict:
+        assert self._compose is not None
         img = sample.image.load()
         kwargs: dict[str, Any] = {"image": img}
 

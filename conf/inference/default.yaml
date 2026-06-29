@@ -3,5 +3,5 @@ defaults:
   - _self_
 
 threshold: 0.5
-device: cpu
+device: gpu
 tta: false

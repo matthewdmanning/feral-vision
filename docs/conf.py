@@ -34,5 +34,5 @@ intersphinx_mapping = {
 }
 
 html_theme = "furo"
-html_title = "feral-segmentor"
+html_title = "FeralSegmentor"
 exclude_patterns = ["_build"]

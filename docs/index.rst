@@ -12,12 +12,3 @@ Image segmentor optimised to detect feral cats on mobile devices.
    guide/training
    guide/inference
 
-.. toctree::
-   :maxdepth: 2
-   :caption: API Reference
-
-   api/data
-   api/models
-   api/training
-   api/inference
-   api/config

@@ -1,117 +1,123 @@
+"""Tests for HFAdapter fetch/inspect and the register_model registry workflow."""
+
+from __future__ import annotations
+
 from pathlib import Path
 
 import pytest
 import torch
+import torch.nn as nn
 from omegaconf import OmegaConf
 
-from feral_segmentor.constants import (
-    DEFAULT_BASE_CHANNELS,
-    DEFAULT_IN_CHANNELS,
-    DEFAULT_NUM_CLASSES,
-)
-from feral_segmentor.models.source import (
-    ConfigModelSource,
-    HubModelSource,
-    ScriptModelSource,
-    build_model_source,
-)
+from feral_segmentor.models.sources.HFAdapter import HFAdapter
 
 
-def _arch_fields():
-    return {
-        "in_channels": DEFAULT_IN_CHANNELS,
-        "base_channels": DEFAULT_BASE_CHANNELS,
-        "num_classes": DEFAULT_NUM_CLASSES,
-    }
-
-
-def test_build_model_source_dispatch():
-    assert isinstance(
-        build_model_source(OmegaConf.create({"source": "hub"})), HubModelSource
-    )
-    assert isinstance(
-        build_model_source(OmegaConf.create({"source": "script"})), ScriptModelSource
-    )
-    assert isinstance(
-        build_model_source(OmegaConf.create({"source": "config"})), ConfigModelSource
+def _cfg(tmp_path, filenames=("weights.pt",), location="weights"):
+    return OmegaConf.create(
+        {
+            "architecture": {"source": "hf_hub", "id": "org/repo", "location": None},
+            "weights": {
+                "source": "hf_hub",
+                "id": list(filenames),
+                "location": str(tmp_path / location) if location else None,
+            },
+        }
     )
 
 
-def test_build_model_source_unknown_raises():
-    with pytest.raises(KeyError):
-        build_model_source(OmegaConf.create({"source": "bogus"}))
+def _cfg_no_weights(tmp_path):
+    return OmegaConf.create(
+        {
+            "architecture": {"source": "hf_hub", "id": "org/repo", "location": None},
+            "weights": None,
+        }
+    )
 
 
-def test_hub_source_calls_pull_model(tmp_path, monkeypatch):
+# --- fetch -------------------------------------------------------------------
+
+
+def test_fetch_downloads_missing_files(tmp_path, monkeypatch):
     calls = []
 
     def fake_download(repo_id, filename, local_dir):
         calls.append((repo_id, filename, local_dir))
-        return str(Path(local_dir) / filename)
+        p = Path(local_dir) / filename
+        p.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(nn.Linear(4, 2), str(p))
 
     monkeypatch.setattr(
-        "feral_segmentor.models.hub_fetch.hf_hub_download", fake_download
+        "feral_segmentor.models.sources.HFAdapter.hf_hub_download", fake_download
     )
-
-    cfg = OmegaConf.create(
-        {
-            "source": "hub",
-            "repo_id": "org/repo",
-            "files": ["a.pt"],
-            "weights_dir": str(tmp_path / "weights"),
-        }
+    monkeypatch.setattr(
+        "feral_segmentor.models.sources.HFAdapter._load_local",
+        lambda dest, filenames: nn.Linear(4, 2),
     )
-    paths = build_model_source(cfg).acquire(cfg)
-    assert len(paths) == 1
-    assert calls == [("org/repo", "a.pt", tmp_path / "weights")]
+    HFAdapter().fetch(_cfg(tmp_path))
+    assert calls == [("org/repo", "weights.pt", tmp_path / "weights")]
 
 
-def test_script_source_runs_entrypoint(tmp_path):
-    weights_dir = tmp_path / "script_weights"
-    cfg = OmegaConf.create(
-        {
-            "source": "script",
-            "name": "student_script",
-            "entrypoint": "feral_segmentor.models.example_export:export",
-            "weights_dir": str(weights_dir),
-            **_arch_fields(),
-        }
+def test_fetch_skips_existing_files(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "feral_segmentor.models.sources.HFAdapter.hf_hub_download",
+        lambda **kw: calls.append(kw),
     )
-    paths = build_model_source(cfg).acquire(cfg)
-    assert len(paths) == 1
-    assert paths[0].exists()
+    weights_dir = tmp_path / "weights"
+    weights_dir.mkdir()
+    (weights_dir / "weights.pt").touch()
 
-
-def test_script_source_bad_entrypoint_format_raises(tmp_path):
-    cfg = OmegaConf.create({"source": "script", "entrypoint": "no_colon_here"})
-    with pytest.raises(ValueError):
-        build_model_source(cfg).acquire(cfg)
-
-
-def test_script_source_missing_attr_raises(tmp_path):
-    cfg = OmegaConf.create(
-        {
-            "source": "script",
-            "entrypoint": "feral_segmentor.models.example_export:does_not_exist",
-        }
+    monkeypatch.setattr(
+        "feral_segmentor.models.sources.HFAdapter._load_local",
+        lambda dest, filenames: nn.Linear(4, 2),
     )
-    with pytest.raises(AttributeError):
-        build_model_source(cfg).acquire(cfg)
+    HFAdapter().fetch(_cfg(tmp_path))
+    assert calls == []
 
 
-def test_config_source_builds_and_saves(tmp_path):
-    weights_dir = tmp_path / "cfg_weights"
-    cfg = OmegaConf.create(
-        {
-            "source": "config",
-            "name": "student_default",
-            "weights_dir": str(weights_dir),
-            **_arch_fields(),
-        }
+def test_fetch_returns_module(tmp_path):
+    model = nn.Linear(4, 2)
+    weights_dir = tmp_path / "weights"
+    weights_dir.mkdir()
+    torch.save(model, str(weights_dir / "weights.pt"))
+
+    result = HFAdapter().fetch(_cfg(tmp_path))
+    assert isinstance(result, nn.Module)
+
+
+def test_fetch_null_location_loads_direct(tmp_path, monkeypatch):
+    loaded = nn.Linear(4, 2)
+    monkeypatch.setattr(
+        "feral_segmentor.models.sources.HFAdapter._load_direct",
+        lambda repo_id: loaded,
     )
-    paths = build_model_source(cfg).acquire(cfg)
-    assert len(paths) == 1
-    assert paths[0].exists()
-    # Saved object is a loadable state_dict.
-    state = torch.load(paths[0])
-    assert isinstance(state, dict)
+    result = HFAdapter().fetch(_cfg_no_weights(tmp_path))
+    assert result is loaded
+
+
+# --- inspect -----------------------------------------------------------------
+
+
+def test_inspect_raises_on_hub_failure_by_default(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "feral_segmentor.models.sources.HFAdapter.model_info",
+        lambda repo_id: (_ for _ in ()).throw(Exception("unreachable")),
+    )
+    with pytest.raises(RuntimeError, match="fetch_if_needed"):
+        HFAdapter().inspect(_cfg(tmp_path))
+
+
+def test_inspect_returns_properties_from_metadata(tmp_path, monkeypatch):
+    class FakeInfo:
+        pipeline_tag = "pose-estimation"
+        config = {"num_labels": 17}
+
+    monkeypatch.setattr(
+        "feral_segmentor.models.sources.HFAdapter.model_info",
+        lambda repo_id: FakeInfo(),
+    )
+    from feral_segmentor.tasks import CVTask
+
+    props, meta = HFAdapter().inspect(_cfg(tmp_path))
+    assert props.model_outputs == [CVTask.POSE]
+    assert meta["pipeline_tag"] == "pose-estimation"

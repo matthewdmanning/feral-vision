@@ -32,10 +32,16 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
+      - name: Authenticate to GCS
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
       - name: DVC doctor
-        run: uvx --from dvc --with dvc-s3 dvc doctor
+        run: uvx dvc doctor
       - name: DVC pipeline graph
         run: |
           if [ -f "dvc.yaml" ]; then
-            uvx --from dvc --with dvc-s3 dvc dag
+            uvx dvc dag
           fi
+      - name: DVC status
+        run: uvx dvc status

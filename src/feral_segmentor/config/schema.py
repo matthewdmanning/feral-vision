@@ -12,6 +12,7 @@ a constant from :mod:`feral_segmentor.constants` (no magic numbers).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any, Optional
 
 from omegaconf import MISSING
 
@@ -30,58 +31,32 @@ class DataConfig:
     class_similarity: list[float] = field(default_factory=list)
 
 
-# --- Model: architecture (shared) + acquisition source (discriminated) ------
+# --- Model ------------------------------------------------------------------
+@dataclass
+class SourceConfig:
+    """Where a model architecture or weights come from. Resolved by source adapter."""
+
+    source: str = MISSING  # discriminator: hf_hub | yolo_hub | local | url | ...
+    id: str = MISSING  # hub repo ID, model name, dotted class path, or URL
+    location: Optional[str] = None  # local path; None = hub loads directly into memory
+
+
+@dataclass
+class WeightsConfig:
+    """Weight files to fetch and load. Independent of architecture source."""
+
+    source: str = MISSING
+    id: list[str] = field(default_factory=list)  # filenames, hub asset names, etc.
+    location: Optional[str] = None  # local path; None = hub loads directly into memory
+
+
 @dataclass
 class ModelConfig:
-    """Base/interface for the model group.
+    """Single source of truth for a model. architecture is required; weights is optional."""
 
-    Architecture fields are shared by every variant (a model has an
-    architecture regardless of how its weights are obtained). ``source`` is the
-    discriminator consumed by the acquisition factory.
-    """
-
-    name: str = MISSING
-    source: str = MISSING
-    in_channels: int = C.DEFAULT_IN_CHANNELS
-    base_channels: int = C.DEFAULT_BASE_CHANNELS
-    num_classes: int = C.DEFAULT_NUM_CLASSES
-
-
-@dataclass
-class HubModelConfig(ModelConfig):
-    """Weights fetched from the Hugging Face Hub."""
-
-    source: str = "hub"
-    repo_id: str = MISSING
-    files: list[str] = field(default_factory=list)
-    weights_dir: str = MISSING
-
-
-@dataclass
-class ScriptModelConfig(ModelConfig):
-    """Weights produced by an imported Python entrypoint (``module:function``)."""
-
-    source: str = "script"
-    entrypoint: str = MISSING
-    weights_dir: str = MISSING
-
-
-@dataclass
-class ConfigModelConfig(ModelConfig):
-    """Model built entirely from config (architecture fields) and saved."""
-
-    source: str = "config"
-    weights_dir: str = MISSING
-
-
-@dataclass
-class TeacherModelConfig(ModelConfig):
-    """YOLO teacher loaded via Ultralytics by model_id string (auto-downloads)."""
-
-    source: str = "config"
-    arch: str = "teacher"
-    model_id: str = "yolo11x-seg.pt"
-    weights_dir: str = "models/checkpoints/teacher"
+    model_outputs: list[str] = field(default_factory=list)
+    architecture: SourceConfig = MISSING
+    weights: Optional[WeightsConfig] = None
 
 
 # --- Training ---------------------------------------------------------------
@@ -129,9 +104,13 @@ class TrackingConfig:
 @dataclass
 class AugmentationConfig:
     name: str = MISSING
-    # Ordered list of registered augmentation op names; the chain builder maps
-    # each name to a concrete Augmentation (params sourced from constants).
-    ops: list[str] = field(default_factory=list)
+    # Each op is a dict with a required 'name' key (short Albumentations class
+    # name or fully-qualified path) plus any kwargs the transform accepts.
+    # Short names are resolved via getattr(albumentations, name); fully qualified
+    # names (containing a dot) are resolved via importlib. Per-op kwargs flow
+    # directly to the transform constructor, so any Albumentations transform is
+    # supported without a registry.
+    ops: list[Any] = field(default_factory=list)
 
 
 # --- Top-level (type-hint convenience; group schemas are what get registered) ---

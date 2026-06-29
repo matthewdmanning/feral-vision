@@ -16,23 +16,20 @@ on:
       - "pyproject.toml"
       - ".github/workflows/docs-build.yml"
 
-concurrency:
-  group: docs-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
   docs-build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.1
 
       - name: Detect docs builder
         id: detect
+        shell: bash
         run: |
           if [ -f "mkdocs.yml" ] || [ -f "mkdocs.yaml" ]; then
             echo "builder=mkdocs" >> "$GITHUB_OUTPUT"
@@ -42,48 +39,32 @@ jobs:
             echo "builder=none" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: astral-sh/setup-uv@v5
+      - name: Install uv
         if: steps.detect.outputs.builder != 'none'
+        uses: astral-sh/setup-uv@v7.2.0
         with:
           python-version: "3.12"
           enable-cache: true
 
-      - name: Sync dependencies
+      - name: Sync dependencies (locked)
         if: steps.detect.outputs.builder != 'none'
         run: |
           if [ "${{ steps.detect.outputs.builder }}" = "mkdocs" ]; then
             uv sync --group dev --group docs-mkdocs
-          else
+          elif [ "${{ steps.detect.outputs.builder }}" = "sphinx" ]; then
             uv sync --group dev --group docs-sphinx
           fi
 
-      - name: Build docs
+      - name: Build documentation
         if: steps.detect.outputs.builder != 'none'
         run: |
           if [ "${{ steps.detect.outputs.builder }}" = "mkdocs" ]; then
             uv run mkdocs build --strict
-          else
+          elif [ "${{ steps.detect.outputs.builder }}" = "sphinx" ]; then
             uv run sphinx-build -b html docs docs/_build -W
           fi
 
       - name: Package build check
         if: steps.detect.outputs.builder != 'none'
-        run: uv build
-
-      - name: Upload pages artifact
-        if: steps.detect.outputs.builder != 'none' && github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ${{ steps.detect.outputs.builder == 'mkdocs' && 'site' || 'docs/_build' }}
-
-  docs-deploy:
-    needs: docs-build
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v4
+        run: |
+          uv build

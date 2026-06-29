@@ -1,52 +1,56 @@
-"""Architecture registry and model builder.
-
-Maps an architecture name to its ``nn.Module`` class so new student variants can
-be added without touching call sites. ``build_model`` constructs a model from a
-model :class:`DictConfig` (the ``cfg.model`` node or a bare model DictConfig).
-"""
+"""Architecture registry. Each nn.Module subclass self-registers via @register."""
 
 from __future__ import annotations
 
+from typing import Any, Callable, TypeVar
+
 from omegaconf import DictConfig
+from torch import nn
 
-from feral_segmentor.models.base import SegmentationModel
-from feral_segmentor.models.segmentation import StudentSegmenter
+from feral_segmentor.tasks import CVTask
 
-# Default architecture used when a model config does not name one explicitly.
-DEFAULT_ARCH: str = "student"
+DEFAULT_ARCH: str = "net"
 
-_ARCHITECTURES: dict[str, type[StudentSegmenter]] = {
-    "student": StudentSegmenter,
-}
+# Values are Any so registered classes may define from_config without mypy
+# needing a Protocol with a classmethod (which is unsound in Python's type system).
+_ARCHITECTURES: dict[str, Any] = {}
+
+_M = TypeVar("_M")
 
 
-def build_model(cfg: DictConfig) -> SegmentationModel:
-    """Build a segmentation model from a model DictConfig.
+def register(name: str) -> Callable[[_M], _M]:
+    """Decorator that registers an nn.Module subclass under ``name``."""
 
-    Reads the architecture fields (``in_channels``/``base_channels``/
-    ``num_classes``). An optional ``arch`` field selects the architecture class
-    (defaults to ``student``).
-    """
+    def decorator(cls: _M) -> _M:
+        _ARCHITECTURES[name] = cls
+        return cls
+
+    return decorator
+
+
+def build_model(cfg: DictConfig) -> nn.Module:
+    """Build from cfg.arch (falls back to DEFAULT_ARCH) via cls.from_config(cfg)."""
     arch = str(cfg.get("arch", DEFAULT_ARCH))
     try:
-        arch_cls = _ARCHITECTURES[arch]
-    except KeyError as exc:
+        cls = _ARCHITECTURES[arch]
+    except KeyError:
         raise KeyError(
             f"unknown architecture {arch!r}; registered: {sorted(_ARCHITECTURES)}"
-        ) from exc
-    return arch_cls.from_config(cfg)
+        ) from None
+    return cls.from_config(cfg)
 
 
-def get_model(name: str = DEFAULT_ARCH) -> SegmentationModel:
-    """Construct a model architecture by name using default arch fields.
-
-    Convenience constructor for call sites that only have an architecture name
-    (no full config). Defaults come from :mod:`feral_segmentor.constants`.
-    """
+def get_model(name: str = DEFAULT_ARCH) -> nn.Module:
+    """Return a default-constructed instance of the named architecture."""
     try:
-        arch_cls = _ARCHITECTURES[name]
-    except KeyError as exc:
+        cls = _ARCHITECTURES[name]
+    except KeyError:
         raise KeyError(
             f"unknown architecture {name!r}; registered: {sorted(_ARCHITECTURES)}"
-        ) from exc
-    return arch_cls()
+        ) from None
+    return cls()
+
+
+def get_model_tasks(model_cfg: DictConfig) -> list[CVTask]:
+    """Return the CVTask list declared in a composed model config."""
+    return [CVTask(t) for t in model_cfg.model_tasks]

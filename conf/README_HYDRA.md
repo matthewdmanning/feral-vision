@@ -47,27 +47,6 @@ Typical groups in this template:
 - **`mlflow/`**  
   MLflow tracking configuration (tracking URI, experiment naming policy, tags).
 
-- **`experiment/`** *(optional)*  
-  Named presets that override multiple groups at once (e.g. `baseline`, `debug`).
-
----
-
-## Common usage examples
-
-```bash
-# Default run (uses defaults from config.yaml)
-python -m src.feral-segmentor.core.train
-
-# Select specific variants
-python -m src.feral-segmentor.core.train model=conv_autoencoder data=base trainer=base
-
-# Override individual parameters
-python -m src.feral-segmentor.core.train trainer.max_epochs=20 model.lr=1e-4
-
-# Use a named experiment preset (if defined)
-python -m src.feral-segmentor.core.train experiment=baseline
-```
-
 ---
 
 ## Template checklist for a new project
@@ -78,17 +57,17 @@ When creating a new project from this template:
 
 Edit `config/config.yaml`:
 
-```yaml
+~~~yaml
 project:
   name: "YOUR_PROJECT_NAME"
   env: "local"
-```
+~~~
 
 ### 2. Ensure a baseline variant exists for each group
 
 Minimum expected files:
 
-```text
+~~~text
 config/
   config.yaml
 
@@ -106,23 +85,23 @@ config/
 
   mlflow/
     base.yaml
-```
+~~~
 
 ### 3. Required conventions
 
 - **Model configs must define a name**:
 
-```yaml
+~~~yaml
 # config/model/base.yaml
 name: "my_model"
-```
+~~~
 
 - **Data configs should define a dataset identifier**:
 
-```yaml
+~~~yaml
 # config/data/base.yaml
 name: "my_dataset"
-```
+~~~
 
 These identifiers are used for:
 
@@ -134,7 +113,7 @@ These identifiers are used for:
 
 - Add additional variants as the project grows:
 
-```text
+~~~text
 config/model/
   small.yaml
   large.yaml
@@ -145,7 +124,7 @@ config/data/
 
 config/trainer/
   fast_dev.yaml
-```
+~~~
 
 - Add reusable experiment presets under `config/experiment/` when useful.
 

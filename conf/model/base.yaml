@@ -1,7 +1,12 @@
 defaults:
-  - base_config_source
+  - base_model
   - _self_
 
-name: student_default
-source: config
-weights_dir: models/checkpoints/student_default
+model_outputs: []
+
+architecture:
+  source: ???
+  id: ???
+  location: ???
+
+weights: null

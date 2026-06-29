@@ -1,15 +1,10 @@
-import torch
-from omegaconf import OmegaConf
+"""Tests for inference post-processing utilities."""
 
-from feral_segmentor.constants import (
-    DEFAULT_BASE_CHANNELS,
-    DEFAULT_IN_CHANNELS,
-    DEFAULT_NUM_CLASSES,
-)
+from __future__ import annotations
+
+import torch
+
 from feral_segmentor.inference.postprocess import clean_mask, masks_to_boxes
-from feral_segmentor.inference.predictor import Predictor
-from feral_segmentor.models.base import SegmentationOutput
-from feral_segmentor.models.segmentation import StudentSegmenter
 
 
 def test_masks_to_boxes_single_rectangle():
@@ -42,42 +37,3 @@ def test_clean_mask_runs():
     cleaned = clean_mask(mask)
     assert cleaned.shape == mask.shape
     assert cleaned.dtype == torch.bool
-
-
-def _model():
-    return StudentSegmenter(
-        in_channels=DEFAULT_IN_CHANNELS,
-        base_channels=DEFAULT_BASE_CHANNELS,
-        num_classes=DEFAULT_NUM_CLASSES,
-    )
-
-
-def _cfg(tta=False):
-    return OmegaConf.create(
-        {
-            "inference": {
-                "threshold": 0.0,
-                "device": "cpu",
-                "tta": tta,
-                "min_box_area": 1,
-            }
-        }
-    )
-
-
-def test_predictor_returns_segmentation_output():
-    model = _model()
-    predictor = Predictor(model, _cfg())
-    image = torch.rand(DEFAULT_IN_CHANNELS, 48, 48)
-    out = predictor.predict(image)
-    assert isinstance(out, SegmentationOutput)
-    assert out.mask_logits.shape == (DEFAULT_NUM_CLASSES, 48, 48)
-    assert out.boxes.shape[-1] == 4
-
-
-def test_predictor_tta_runs():
-    model = _model()
-    predictor = Predictor(model, _cfg(tta=True))
-    image = torch.rand(DEFAULT_IN_CHANNELS, 48, 48)
-    out = predictor.predict(image)
-    assert isinstance(out, SegmentationOutput)

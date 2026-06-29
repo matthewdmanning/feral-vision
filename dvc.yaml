@@ -4,13 +4,6 @@ stages:
     outs:
       - data/raw
 
-  augment:
-    cmd: uv run python -m feral_segmentor.data.augmentations
-    deps:
-      - data/raw
-    outs:
-      - data/augmented
-
   preprocess:
     cmd: uv run python -m feral_segmentor.data.transforms
     deps:
@@ -18,32 +11,25 @@ stages:
     outs:
       - data/processed
 
-  acquire_model:
-    cmd: uv run python -m feral_segmentor.models.acquire
-    deps:
-      - conf
-    outs:
-      - models/checkpoints
-
-  train:
-    cmd: uv run python -m feral_segmentor.training.trainer
+  augment:
+    cmd: uv run python -m feral_segmentor.data.augmentations
     deps:
       - data/processed
-      - models/checkpoints
+    outs:
+      - data/augmented
+
+  train:
+    cmd: uv run python -m feral_segmentor.pipelines.base_segmentation_pipeline
+    deps:
+      - data/processed
       - conf
     outs:
       - models/registry/best.pt
 
   evaluate:
-    cmd: uv run python -m feral_segmentor.training.metrics
+    cmd: uv run python -m feral_segmentor.pipelines.evaluate_segmentation_pipeline
     deps:
       - models/registry/best.pt
     metrics:
       - metrics.json
 
-  export:
-    cmd: uv run python -m feral_segmentor.inference.predictor
-    deps:
-      - models/registry/best.pt
-    outs:
-      - models/registry/onnx

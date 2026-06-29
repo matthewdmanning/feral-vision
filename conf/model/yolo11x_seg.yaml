@@ -1,7 +1,13 @@
 defaults:
-  - base_teacher
+  - base
   - _self_
 
-name: yolo11x_seg
-model_id: yolo11x-seg.pt
-weights_dir: models/checkpoints/yolo11x_seg
+model_outputs:
+  - seg_instance
+
+architecture:
+  source: ultralytics
+  id: yolo11x-seg.pt
+  location: null
+
+weights: null

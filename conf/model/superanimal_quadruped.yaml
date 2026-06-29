@@ -1,11 +1,12 @@
 defaults:
-  - base_hub
+  - base_model
   - _self_
 
-name: superanimal_quadruped
-source: hub
-repo_id: mwmathis/DeepLabCutModelZoo-SuperAnimal-Quadruped
-files:
-  - detector.pt
-  - pose_model.pth
-weights_dir: models/checkpoints/superanimal_quadruped
+model_outputs: []
+
+architecture:
+  source: ???
+  id: ???
+  location: ???
+
+weights: null
