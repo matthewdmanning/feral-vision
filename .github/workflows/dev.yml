@@ -1,11 +1,13 @@
 name: Dev
 
 on:
+  push:
+    branches-ignore: [main]
   pull_request:
     branches: [main]
 
 concurrency:
-  group: dev-${{ github.event.pull_request.number }}
+  group: dev-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -13,7 +15,7 @@ permissions:
 
 jobs:
   lint:
-    name: Lint
+    name: Style check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,11 +23,13 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uvx ruff check . --output-format=github
-      - run: uvx ruff format --check .
+      - name: Lint
+        run: uvx ruff check . --output-format=github
+      - name: Format
+        run: uvx ruff format --check .
 
   type-check:
-    name: Type check
+    name: Type safety
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +38,8 @@ jobs:
           python-version: "3.12"
           enable-cache: true
       - run: uv sync --group dev
-      - run: uv run mypy src
+      - name: Static analysis
+        run: uv run mypy src
 
   tests:
     name: Unit tests
@@ -46,10 +51,17 @@ jobs:
           python-version: "3.12"
           enable-cache: true
       - run: uv sync --group dev
-      - run: uv run python -m pytest -m "not gpu and not slow" -q --tb=short
+      - name: Run tests with coverage
+        run: uv run python -m pytest -m "not gpu and not slow" -q --tb=short --cov=src --cov-report=xml
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: coverage.xml
+          retention-days: 7
 
   docs-check:
-    name: Docs build
+    name: Docs compilation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -76,9 +88,9 @@ jobs:
           else
             uv sync --group dev
           fi
-      - name: Build sphinx docs
+      - name: Compile sphinx docs
         if: steps.detect.outputs.builder == 'sphinx'
         run: uv run sphinx-build -b html docs docs/_build -W
-      - name: Build mkdocs
+      - name: Compile mkdocs
         if: steps.detect.outputs.builder == 'mkdocs'
         run: uv run mkdocs build --strict
