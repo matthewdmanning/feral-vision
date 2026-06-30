@@ -11,7 +11,7 @@ from typing import Any, Callable, Protocol, TypeVar
 from omegaconf import DictConfig
 from torch import nn
 
-from feral_segmentor.models.properties import ModelProperties
+from feral_segmentor.models.ModelProperties import ModelProperties
 
 _SOURCES: dict[str, Any] = {}
 _S = TypeVar("_S")

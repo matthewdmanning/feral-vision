@@ -34,9 +34,11 @@ src/feral_segmentor/
                    # schema_convert.py — appearance JSON -> Hydra YAML
   models/          # register_model.py, ModelProperties.py, sources/ (SourceAdapter base + concrete adapters)
   training/        # trainer.py, losses.py, metrics.py, optim.py, train.py
-  inference/       # predictor
+  inference/       # postprocess.py
+  pipelines/       # base_segmentation_pipeline.py (entry point), evaluate_segmentation_pipeline.py
   tasks.py         # CVTask StrEnum
-conf/              # Hydra config groups: model/, train/, data/, augmentation/
+conf/              # Hydra config groups: model/, train/, data/, augmentation/,
+                   #   gcp/, tracking/, inference/, experiment/
   schemas/         # appearance.yaml (converted from draft_appearance_schema.json)
 docker/            # Dockerfile, entrypoint.sh, USER_STEPS.md
 docs/              # requirements.md
@@ -59,7 +61,7 @@ All datasets use a canonical two-directory layout:
 Source identifiers:
 
 - (local, \<path>)      -- directory on disk in the layout above
-- (remote, coco_2017)  -- fetched via fetch_coco(), lands in data/raw/
+- (remote, coco_2017)  -- fetched via fetch_data(), lands in data/raw/
 - (remote, \<id>)       -- future sources; must resolve to the layout above
 
 ## Environment
@@ -111,4 +113,4 @@ Attempt to find documentation yourself by web search. Verify the exact version w
 
 ## SCOPING
 
-Scope strictly to the task at hand. Do modify files that are not directly affected by the plan. Insert a #TODO for any dependencies or breaking changes that result from changes.
+Scope strictly to the task at hand. Do NOT modify files that are not directly affected by the plan. Insert a #TODO for any dependencies or breaking changes that result from changes.
