@@ -84,29 +84,173 @@ class TeacherModelConfig(ModelConfig):
     weights_dir: str = "models/checkpoints/teacher"
 
 
+# --- Training sub-configs ---------------------------------------------------
+@dataclass
+class OptimConfig:
+    """Base contract for optimizer configs. Subclass for each concrete variant."""
+
+    _target_: str = MISSING
+    _partial_: bool = True
+
+
+@dataclass
+class LossFnConfig:
+    """Base contract for loss function configs. Subclass for each concrete variant."""
+
+    _target_: str = MISSING
+
+
+@dataclass
+class SchedulerConfig:
+    """Base contract for scheduler configs. Subclass for each concrete variant."""
+
+    _target_: str = MISSING
+    _partial_: bool = True
+
+
+# --- Optim variants ---------------------------------------------------------
+@dataclass
+class AdamWConfig(OptimConfig):
+    _target_: str = "torch.optim.AdamW"
+    lr: float = 1e-3
+    betas: list[float] = field(default_factory=lambda: [0.9, 0.999])
+    eps: float = 1e-8
+    weight_decay: float = 1e-2
+    amsgrad: bool = False
+
+
+@dataclass
+class AdamConfig(OptimConfig):
+    _target_: str = "torch.optim.Adam"
+    lr: float = 1e-3
+    betas: list[float] = field(default_factory=lambda: [0.9, 0.999])
+    eps: float = 1e-8
+    weight_decay: float = 0.0
+    amsgrad: bool = False
+
+
+@dataclass
+class SGDConfig(OptimConfig):
+    _target_: str = "torch.optim.SGD"
+    lr: float = 1e-2
+    momentum: float = 0.9
+    dampening: float = 0.0
+    weight_decay: float = 0.0
+    nesterov: bool = False
+
+
+@dataclass
+class RMSpropConfig(OptimConfig):
+    _target_: str = "torch.optim.RMSprop"
+    lr: float = 1e-2
+    alpha: float = 0.99
+    eps: float = 1e-8
+    weight_decay: float = 0.0
+    momentum: float = 0.0
+    centered: bool = False
+
+
+@dataclass
+class RAdamConfig(OptimConfig):
+    _target_: str = "torch.optim.RAdam"
+    lr: float = 1e-3
+    betas: list[float] = field(default_factory=lambda: [0.9, 0.999])
+    eps: float = 1e-8
+    weight_decay: float = 0.0
+
+
+# --- Scheduler variants -----------------------------------------------------
+@dataclass
+class CosineAnnealingConfig(SchedulerConfig):
+    _target_: str = "torch.optim.lr_scheduler.CosineAnnealingLR"
+    T_max: int = C.DEFAULT_EPOCHS
+    eta_min: float = 0.0
+    last_epoch: int = -1
+
+
+@dataclass
+class LinearLRConfig(SchedulerConfig):
+    _target_: str = "torch.optim.lr_scheduler.LinearLR"
+    start_factor: float = 0.3333333333333333
+    end_factor: float = 1.0
+    total_iters: int = 5
+    last_epoch: int = -1
+
+
+@dataclass
+class StepLRConfig(SchedulerConfig):
+    _target_: str = "torch.optim.lr_scheduler.StepLR"
+    step_size: int = 10
+    gamma: float = 0.1
+    last_epoch: int = -1
+
+
+@dataclass
+class ReduceLROnPlateauConfig(SchedulerConfig):
+    _target_: str = "torch.optim.lr_scheduler.ReduceLROnPlateau"
+    mode: str = "min"
+    factor: float = 0.1
+    patience: int = 10
+    threshold: float = 1e-4
+    threshold_mode: str = "rel"
+    cooldown: int = 0
+    min_lr: float = 0.0
+    eps: float = 1e-8
+
+
+@dataclass
+class CosineWarmRestartsConfig(SchedulerConfig):
+    _target_: str = "torch.optim.lr_scheduler.CosineAnnealingWarmRestarts"
+    T_0: int = 10
+    T_mult: int = 1
+    eta_min: float = 0.0
+    last_epoch: int = -1
+
+
+# --- Loss variants ----------------------------------------------------------
+@dataclass
+class CrossEntropyConfig(LossFnConfig):
+    _target_: str = "torch.nn.CrossEntropyLoss"
+    reduction: str = "mean"
+    label_smoothing: float = 0.0
+    ignore_index: int = -100
+
+
+@dataclass
+class BCEWithLogitsConfig(LossFnConfig):
+    _target_: str = "torch.nn.BCEWithLogitsLoss"
+    reduction: str = "mean"
+
+
+@dataclass
+class MSELossConfig(LossFnConfig):
+    _target_: str = "torch.nn.MSELoss"
+    reduction: str = "mean"
+
+
+@dataclass
+class L1LossConfig(LossFnConfig):
+    _target_: str = "torch.nn.L1Loss"
+    reduction: str = "mean"
+
+
+@dataclass
+class NLLLossConfig(LossFnConfig):
+    _target_: str = "torch.nn.NLLLoss"
+    reduction: str = "mean"
+    ignore_index: int = -100
+
+
 # --- Training ---------------------------------------------------------------
 @dataclass
 class TrainConfig:
     epochs: int = C.DEFAULT_EPOCHS
-    lr: float = C.DEFAULT_LR
     batch_size: int = C.DEFAULT_BATCH_SIZE
-    optimizer: str = C.DEFAULT_OPTIMIZER
-    scheduler: str = C.DEFAULT_SCHEDULER
-    weight_decay: float = C.DEFAULT_WEIGHT_DECAY
-    momentum: float = C.DEFAULT_MOMENTUM
     num_workers: int = C.DEFAULT_NUM_WORKERS
-    scheduler_step_size: int = C.DEFAULT_SCHEDULER_STEP_SIZE
-    scheduler_gamma: float = C.DEFAULT_SCHEDULER_GAMMA
-    dice_weight: float = C.DEFAULT_DICE_WEIGHT
-    bce_weight: float = C.DEFAULT_BCE_WEIGHT
-    distill_weight: float = C.DEFAULT_DISTILL_WEIGHT
-    distill_temperature: float = C.DEFAULT_DISTILL_TEMPERATURE
-    # Similarity-weighted training. Set use_similarity=true to activate.
-    # similarity_loss / similarity_sampler are dotted import paths to callables
-    # resolved at runtime via importlib; "none" disables each respectively.
-    use_similarity: bool = False
-    similarity_loss: str = "none"
-    similarity_sampler: str = "none"
+    device: str = C.DEFAULT_DEVICE
+    optim: OptimConfig = MISSING
+    loss_fn: LossFnConfig = MISSING
+    scheduler: SchedulerConfig = MISSING
 
 
 # --- Inference --------------------------------------------------------------

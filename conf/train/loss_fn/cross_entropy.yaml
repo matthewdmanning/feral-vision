@@ -1,0 +1,8 @@
+# conf/train/loss_fn/cross_entropy.yaml
+# CrossEntropyLoss — instantiated directly (no partial needed).
+# Source: https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html
+
+_target_: torch.nn.CrossEntropyLoss
+reduction: mean
+label_smoothing: 0.0
+ignore_index: -100

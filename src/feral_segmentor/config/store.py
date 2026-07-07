@@ -25,6 +25,27 @@ from feral_segmentor.config.schema import (
     InferenceConfig,
     ScriptModelConfig,
     TeacherModelConfig,
+    # Loss base + variants
+    LossFnConfig,
+    CrossEntropyConfig,
+    BCEWithLogitsConfig,
+    MSELossConfig,
+    L1LossConfig,
+    NLLLossConfig,
+    # Optim base + variants
+    OptimConfig,
+    AdamWConfig,
+    AdamConfig,
+    SGDConfig,
+    RMSpropConfig,
+    RAdamConfig,
+    # Scheduler base + variants
+    SchedulerConfig,
+    CosineAnnealingConfig,
+    LinearLRConfig,
+    StepLRConfig,
+    ReduceLROnPlateauConfig,
+    CosineWarmRestartsConfig,
     TrackingConfig,
     TrainConfig,
 )
@@ -38,6 +59,29 @@ _SCHEMAS: tuple[tuple[str, str, type], ...] = (
     ("model", "base_config_source", ConfigModelConfig),
     ("model", "base_teacher", TeacherModelConfig),
     ("train", "base_train", TrainConfig),
+    # Base schemas — type contracts for TrainConfig fields
+    ("train/optim", "base_optim", OptimConfig),
+    ("train/loss_fn", "base_loss_fn", LossFnConfig),
+    ("train/scheduler", "base_scheduler", SchedulerConfig),
+    # Optim variants
+    ("train/optim", "adamw", AdamWConfig),
+    ("train/optim", "adam", AdamConfig),
+    ("train/optim", "sgd", SGDConfig),
+    ("train/optim", "rmsprop", RMSpropConfig),
+    ("train/optim", "radam", RAdamConfig),
+    # Scheduler variants
+    ("train/scheduler", "cosine", CosineAnnealingConfig),
+    ("train/scheduler", "linear", LinearLRConfig),
+    ("train/scheduler", "step", StepLRConfig),
+    ("train/scheduler", "plateau", ReduceLROnPlateauConfig),
+    ("train/scheduler", "warmrestarts", CosineWarmRestartsConfig),
+    # Loss variants
+    ("train/loss_fn", "cross_entropy", CrossEntropyConfig),
+    ("train/loss_fn", "bce_with_logits", BCEWithLogitsConfig),
+    ("train/loss_fn", "mse", MSELossConfig),
+    ("train/loss_fn", "l1", L1LossConfig),
+    ("train/loss_fn", "nll", NLLLossConfig),
+    # Other configs
     ("inference", "base_inference", InferenceConfig),
     ("tracking", "base_tracking", TrackingConfig),
     ("augmentation", "base_augmentation", AugmentationConfig),

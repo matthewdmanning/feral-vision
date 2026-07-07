@@ -1,0 +1,10 @@
+# conf/train/optim/radam.yaml
+# RAdam (Rectified Adam) — partial; call opt_factory(model.parameters()).
+# Source: https://pytorch.org/docs/stable/generated/torch.optim.RAdam.html
+
+_target_: torch.optim.RAdam
+_partial_: true
+lr: 1e-3
+betas: [0.9, 0.999]
+eps: 1e-8
+weight_decay: 0.0

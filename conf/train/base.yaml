@@ -1,17 +1,12 @@
-# config/trainer/base.yaml
-_target_: pytorch_lightning.Trainer
+# conf/train/base.yaml
 
-max_epochs: 10
-accelerator: auto
-devices: 1
-precision: "32"
-log_every_n_steps: 50
-enable_checkpointing: true
-enable_progress_bar: true
-
-# Compose callbacks from a separate group (recommended)
 defaults:
-  - callbacks: base
-epochs: 10
-lr: 0.001
+  - base_train  # merges onto TrainConfig schema for struct-mode validation
+  - optim: adamw
+  - scheduler: cosine
+  - loss_fn: cross_entropy
+
+epochs: 50
 batch_size: 32
+num_workers: 0
+device: cuda

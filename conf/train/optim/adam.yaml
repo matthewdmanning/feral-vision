@@ -1,0 +1,11 @@
+# conf/train/optim/adam.yaml
+# Adam — partial; call opt_factory(model.parameters()).
+# Source: https://pytorch.org/docs/stable/generated/torch.optim.Adam.html
+
+_target_: torch.optim.Adam
+_partial_: true
+lr: 1e-3
+betas: [0.9, 0.999]
+eps: 1e-8
+weight_decay: 0.0
+amsgrad: false

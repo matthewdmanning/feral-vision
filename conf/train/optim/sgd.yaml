@@ -1,0 +1,11 @@
+# conf/train/optim/sgd.yaml
+# SGD with momentum — partial; call opt_factory(model.parameters()).
+# Source: https://pytorch.org/docs/stable/generated/torch.optim.SGD.html
+
+_target_: torch.optim.SGD
+_partial_: true
+lr: 1e-2
+momentum: 0.9
+dampening: 0.0
+weight_decay: 0.0
+nesterov: false

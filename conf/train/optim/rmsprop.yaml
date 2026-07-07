@@ -1,0 +1,12 @@
+# conf/train/optim/rmsprop.yaml
+# RMSprop — partial; call opt_factory(model.parameters()).
+# Source: https://pytorch.org/docs/stable/generated/torch.optim.RMSprop.html
+
+_target_: torch.optim.RMSprop
+_partial_: true
+lr: 1e-2
+alpha: 0.99
+eps: 1e-8
+weight_decay: 0.0
+momentum: 0.0
+centered: false

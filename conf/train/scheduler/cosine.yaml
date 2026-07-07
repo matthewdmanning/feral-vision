@@ -1,0 +1,10 @@
+# conf/train/scheduler/cosine.yaml
+# CosineAnnealingLR — partial; call sched_factory(optimizer).
+# T_max should match cfg.train.epochs; override via CLI if needed.
+# Source: https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.CosineAnnealingLR.html
+
+_target_: torch.optim.lr_scheduler.CosineAnnealingLR
+_partial_: true
+T_max: 50
+eta_min: 0.0
+last_epoch: -1

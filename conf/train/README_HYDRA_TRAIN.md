@@ -1,24 +1,14 @@
-# Trainer Configuration (`config/trainer/`)
+# Train Config Group (`conf/train/`)
 
-This directory defines **training runtime configuration**. It is intended to work with Hydra composition and to scale
-as projects grow.
-
-This group covers:
-
-- Trainer/runtime settings (epochs, devices, precision, accumulation, etc.)
-- Callback configuration (checkpointing, early stopping, LR monitoring, etc.)
-
-**MLflow is handled separately** (Pattern A):
-
-- MLflow configuration and run tracking live under `config/mlflow/`
-- The training entrypoint is responsible for starting/stopping MLflow runs and logging params/metrics/artifacts
-- Trainer configs should not duplicate MLflow settings
+This directory defines training configuration composed from four concerns:
+runtime knobs (`base.yaml`) and three swappable sub-groups (optimizer, scheduler, loss function).
 
 ---
 
-## Recommended structure
+## Structure
 
 ```text
+<<<<<<< HEAD
 config/trainer/
   README.md
   base.yaml
@@ -28,35 +18,96 @@ config/trainer/
     README.md
     base.yaml              # standard callbacks
     minimal.yaml           # optional: fewer callbacks
+=======
+conf/train/
+  base.yaml              # runtime knobs + default sub-group selections
+  fast_dev.yaml          # CI / quick-iteration override (inherits base)
+
+  optim/                 # optimizer configs — see README_HYDRA_OPTIM.md
+    adamw.yaml           # default
+    adam.yaml
+    sgd.yaml
+    rmsprop.yaml
+    radam.yaml
+
+  scheduler/             # LR scheduler configs — see README_HYDRA_SCHEDULER.md
+    cosine.yaml          # default
+    linear.yaml
+    step.yaml
+    plateau.yaml
+    warmrestarts.yaml
+
+  loss_fn/               # loss function configs — see README_HYDRA_LOSS_FN.md
+    cross_entropy.yaml   # default
+    bce_with_logits.yaml
+    mse.yaml
+    l1.yaml
+    nll.yaml
+>>>>>>> adb4359 (feat(config): harmonize Hydra train sub-configs with swappable component pattern)
 ```
 
 ---
 
-## What belongs here
+## `base.yaml`
 
-### Trainer runtime settings
+Holds runtime knobs and selects one default from each sub-group:
 
-Examples (Lightning):
+```yaml
+defaults:
+  - base_train            # merges onto TrainConfig structured schema
+  - optim: adamw
+  - scheduler: cosine
+  - loss_fn: cross_entropy
 
-- `max_epochs`
-- `accelerator`, `devices`
-- `precision`
-- `accumulate_grad_batches`
-- `log_every_n_steps`
-- `limit_*_batches` (debugging)
+epochs: 50
+batch_size: 32
+num_workers: 0
+device: cuda
+```
 
-### Callbacks
+Override a sub-group at the CLI without touching this file:
 
-Examples:
+```bash
+python -m feral_segmentor.training.train train/optim=sgd
+python -m feral_segmentor.training.train train/scheduler=plateau
+python -m feral_segmentor.training.train train/loss_fn=bce_with_logits
+```
 
-- Model checkpointing (dirpath should use `${paths.checkpoints_dir}`)
-- Early stopping
-- Learning rate monitoring
+---
+
+## `fast_dev.yaml`
+
+Inherits `base` and overrides only the run knobs for CI / quick iteration:
+
+```yaml
+defaults:
+  - base
+  - _self_
+
+epochs: 1
+batch_size: 2
+device: cpu
+num_workers: 0
+```
+
+Use with: `train=fast_dev`
+
+---
+
+## Sub-group design
+
+Each sub-group YAML is **self-contained** — it includes `_target_`, `_partial_`
+(where applicable), and all constructor kwargs. No registration is required to
+use a variant at runtime; registration in `store.py` is for static type checking only.
+
+See the README in each sub-folder for format details and instructions on adding
+custom variants.
 
 ---
 
 ## Best practices
 
+<<<<<<< HEAD
 - Keep training logic in code; keep runtime knobs and callback wiring in config.
 - Prefer small, composable variants over large monolithic configs.
 - Use `fast_dev.yaml` for quick feedback and CI smoke runs.
@@ -76,3 +127,9 @@ python -m src.feral-segmentor.core.train trainer=fast_dev
 # Override runtime parameters
 python -m src.feral-segmentor.core.train trainer.max_epochs=50 trainer.precision=16
 ```
+=======
+- Override fields at the CLI for quick experiments; create a named variant for reproducible runs.
+- Never modify `base.yaml` defaults directly — use a named experiment preset under `conf/experiment/`.
+- `T_max` in `cosine.yaml` should match `epochs`; sync them via CLI override:
+  `train.scheduler.T_max=100 train.epochs=100`
+>>>>>>> adb4359 (feat(config): harmonize Hydra train sub-configs with swappable component pattern)
