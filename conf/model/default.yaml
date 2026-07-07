@@ -2,6 +2,6 @@ defaults:
   - base_config_source
   - _self_
 
-name: student_default
+name: default
 source: config
-weights_dir: models/checkpoints/student_default
+weights_dir: models/checkpoints/default
