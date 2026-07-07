@@ -2,9 +2,8 @@ import hydra
 import mlflow
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
-
+from feral_segmentor.data
 from feral_segmentor.config.store import register_configs
-from feral_segmentor.pipeline import segment
 from feral_segmentor.utils import get_logger
 
 logger = get_logger(__name__)
@@ -38,7 +37,6 @@ def main(cfg: DictConfig) -> None:
         mlflow.log_param("output_dir", output_dir)
         mlflow.set_tag("output_dir", output_dir)
         mlflow.set_tag("dataset_variant", cfg.augmentation.name)
-        segment(cfg)
 
 
 if __name__ == "__main__":
