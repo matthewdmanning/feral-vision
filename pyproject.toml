@@ -40,6 +40,11 @@ exclude = [
 ]
 
 [dependency-groups]
+docs-sphinx = [
+    "sphinx>=8.0",
+    "furo>=2024.0",
+    "sphinx-copybutton>=0.5",
+]
 dev = [
     "coverage>=7.14.2",
     "mypy>=1.10.0",
