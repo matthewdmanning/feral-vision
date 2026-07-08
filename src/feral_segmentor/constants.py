@@ -23,8 +23,6 @@ DEFAULT_BATCH_SIZE: int = 8
 DEFAULT_WEIGHT_DECAY: float = 1e-4
 DEFAULT_MOMENTUM: float = 0.9
 DEFAULT_NUM_WORKERS: int = 0
-DEFAULT_OPTIMIZER: str = "adam"
-DEFAULT_SCHEDULER: str = "none"
 DEFAULT_SCHEDULER_STEP_SIZE: int = 10
 DEFAULT_SCHEDULER_GAMMA: float = 0.1
 
@@ -40,7 +38,9 @@ DEFAULT_DATA_SOURCE: str = "local"
 DEFAULT_VAL_SPLIT: float = 0.2
 
 # COCO train2017 download
-COCO_ANNOTATIONS_URL: str = "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
+COCO_ANNOTATIONS_URL: str = (
+    "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
+)
 COCO_IMAGE_URL_TEMPLATE: str = "http://images.cocodataset.org/train2017/{file_name}"
 COCO_SUPERCATEGORY_FILTER: str = "animal"
 

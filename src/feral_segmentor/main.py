@@ -2,7 +2,6 @@ import hydra
 import mlflow
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
-from feral_segmentor.data
 from feral_segmentor.config.store import register_configs
 from feral_segmentor.utils import get_logger
 

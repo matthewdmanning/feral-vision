@@ -88,7 +88,9 @@ def fetch_coco(root: str = "data") -> tuple[Path, Path]:
         )
 
         # Keep only annotations that belong to animal categories.
-        animal_anns = [a for a in full["annotations"] if a["category_id"] in animal_cat_ids]
+        animal_anns = [
+            a for a in full["annotations"] if a["category_id"] in animal_cat_ids
+        ]
         animal_image_ids = {a["image_id"] for a in animal_anns}
         animal_images = [i for i in full["images"] if i["id"] in animal_image_ids]
         animal_cats = [c for c in full["categories"] if c["id"] in animal_cat_ids]

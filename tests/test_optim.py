@@ -1,7 +1,7 @@
-"""Tests for optimizer/scheduler builders (unit D).
+"""Tests for optimizer/scheduler/loss-fn builders.
 
-Self-contained: builds a 1-parameter dummy module and structured ``TrainConfig``
-nodes directly, with no dependency on other pipeline units.
+Verify that build_optimizer / build_scheduler / build_loss_fn correctly delegate
+to hydra.utils.instantiate for each supported config variant in schema.py.
 """
 
 import pytest
@@ -9,8 +9,20 @@ import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 
-from feral_segmentor.config.schema import TrainConfig
-from feral_segmentor.training.optim import build_optimizer, build_scheduler
+from feral_segmentor.config.schema import (
+    AdamConfig,
+    AdamWConfig,
+    BCEWithLogitsConfig,
+    CosineAnnealingConfig,
+    CrossEntropyConfig,
+    SGDConfig,
+    StepLRConfig,
+)
+from feral_segmentor.training.optim import (
+    build_loss_fn,
+    build_optimizer,
+    build_scheduler,
+)
 
 
 @pytest.fixture
@@ -18,56 +30,72 @@ def module() -> nn.Module:
     return nn.Linear(1, 1)
 
 
+# --- build_optimizer ---------------------------------------------------------
+
+
+def test_build_optimizer_adamw(module):
+    cfg = OmegaConf.structured(AdamWConfig(lr=1e-3))
+    opt = build_optimizer(module.parameters(), cfg)
+    assert isinstance(opt, torch.optim.AdamW)
+    assert opt.param_groups[0]["lr"] == pytest.approx(1e-3)
+
+
 def test_build_optimizer_adam(module):
-    cfg = OmegaConf.structured(TrainConfig(optimizer="adam"))
+    cfg = OmegaConf.structured(AdamConfig(lr=5e-4))
     opt = build_optimizer(module.parameters(), cfg)
     assert isinstance(opt, torch.optim.Adam)
-    group = opt.param_groups[0]
-    assert group["lr"] == cfg.lr
-    assert group["weight_decay"] == cfg.weight_decay
+    assert opt.param_groups[0]["lr"] == pytest.approx(5e-4)
 
 
 def test_build_optimizer_sgd_has_momentum(module):
-    cfg = OmegaConf.structured(TrainConfig(optimizer="sgd"))
+    cfg = OmegaConf.structured(SGDConfig(lr=1e-2, momentum=0.9))
     opt = build_optimizer(module.parameters(), cfg)
     assert isinstance(opt, torch.optim.SGD)
-    group = opt.param_groups[0]
-    assert group["lr"] == cfg.lr
-    assert group["weight_decay"] == cfg.weight_decay
-    assert group["momentum"] == cfg.momentum
+    assert opt.param_groups[0]["lr"] == pytest.approx(1e-2)
+    assert opt.param_groups[0]["momentum"] == pytest.approx(0.9)
 
 
-def test_build_optimizer_unknown_raises(module):
-    cfg = OmegaConf.structured(TrainConfig(optimizer="rmsprop"))
-    with pytest.raises(ValueError, match="Unknown optimizer"):
-        build_optimizer(module.parameters(), cfg)
+# --- build_scheduler ---------------------------------------------------------
 
 
 def test_build_scheduler_none_returns_none(module):
-    cfg = OmegaConf.structured(TrainConfig(scheduler="none"))
-    opt = build_optimizer(module.parameters(), cfg)
-    assert build_scheduler(opt, cfg) is None
+    opt = build_optimizer(module.parameters(), OmegaConf.structured(AdamWConfig()))
+    assert build_scheduler(opt, None) is None
 
 
 def test_build_scheduler_step(module):
-    cfg = OmegaConf.structured(TrainConfig(scheduler="step"))
-    opt = build_optimizer(module.parameters(), cfg)
-    sched = build_scheduler(opt, cfg)
+    opt = build_optimizer(module.parameters(), OmegaConf.structured(AdamWConfig()))
+    sched_cfg = OmegaConf.structured(StepLRConfig(step_size=5, gamma=0.5))
+    sched = build_scheduler(opt, sched_cfg)
     assert isinstance(sched, torch.optim.lr_scheduler.StepLR)
-    assert sched.step_size == cfg.scheduler_step_size
-    assert sched.gamma == cfg.scheduler_gamma
+    assert sched.step_size == 5
+    assert sched.gamma == pytest.approx(0.5)
 
 
 def test_build_scheduler_cosine(module):
-    cfg = OmegaConf.structured(TrainConfig(scheduler="cosine"))
-    opt = build_optimizer(module.parameters(), cfg)
-    sched = build_scheduler(opt, cfg)
+    opt = build_optimizer(module.parameters(), OmegaConf.structured(AdamWConfig()))
+    sched_cfg = OmegaConf.structured(CosineAnnealingConfig(T_max=10))
+    sched = build_scheduler(opt, sched_cfg)
     assert isinstance(sched, torch.optim.lr_scheduler.CosineAnnealingLR)
-    assert sched.T_max == cfg.epochs
+    assert sched.T_max == 10
 
 
-def test_build_scheduler_unknown_raises(module):
-    cfg = OmegaConf.structured(TrainConfig(scheduler="exponential"))
-    opt = build_optimizer(module.parameters(), cfg)
-    with pytest.raises(ValueError, match="Unknown scheduler"):
-        build_scheduler(opt, cfg)
+# --- build_loss_fn -----------------------------------------------------------
+
+
+def test_build_loss_fn_cross_entropy():
+    loss_fn = build_loss_fn(OmegaConf.structured(CrossEntropyConfig()))
+    assert isinstance(loss_fn, torch.nn.CrossEntropyLoss)
+
+
+def test_build_loss_fn_bce_with_logits():
+    loss_fn = build_loss_fn(OmegaConf.structured(BCEWithLogitsConfig()))
+    assert isinstance(loss_fn, torch.nn.BCEWithLogitsLoss)
+
+
+def test_build_loss_fn_cross_entropy_label_smoothing():
+    loss_fn = build_loss_fn(
+        OmegaConf.structured(CrossEntropyConfig(label_smoothing=0.1))
+    )
+    assert isinstance(loss_fn, torch.nn.CrossEntropyLoss)
+    assert loss_fn.label_smoothing == pytest.approx(0.1)

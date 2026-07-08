@@ -28,8 +28,8 @@ def test_default_compose_is_mergeable_dictconfig():
 
 
 def test_cli_override_merges():
-    cfg = _compose(["train.lr=0.01", "inference.device=cuda"])
-    assert cfg.train.lr == 0.01
+    cfg = _compose(["train.optim.lr=0.01", "inference.device=cuda"])
+    assert cfg.train.optim.lr == 0.01
     assert cfg.inference.device == "cuda"
 
 

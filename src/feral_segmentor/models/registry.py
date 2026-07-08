@@ -8,10 +8,11 @@ canonical image size). ``build_model`` and ``get_model`` call-sites unchanged.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from omegaconf import DictConfig
+from torch import nn
 
-from feral_segmentor.models.base import SegmentationModel
 from feral_segmentor.tasks import CVTask
 
 DEFAULT_ARCH: str = "student"
@@ -49,7 +50,7 @@ _MODEL_PROFILES: dict[str, ModelProfile] = {
 }
 
 
-def _resolve_arch_cls(name: str) -> type:
+def _resolve_arch_cls(name: str) -> Any:
     """Resolve arch class lazily to avoid circular imports at module load."""
     if name == "student":
         from feral_segmentor.models.segmentation import StudentSegmenter
@@ -72,7 +73,7 @@ def get_profile(name: str) -> ModelProfile:
         ) from exc
 
 
-def build_model(cfg: DictConfig) -> SegmentationModel:
+def build_model(cfg: DictConfig) -> nn.Module:
     """Build a segmentation model from a model DictConfig."""
     arch = str(cfg.get("arch", DEFAULT_ARCH))
     get_profile(arch)  # raises KeyError if unknown
@@ -80,7 +81,7 @@ def build_model(cfg: DictConfig) -> SegmentationModel:
     return arch_cls.from_config(cfg)
 
 
-def get_model(name: str = DEFAULT_ARCH) -> SegmentationModel:
+def get_model(name: str = DEFAULT_ARCH) -> nn.Module:
     """Construct a model architecture by name using default arch fields."""
     get_profile(name)  # raises KeyError if unknown
     arch_cls = _resolve_arch_cls(name)

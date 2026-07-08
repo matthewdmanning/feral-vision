@@ -1,7 +1,7 @@
 defaults:
   - data: default
   - model: default
-  - train: default
+  - train: base
   - inference: default
   - tracking: mlflow
   - augmentation: default

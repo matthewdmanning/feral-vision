@@ -75,7 +75,11 @@ Never modify Hydra `default.yaml` files. Copy to a new named yaml (e.g. `trial_a
 
 
 
-Attempt to find documentation yourself. Check version with install version. If Use context7 mcp to fetch latest documentation.
+Attempt to find documentation yourself. Check version with install version. If you can't find it, use context7 mcp to fetch latest documentation.
+
+## Pull Requests
+
+When writing a PR description, always use `.github/PULL_REQUEST_TEMPLATE.md` as the structure. Fill in every section that is relevant to the changes. For sections that do not apply (e.g. "Reproducibility & configs" for a non-training change, or "MLflow" when no tracking was touched), do not think about them — do not include the header or placeholder text.
 
 ## SCOPING
 

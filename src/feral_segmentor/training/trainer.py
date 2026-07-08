@@ -157,15 +157,16 @@ def build_trainer(cfg: Any) -> Trainer:
     are skeletons; ``build_trainer`` is only called from the DVC entrypoint.
     """
     from feral_segmentor.models.registry import build_model
-    from feral_segmentor.training.losses import segmentation_loss
-    from feral_segmentor.training.optim import build_optimizer, build_scheduler
+    from feral_segmentor.training.optim import (
+        build_loss_fn,
+        build_optimizer,
+        build_scheduler,
+    )
 
     model = build_model(cfg.model)
-    optimizer = build_optimizer(model.parameters(), cfg.train)
-    scheduler = build_scheduler(optimizer, cfg.train)
-
-    def loss_fn(outputs: Any, targets: Any) -> torch.Tensor:
-        return segmentation_loss(outputs, targets, cfg.train)
+    optimizer = build_optimizer(model.parameters(), cfg.train.optim)
+    scheduler = build_scheduler(optimizer, cfg.train.scheduler)
+    loss_fn = build_loss_fn(cfg.train.loss_fn)
 
     return Trainer(
         model=model,
@@ -176,10 +177,57 @@ def build_trainer(cfg: Any) -> Trainer:
     )
 
 
+def build_dataloader(cfg: Any) -> tuple[Any, Any | None]:
+    """Build train and optional val :class:`~torch.utils.data.DataLoader` from config.
+
+    Args:
+        cfg: Hydra config with ``cfg.data`` (``DataConfig``) and ``cfg.train``
+            (``TrainConfig``) sub-configs.
+
+    Returns:
+        ``(train_loader, val_loader)`` — ``val_loader`` is ``None`` when
+        ``cfg.data.val_split`` is 0.
+    """
+    from torch.utils.data import DataLoader, Dataset, random_split
+
+    from feral_segmentor.data.dataset import SegmentationDataset
+
+    dataset = SegmentationDataset(
+        root=str(cfg.data.root),
+        image_size=int(cfg.data.image_size),
+    )
+
+    val_split = float(cfg.data.val_split)
+    n = len(dataset)
+    n_val = int(n * val_split) if val_split > 0.0 else 0
+    n_train = n - n_val
+
+    train_ds: Dataset[Any]
+    if n_val > 0 and n_train > 0:
+        train_ds, val_ds = random_split(dataset, [n_train, n_val])
+        val_loader: Any = DataLoader(
+            val_ds,
+            batch_size=int(cfg.train.batch_size),
+            shuffle=False,
+            num_workers=int(cfg.train.num_workers),
+        )
+    else:
+        train_ds = dataset
+        val_loader = None
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=int(cfg.train.batch_size),
+        shuffle=True,
+        num_workers=int(cfg.train.num_workers),
+    )
+
+    return train_loader, val_loader
+
+
 def main() -> None:
     """DVC ``train`` stage entrypoint."""
     import hydra
-    from torch.utils.data import DataLoader
 
     from feral_segmentor.config.store import register_configs
 
@@ -187,16 +235,8 @@ def main() -> None:
 
     @hydra.main(version_base=None, config_path="../../conf", config_name="config")
     def _run(cfg: Any) -> None:
-        from feral_segmentor.data.dataset import SegmentationDataset
-
-        dataset = SegmentationDataset(cfg.data.root)
-        loader = DataLoader(
-            dataset,
-            batch_size=int(cfg.train.batch_size),
-            shuffle=True,
-            num_workers=int(cfg.train.num_workers),
-        )
-        build_trainer(cfg).fit(loader)
+        train_loader, val_loader = build_dataloader(cfg)
+        build_trainer(cfg).fit(train_loader, val_dataloader=val_loader)
 
     _run()
 
