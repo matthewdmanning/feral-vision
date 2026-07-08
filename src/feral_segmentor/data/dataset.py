@@ -1,80 +1,100 @@
-"""Paired image/mask dataset for semantic segmentation."""
+"""Paired image / annotation dataset."""
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
+from typing import Iterator
 
-import cv2
-import numpy as np
-import torch
-from torch.utils.data import Dataset
+from PIL import Image
+from torch.utils.data import Dataset, IterableDataset, get_worker_info
 
-from feral_segmentor.data.transforms import preprocess
+from feral_segmentor.data.annotations import Annotation, BBoxAnnotation, MaskAnnotation
 
-# Subdirectories expected under the dataset root.
 _IMAGES_DIR = "images"
-_MASKS_DIR = "masks"
+_ANNOTATIONS_DIR = "annotations"
 
 
-class SegmentationDataset(Dataset):
-    """Dataset of ``(image, mask)`` pairs read from disk.
+def _load_image(path: Path) -> Image.Image:
+    return Image.open(path)
 
-    Expects images under ``<root>/images`` and masks under ``<root>/masks`` with
-    matching filename stems. Images are preprocessed into normalized CHW float
-    tensors; masks are loaded single-channel, resized with nearest-neighbour
-    interpolation (to preserve class ids), and returned as ``H x W`` long
-    tensors.
-    """
 
-    def __init__(self, root: str, image_size: int = 256) -> None:
+def _load_annotation(path: Path) -> Annotation:
+    suffix = path.suffix.lower()
+    if suffix in {".jpg", ".jpeg", ".png", ".bmp"}:
+        return MaskAnnotation(path=path).load()
+    if suffix == ".txt":
+        return BBoxAnnotation(path=path).load()
+    raise NotImplementedError(f"no annotation loader for {suffix!r}: {path}")
+
+
+def _load_sample(
+    img_path: Path, ann_paths: list[Path]
+) -> tuple[Image.Image, list[Annotation]]:
+    return _load_image(img_path), [_load_annotation(p) for p in ann_paths]
+
+
+def _build_index(root: Path) -> list[tuple[Path, list[Path]]]:
+    images_dir = root / _IMAGES_DIR
+    annotations_dir = root / _ANNOTATIONS_DIR
+
+    if not images_dir.is_dir():
+        raise FileNotFoundError(f"images directory not found: {images_dir}")
+    if not annotations_dir.is_dir():
+        raise FileNotFoundError(f"annotations directory not found: {annotations_dir}")
+
+    annotations_by_stem: dict[str, list[Path]] = {}
+    for p in sorted(annotations_dir.iterdir()):
+        if p.is_file() and p.stem != "names":
+            annotations_by_stem.setdefault(p.stem, []).append(p)
+
+    samples: list[tuple[Path, list[Path]]] = []
+    for image_path in sorted(images_dir.iterdir()):
+        if not image_path.is_file():
+            continue
+        ann_paths = annotations_by_stem.get(image_path.stem)
+        if ann_paths is None:
+            raise FileNotFoundError(
+                f"no annotation matching image stem {image_path.stem!r}"
+                f" in {annotations_dir}"
+            )
+        samples.append((image_path, ann_paths))
+
+    if not samples:
+        raise FileNotFoundError(f"no images found in {images_dir}")
+
+    return samples
+
+
+class AnnotationDataset(Dataset[tuple[Image.Image, list[Annotation]]]):
+    """Map-style dataset for on-disk image / annotation pairs."""
+
+    def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
-        self.image_size = image_size
-        self.images_dir = self.root / _IMAGES_DIR
-        self.masks_dir = self.root / _MASKS_DIR
-
-        if not self.images_dir.is_dir():
-            raise FileNotFoundError(f"images directory not found: {self.images_dir}")
-        if not self.masks_dir.is_dir():
-            raise FileNotFoundError(f"masks directory not found: {self.masks_dir}")
-
-        # Index image files; require a matching mask (by stem) for each.
-        masks_by_stem = {
-            p.stem: p for p in sorted(self.masks_dir.iterdir()) if p.is_file()
-        }
-        self.samples: list[tuple[Path, Path]] = []
-        for image_path in sorted(self.images_dir.iterdir()):
-            if not image_path.is_file():
-                continue
-            mask_path = masks_by_stem.get(image_path.stem)
-            if mask_path is None:
-                raise FileNotFoundError(
-                    f"no mask matching image stem {image_path.stem!r} in {self.masks_dir}"
-                )
-            self.samples.append((image_path, mask_path))
-
-        if not self.samples:
-            raise FileNotFoundError(f"no images found in {self.images_dir}")
+        self.samples = _build_index(self.root)
 
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        image_path, mask_path = self.samples[index]
+    def __getitem__(self, index: int) -> tuple[Image.Image, list[Annotation]]:
+        img_path, ann_paths = self.samples[index]
+        return _load_sample(img_path, ann_paths)
 
-        image = cv2.imread(str(image_path), cv2.IMREAD_UNCHANGED)
-        if image is None:
-            raise FileNotFoundError(f"failed to read image: {image_path}")
-        image_tensor = preprocess(image, size=self.image_size)
 
-        mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
-        if mask is None:
-            raise FileNotFoundError(f"failed to read mask: {mask_path}")
-        # Nearest-neighbour keeps integer class ids intact during resize.
-        mask = cv2.resize(
-            mask,
-            (self.image_size, self.image_size),
-            interpolation=cv2.INTER_NEAREST,
-        )
-        mask_tensor = torch.from_numpy(mask.astype(np.int64))
+class StreamingAnnotationDataset(IterableDataset[tuple[Image.Image, list[Annotation]]]):
+    """Iterable dataset for streaming image / annotation pairs."""
 
-        return image_tensor, mask_tensor
+    def __init__(self, root: str | Path) -> None:
+        self.root = Path(root)
+        self.samples = _build_index(self.root)
+
+    def __iter__(self) -> Iterator[tuple[Image.Image, list[Annotation]]]:
+        worker_info = get_worker_info()
+        if worker_info is None:
+            samples = self.samples
+        else:
+            per_worker = math.ceil(len(self.samples) / worker_info.num_workers)
+            start = worker_info.id * per_worker
+            samples = self.samples[start : start + per_worker]
+        for img_path, ann_paths in samples:
+            yield _load_sample(img_path, ann_paths)

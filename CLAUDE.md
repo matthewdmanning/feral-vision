@@ -2,8 +2,6 @@
 
 At beginning of session, check that gh CLI is installed, git remote origin is set, and MCP servers respond, and any scripts I rely on. For each broken or missing tool, either auto-install it or give me a one-line fix. Report any missing prerequisites and stop if something is broken.
 
-
-
 ## Commands
 
 ```bash
@@ -73,9 +71,23 @@ Never modify Hydra `default.yaml` files. Copy to a new named yaml (e.g. `trial_a
 
 ## Documentations
 
-
-
 Attempt to find documentation yourself. Check version with install version. If you can't find it, use context7 mcp to fetch latest documentation.
+
+## Tool Responsibilities
+
+Each tool owns exactly one concern — do not blur these boundaries:
+
+| Tool | Owns |
+|---|---|
+| DVC | Data versioning only |
+| Scripts + source code | Workflow control |
+| Hydra | Parameters (all tunables live in `conf/`) |
+| MLflow | Metrics, hardware metrics, and experiments (model versions + exact data version per run) |
+| `model_registry.json` | Individual model metadata (access point, API params, architecture) |
+
+## DVC + MLflow Integration
+
+See memory: `reference_dvc_mlflow.md` — three patterns for linking DVC and MLflow without duplicating data. Key rule: never log raw data directories to MLflow; log `.dvc` tracker files, `dvc.api.get_url()` params, or `dvc.lock` instead.
 
 ## Pull Requests
 
