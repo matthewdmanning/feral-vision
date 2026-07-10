@@ -1,7 +1,0 @@
-defaults:
-  - base_teacher
-  - _self_
-
-name: yolo11x_seg
-model_id: yolo11x-seg.pt
-weights_dir: models/checkpoints/yolo11x_seg

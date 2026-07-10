@@ -1,4 +1,4 @@
-"""Example pytorch model for sanity checks and tests."""
+"""Default no-config model for sanity checks and tests."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from torch import nn
 from feral_segmentor.models.registry import register
 
 
-@register("TutorialArchitecture")
-class TutorialArchitecture(nn.Module):
+@register("net")
+class Net(nn.Module):
     """Classic PyTorch tutorial CNN; used as a test fixture."""
 
     def __init__(self) -> None:
@@ -20,6 +20,10 @@ class TutorialArchitecture(nn.Module):
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
+
+    @classmethod
+    def from_config(cls, cfg) -> "Net":
+        return cls()
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))

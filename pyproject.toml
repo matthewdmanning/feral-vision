@@ -7,6 +7,7 @@ authors = [
 ]
 requires-python = ">=3.12,<3.14"
 dependencies = [
+    "albumentations>=2.0",
     "dvc",
     "huggingface-hub>=1.20.1",
     "hydra-core",

@@ -1,215 +1,209 @@
-import abc
+import difflib
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, NoReturn
 
+import albumentations as A
 import hydra
 import numpy as np
 from omegaconf import DictConfig
 
 from feral_segmentor.config.store import register_configs
-from feral_segmentor.utils import get_logger
+from feral_segmentor.utils import get_logger, to_dtype
 
 log = get_logger(__name__)
 
-
-
-class Augmentation(abc.ABC):
-    """Composes via constructor chaining: Outer(Inner()).augment(x) == Outer._apply(Inner._apply(x))."""
-
-    def __init__(self, inner: "Augmentation | None" = None):
-        self.inner = inner
-
-    def augment(self, sample: Any) -> Any:
-        if self.inner is not None:
-            sample = self.inner.augment(sample)
-        return self._apply(sample)
-
-    @abc.abstractmethod
-    def _apply(self, sample: Any) -> Any: ...
-
-    def _own_params(self) -> dict[str, str | float]:
-        return {}
-
-    def to_params(self, index: int = 0) -> dict[str, str | float]:
-        flat = {
-            f"{index}.{type(self).__name__}.{k}": v
-            for k, v in self._own_params().items()
-        }
-        if self.inner is not None:
-            flat |= self.inner.to_params(index=index + 1)
-        return flat
-
-    def variant_label(self) -> str:
-        names = [type(self).__name__]
-        if self.inner is not None:
-            names.insert(0, self.inner.variant_label())
-        return "_".join(names)
-
-
-class FunctionAugmentation(Augmentation):
-    """Adapter wrapping an albumentations/torchvision-style transform callable."""
-
-    def __init__(self, fn: Callable, inner: "Augmentation | None" = None, **kwargs):
-        super().__init__(inner)
-        self.fn = fn
-        self.kwargs = kwargs
-
-    def _apply(self, sample: Any) -> Any:
-        raise NotImplementedError(
-            "backend call convention not yet chosen (albumentations vs torchvision)"
-        )
-
-    def _own_params(self) -> dict[str, str | float]:
-        return {"fn": type(self.fn).__name__, **self.kwargs}
-
-
-# --- Concrete augmentations -------------------------------------------------
-# A *sample* is a numpy ndarray image of shape (H, W) or (H, W, C). Each
-# concrete ``_apply`` is pure and deterministic (no RNG state), so a given
-# input always maps to the same output — i.e. trivially seedable/reproducible.
-
-
-class Identity(Augmentation):
-    """No-op augmentation; returns the sample unchanged. Used for empty chains."""
-
-    def _apply(self, sample: Any) -> Any:
-        return sample
-
-
-class HorizontalFlip(Augmentation):
-    """Mirror the image left-to-right (flip along the width axis)."""
-
-    def _apply(self, sample: np.ndarray) -> np.ndarray:
-        return np.ascontiguousarray(np.flip(sample, axis=1))
-
-
-class RandomRotate90(Augmentation):
-    """Rotate by a fixed multiple of 90 degrees (deterministic given ``k``)."""
-
-    def __init__(self, inner: "Augmentation | None" = None, k: int = 1):
-        super().__init__(inner)
-        self.k = k
-
-    def _apply(self, sample: np.ndarray) -> np.ndarray:
-        return np.ascontiguousarray(np.rot90(sample, k=self.k, axes=(0, 1)))
-
-    def _own_params(self) -> dict[str, str | float]:
-        return {"k": self.k}
-
-
-class BrightnessShift(Augmentation):
-    """Add a constant offset, clipping to the valid [0, 1] range."""
-
-    def __init__(
-        self,
-        inner: "Augmentation | None" = None,
-        shift: float = 0.1,
-    ):
-        super().__init__(inner)
-        self.shift = shift
-
-    def _apply(self, sample: np.ndarray) -> np.ndarray:
-        return np.clip(sample.astype(np.float64) + self.shift, 0.0, 1.0)
-
-    def _own_params(self) -> dict[str, str | float]:
-        return {"shift": self.shift}
-
-
-class GammaAdjust(Augmentation):
-    """Apply gamma correction ``out = in ** gamma`` on [0, 1] images."""
-
-    def __init__(self, inner: "Augmentation | None" = None, gamma: float = 1.2):
-        super().__init__(inner)
-        self.gamma = gamma
-
-    def _apply(self, sample: np.ndarray) -> np.ndarray:
-        clipped = np.clip(sample.astype(np.float64), 0.0, 1.0)
-        return np.power(clipped, self.gamma)
-
-    def _own_params(self) -> dict[str, str | float]:
-        return {"gamma": self.gamma}
-
-
-class MotionBlur(Augmentation):
-    """Simulate camera/subject motion via a horizontal linear blur kernel."""
-
-    def __init__(
-        self,
-        inner: "Augmentation | None" = None,
-        kernel_size: int = 15,
-    ):
-        super().__init__(inner)
-        if kernel_size % 2 == 0:
-            raise ValueError(f"kernel_size must be odd, got {kernel_size}")
-        self.kernel_size = kernel_size
-
-    def _apply(self, sample: np.ndarray) -> np.ndarray:
-        import cv2
-
-        kernel = np.zeros((self.kernel_size, self.kernel_size), dtype=np.float64)
-        kernel[self.kernel_size // 2, :] = 1.0 / self.kernel_size
-        img = (np.clip(sample, 0.0, 1.0) * 255.0).astype(np.uint8)
-        blurred = cv2.filter2D(img, -1, kernel)
-        return blurred.astype(np.float64) / 255.0
-
-    def _own_params(self) -> dict[str, str | float]:
-        return {"kernel_size": self.kernel_size}
-
-
-# --- Registry ---------------------------------------------------------------
-_AUGMENTATIONS: dict[str, type[Augmentation]] = {
-    "Identity": Identity,
-    "HorizontalFlip": HorizontalFlip,
-    "RandomRotate90": RandomRotate90,
-    "BrightnessShift": BrightnessShift,
-    "GammaAdjust": GammaAdjust,
-    "MotionBlur": MotionBlur,
+# Static registry of every instantiable Albumentations transform.
+# Enumerated from the archived release; update only if the library is replaced.
+_TRANSFORMS: dict[str, type[A.BasicTransform]] = {
+    "AdditiveNoise": A.AdditiveNoise,
+    "AdvancedBlur": A.AdvancedBlur,
+    "Affine": A.Affine,
+    "AtLeastOneBBoxRandomCrop": A.AtLeastOneBBoxRandomCrop,
+    "AutoContrast": A.AutoContrast,
+    "BBoxSafeRandomCrop": A.BBoxSafeRandomCrop,
+    "Blur": A.Blur,
+    "CLAHE": A.CLAHE,
+    "CenterCrop": A.CenterCrop,
+    "CenterCrop3D": A.CenterCrop3D,
+    "ChannelDropout": A.ChannelDropout,
+    "ChannelShuffle": A.ChannelShuffle,
+    "ChromaticAberration": A.ChromaticAberration,
+    "CoarseDropout": A.CoarseDropout,
+    "CoarseDropout3D": A.CoarseDropout3D,
+    "ColorJitter": A.ColorJitter,
+    "ConstrainedCoarseDropout": A.ConstrainedCoarseDropout,
+    "Crop": A.Crop,
+    "CropAndPad": A.CropAndPad,
+    "CropNonEmptyMaskIfExists": A.CropNonEmptyMaskIfExists,
+    "CubicSymmetry": A.CubicSymmetry,
+    "D4": A.D4,
+    "Defocus": A.Defocus,
+    "Downscale": A.Downscale,
+    "ElasticTransform": A.ElasticTransform,
+    "Emboss": A.Emboss,
+    "Equalize": A.Equalize,
+    "Erasing": A.Erasing,
+    "FDA": A.FDA,
+    "FancyPCA": A.FancyPCA,
+    "FrequencyMasking": A.FrequencyMasking,
+    "FromFloat": A.FromFloat,
+    "GaussNoise": A.GaussNoise,
+    "GaussianBlur": A.GaussianBlur,
+    "GlassBlur": A.GlassBlur,
+    "GridDistortion": A.GridDistortion,
+    "GridDropout": A.GridDropout,
+    "GridElasticDeform": A.GridElasticDeform,
+    "HEStain": A.HEStain,
+    "HistogramMatching": A.HistogramMatching,
+    "HorizontalFlip": A.HorizontalFlip,
+    "HueSaturationValue": A.HueSaturationValue,
+    "ISONoise": A.ISONoise,
+    "Illumination": A.Illumination,
+    "ImageCompression": A.ImageCompression,
+    "InvertImg": A.InvertImg,
+    "Lambda": A.Lambda,
+    "LongestMaxSize": A.LongestMaxSize,
+    "MaskDropout": A.MaskDropout,
+    "MedianBlur": A.MedianBlur,
+    "Morphological": A.Morphological,
+    "Mosaic": A.Mosaic,
+    "MotionBlur": A.MotionBlur,
+    "MultiplicativeNoise": A.MultiplicativeNoise,
+    "NoOp": A.NoOp,
+    "Normalize": A.Normalize,
+    "OpticalDistortion": A.OpticalDistortion,
+    "OverlayElements": A.OverlayElements,
+    "Pad": A.Pad,
+    "Pad3D": A.Pad3D,
+    "PadIfNeeded": A.PadIfNeeded,
+    "PadIfNeeded3D": A.PadIfNeeded3D,
+    "Perspective": A.Perspective,
+    "PiecewiseAffine": A.PiecewiseAffine,
+    "PixelDistributionAdaptation": A.PixelDistributionAdaptation,
+    "PixelDropout": A.PixelDropout,
+    "PlanckianJitter": A.PlanckianJitter,
+    "PlasmaBrightnessContrast": A.PlasmaBrightnessContrast,
+    "PlasmaShadow": A.PlasmaShadow,
+    "Posterize": A.Posterize,
+    "RGBShift": A.RGBShift,
+    "RandomBrightnessContrast": A.RandomBrightnessContrast,
+    "RandomCrop": A.RandomCrop,
+    "RandomCrop3D": A.RandomCrop3D,
+    "RandomCropFromBorders": A.RandomCropFromBorders,
+    "RandomCropNearBBox": A.RandomCropNearBBox,
+    "RandomFog": A.RandomFog,
+    "RandomGamma": A.RandomGamma,
+    "RandomGravel": A.RandomGravel,
+    "RandomGridShuffle": A.RandomGridShuffle,
+    "RandomRain": A.RandomRain,
+    "RandomResizedCrop": A.RandomResizedCrop,
+    "RandomRotate90": A.RandomRotate90,
+    "RandomScale": A.RandomScale,
+    "RandomShadow": A.RandomShadow,
+    "RandomSizedBBoxSafeCrop": A.RandomSizedBBoxSafeCrop,
+    "RandomSizedCrop": A.RandomSizedCrop,
+    "RandomSnow": A.RandomSnow,
+    "RandomSunFlare": A.RandomSunFlare,
+    "RandomToneCurve": A.RandomToneCurve,
+    "Resize": A.Resize,
+    "RingingOvershoot": A.RingingOvershoot,
+    "Rotate": A.Rotate,
+    "SafeRotate": A.SafeRotate,
+    "SaltAndPepper": A.SaltAndPepper,
+    "Sharpen": A.Sharpen,
+    "ShiftScaleRotate": A.ShiftScaleRotate,
+    "ShotNoise": A.ShotNoise,
+    "SmallestMaxSize": A.SmallestMaxSize,
+    "Solarize": A.Solarize,
+    "Spatter": A.Spatter,
+    "SquareSymmetry": A.SquareSymmetry,
+    "Superpixels": A.Superpixels,
+    "TextImage": A.TextImage,
+    "ThinPlateSpline": A.ThinPlateSpline,
+    "TimeMasking": A.TimeMasking,
+    "TimeReverse": A.TimeReverse,
+    "ToFloat": A.ToFloat,
+    "ToGray": A.ToGray,
+    "ToRGB": A.ToRGB,
+    "ToSepia": A.ToSepia,
+    "ToTensor3D": A.ToTensor3D,
+    "ToTensorV2": A.ToTensorV2,
+    "Transpose": A.Transpose,
+    "UnsharpMask": A.UnsharpMask,
+    "VerticalFlip": A.VerticalFlip,
+    "XYMasking": A.XYMasking,
+    "ZoomBlur": A.ZoomBlur,
 }
 
 
-def build_chain(cfg: DictConfig) -> Augmentation:
-    """Construct a nested augmentation chain from ``cfg.ops``.
+def _suggest(name: str) -> list[str]:
+    return difflib.get_close_matches(name, _TRANSFORMS.keys(), n=3, cutoff=0.6)
 
-    ``cfg`` is an :class:`AugmentationConfig`-shaped node (a DictConfig with an
-    ``ops: list[str]``). The first name in ``ops`` becomes the *innermost*
-    augmentation (applied first), composed outward via the ``inner=`` pattern.
-    An empty ``ops`` yields an :class:`Identity` no-op.
+
+def compose_augmentations(cfg: DictConfig) -> A.Compose:
+    """Build an Albumentations Compose pipeline from a Hydra AugmentationConfig.
+
+    Parameters
+    ----------
+    cfg : DictConfig
+        An ``AugmentationConfig``-shaped node with an ``ops`` list. Each entry
+        must have a ``name`` key and any kwargs accepted by the corresponding
+        Albumentations transform.
+
+    Returns
+    -------
+    A.Compose
+        Ready-to-call pipeline; invoke as ``pipeline(image=img)["image"]``.
+
+    Raises
+    ------
+    ValueError
+        If a transform name is not found in ``_TRANSFORMS``.
     """
-    ops = list(cfg.ops) if cfg.ops is not None else []
-    if not ops:
-        return Identity()
-    chain: Augmentation | None = None
-    for name in ops:
-        try:
-            cls = _AUGMENTATIONS[name]
-        except KeyError as exc:
-            raise KeyError(
-                f"unknown augmentation op {name!r}; registered: {sorted(_AUGMENTATIONS)}"
-            ) from exc
-        chain = cls(inner=chain)
-    assert chain is not None  # guaranteed: ops is non-empty
-    return chain
+    ops = list(cfg.ops) if cfg.ops else []
+    transforms = [_instantiate_transform(op) for op in ops]
+    return A.Compose(transforms)
+
+
+def _instantiate_transform(op: Any) -> A.BasicTransform:
+    name = op["name"] if hasattr(op, "__getitem__") else op.name
+    kwargs = {k: v for k, v in op.items() if k != "name"}
+    if name not in _TRANSFORMS:
+        _unknown_transform(name)
+    return _TRANSFORMS[name](**kwargs)
+
+
+def _unknown_transform(name: str) -> NoReturn:
+    suggestions = _suggest(name)
+    msg = f"unknown transform {name!r}"
+    if suggestions:
+        msg += f"; did you mean: {', '.join(suggestions)}?"
+    raise ValueError(msg)
 
 
 def run_augment_stage(cfg: DictConfig) -> None:
-    """Build the chain and apply it across data/raw -> data/augmented.
+    """Apply the configured augmentation pipeline across data/raw -> data/augmented.
 
-    IO is guarded: if the input directory is absent we just log and return, so
-    the stage never crashes in environments where data has not been fetched.
+    Parameters
+    ----------
+    cfg : DictConfig
+        Top-level Hydra config; must contain ``cfg.augmentation`` and optionally
+        ``cfg.data.root`` (defaults to ``"data"``).
+
+    Notes
+    -----
+    Images are converted to uint8 via ``to_dtype`` before the Albumentations
+    pipeline (its expected input format) and written back as uint8. The stage
+    is a no-op when the raw directory is absent so DVC never fails in
+    environments where data has not been fetched.
     """
-    chain = build_chain(cfg.augmentation)
-    log.info("built augmentation chain: %s", chain.variant_label())
+    pipeline = compose_augmentations(cfg.augmentation)
+    label = cfg.augmentation.name
+    log.info("built augmentation pipeline: %s", label)
 
-    raw_dir = (
-        Path(getattr(cfg.data, "root", "data")) / "raw"
-        if "data" in cfg
-        else Path("data/raw")
-    )
-    out_dir = (
-        Path(getattr(cfg.data, "root", "data")) / "augmented"
-        if "data" in cfg
-        else Path("data/augmented")
-    )
+    root = Path(getattr(cfg.data, "root", "data")) if "data" in cfg else Path("data")
+    raw_dir = root / "raw"
+    out_dir = root / "augmented"
 
     if not raw_dir.exists():
         log.info("raw dir %s absent; nothing to augment", raw_dir)
@@ -226,11 +220,10 @@ def run_augment_stage(cfg: DictConfig) -> None:
         if image is None:
             log.warning("could not read %s; skipping", path)
             continue
-        normalized = image.astype(np.float64) / 255.0
-        augmented = chain.augment(normalized)
-        out_image = np.clip(augmented * 255.0, 0, 255).astype(np.uint8)
-        dest = out_dir / f"{path.stem}_{chain.variant_label()}{path.suffix}"
-        cv2.imwrite(str(dest), out_image)
+        image_u8 = to_dtype(image, np.uint8) if image.dtype != np.uint8 else image
+        augmented = pipeline(image=image_u8)["image"]
+        dest = out_dir / f"{path.stem}_{label}{path.suffix}"
+        cv2.imwrite(str(dest), augmented)
         log.info("wrote %s", dest)
 
 

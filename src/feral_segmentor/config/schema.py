@@ -72,16 +72,6 @@ class ConfigModelConfig(ModelConfig):
     weights_dir: str = MISSING
 
 
-@dataclass
-class TeacherModelConfig(ModelConfig):
-    """YOLO teacher loaded via Ultralytics by model_id string (auto-downloads)."""
-
-    source: str = "config"
-    arch: str = "teacher"
-    model_id: str = "yolo11x-seg.pt"
-    weights_dir: str = "models/checkpoints/teacher"
-
-
 # --- Training sub-configs ---------------------------------------------------
 @dataclass
 class OptimConfig:

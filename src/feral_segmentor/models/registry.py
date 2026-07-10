@@ -1,88 +1,56 @@
-"""Model profile registry and builder.
-
-Each entry in ``_MODEL_PROFILES`` is a :class:`ModelProfile` combining the
-``nn.Module`` class with dataset-facing metadata (task list, annotation format,
-canonical image size). ``build_model`` and ``get_model`` call-sites unchanged.
-"""
+"""Architecture registry. Each nn.Module subclass self-registers via @register."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 from omegaconf import DictConfig
 from torch import nn
 
 from feral_segmentor.tasks import CVTask
 
-DEFAULT_ARCH: str = "student"
+DEFAULT_ARCH: str = "net"
+
+# Values are Any so registered classes may define from_config without mypy
+# needing a Protocol with a classmethod (which is unsound in Python's type system).
+_ARCHITECTURES: dict[str, Any] = {}
+
+_M = TypeVar("_M")
 
 
-@dataclass
-class ModelProfile:
-    """All static metadata for a registered model architecture."""
+def register(name: str) -> Callable[[_M], _M]:
+    """Decorator that registers an nn.Module subclass under ``name``."""
 
-    arch_cls: type | None  # resolved lazily to avoid circular imports
-    tasks: list[CVTask]
-    annotation_format: str  # e.g. "mask", "yolo_seg", "yolo_det"
-    image_size: int  # canonical square side length
+    def decorator(cls: _M) -> _M:
+        _ARCHITECTURES[name] = cls
+        return cls
 
-
-_MODEL_PROFILES: dict[str, ModelProfile] = {
-    "student": ModelProfile(
-        arch_cls=None,
-        tasks=[CVTask.SEG_SEMANTIC],
-        annotation_format="mask",
-        image_size=256,
-    ),
-    "teacher": ModelProfile(
-        arch_cls=None,
-        tasks=[CVTask.SEG_INSTANCE, CVTask.SEG_SEMANTIC],
-        annotation_format="yolo_seg",
-        image_size=640,
-    ),
-    "yolo11n-seg": ModelProfile(
-        arch_cls=None,
-        tasks=[CVTask.SEG_INSTANCE, CVTask.SEG_SEMANTIC],
-        annotation_format="yolo_seg",
-        image_size=640,
-    ),
-}
-
-
-def _resolve_arch_cls(name: str) -> Any:
-    """Resolve arch class lazily to avoid circular imports at module load."""
-    if name == "student":
-        from feral_segmentor.models.segmentation import StudentSegmenter
-
-        return StudentSegmenter
-    if name in ("teacher", "yolo11n-seg"):
-        from feral_segmentor.models.teacher import TeacherModel
-
-        return TeacherModel
-    raise KeyError(f"no class resolver for {name!r}")
-
-
-def get_profile(name: str) -> ModelProfile:
-    """Return the :class:`ModelProfile` for a registered model name."""
-    try:
-        return _MODEL_PROFILES[name]
-    except KeyError as exc:
-        raise KeyError(
-            f"unknown model {name!r}; registered: {sorted(_MODEL_PROFILES)}"
-        ) from exc
+    return decorator
 
 
 def build_model(cfg: DictConfig) -> nn.Module:
-    """Build a segmentation model from a model DictConfig."""
+    """Build from cfg.arch (falls back to DEFAULT_ARCH) via cls.from_config(cfg)."""
     arch = str(cfg.get("arch", DEFAULT_ARCH))
-    get_profile(arch)  # raises KeyError if unknown
-    arch_cls = _resolve_arch_cls(arch)
-    return arch_cls.from_config(cfg)
+    try:
+        cls = _ARCHITECTURES[arch]
+    except KeyError:
+        raise KeyError(
+            f"unknown architecture {arch!r}; registered: {sorted(_ARCHITECTURES)}"
+        ) from None
+    return cls.from_config(cfg)
 
 
 def get_model(name: str = DEFAULT_ARCH) -> nn.Module:
-    """Construct a model architecture by name using default arch fields."""
-    get_profile(name)  # raises KeyError if unknown
-    arch_cls = _resolve_arch_cls(name)
-    return arch_cls()
+    """Return a default-constructed instance of the named architecture."""
+    try:
+        cls = _ARCHITECTURES[name]
+    except KeyError:
+        raise KeyError(
+            f"unknown architecture {name!r}; registered: {sorted(_ARCHITECTURES)}"
+        ) from None
+    return cls()
+
+
+def get_model_tasks(model_cfg: DictConfig) -> list[CVTask]:
+    """Return the CVTask list declared in a composed model config."""
+    return [CVTask(t) for t in model_cfg.model_tasks]

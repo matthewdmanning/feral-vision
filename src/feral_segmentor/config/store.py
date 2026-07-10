@@ -24,7 +24,6 @@ from feral_segmentor.config.schema import (
     HubModelConfig,
     InferenceConfig,
     ScriptModelConfig,
-    TeacherModelConfig,
     # Loss base + variants
     LossFnConfig,
     CrossEntropyConfig,
@@ -57,7 +56,6 @@ _SCHEMAS: tuple[tuple[str, str, type], ...] = (
     ("model", "base_hub", HubModelConfig),
     ("model", "base_script", ScriptModelConfig),
     ("model", "base_config_source", ConfigModelConfig),
-    ("model", "base_teacher", TeacherModelConfig),
     ("train", "base_train", TrainConfig),
     # Base schemas — type contracts for TrainConfig fields
     ("train/optim", "base_optim", OptimConfig),
