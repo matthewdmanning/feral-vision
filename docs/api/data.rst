@@ -18,6 +18,3 @@ Data
 
 .. automodule:: feral_segmentor.data.coco_to_yolo
    :members:
-
-.. automodule:: feral_segmentor.data.creator
-   :members:

@@ -24,6 +24,8 @@ mlflow.db
 !/data/**/.gitkeep
 /models/**
 !/models/**/.gitkeep
+.dvc/tmp/
+.dvc/cache/
 
 # Dev Files
 .claude/**
