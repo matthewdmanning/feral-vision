@@ -214,7 +214,9 @@ def test_dataset_target_transform_applied():
 
 
 def test_dataset_image_transform_applied():
-    transform = lambda img: img.float() / 255.0
+    def transform(img):
+        return img.float() / 255.0
+
     ds = AnnotationDataset(_MockSource(), transform=transform)
     img, _ = ds[0]
     assert img.dtype == torch.float32
