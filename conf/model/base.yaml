@@ -1,7 +1,12 @@
 defaults:
-  - base_config_source
+  - base_model
   - _self_
 
-name: default
-source: config
-weights_dir: models/checkpoints/default
+model_outputs: []
+
+architecture:
+  source: ???
+  id: ???
+  location: ???
+
+weights: null

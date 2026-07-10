@@ -24,12 +24,14 @@ mlflow.db
 !/data/**/.gitkeep
 /models/**
 !/models/**/.gitkeep
+
+# Dev Files
 .claude/**
 CLAUDE.md
-
 bash.exe.stackdump
 .coverage
 coverage.xml
 example_augment.txt
 yolo11n-seg.pt
 docs/_build
+.vscode/tasks.json

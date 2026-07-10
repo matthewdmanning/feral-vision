@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "model-inspector": {
+      "command": "uv",
+      "args": ["run", "python", "mcp/server/main.py"],
+      "env": {
+        "PROJECT_ROOT": "."
+      }
+    }
+  }
+}

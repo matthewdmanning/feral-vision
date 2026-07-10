@@ -1,5 +1,4 @@
 [core]
-    no_scm = True
     remote = gcs
 [remote "gcs"]
     url = gs://${GCS_BUCKET}/dvc

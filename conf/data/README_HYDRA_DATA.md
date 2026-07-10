@@ -31,7 +31,7 @@ No transformation, preprocessing, or filtering logic should live in these files.
 
 Every project must define a canonical dataset configuration, typically `base.yaml`.
 
-```yaml
+~~~yaml
 name: "CHANGE_ME_dataset_name"
 path: ${paths.data_dir}/processed/CHANGE_ME_dataset_name
 format: null
@@ -49,7 +49,7 @@ dvc:
   enabled: true
   data_path: "data/processed/CHANGE_ME_dataset_name"
   metadata_path: null
-```
+~~~
 
 ---
 
@@ -59,22 +59,22 @@ dvc:
 
 If your pipeline produces explicit split files:
 
-```yaml
+~~~yaml
 splits:
   train: "train.parquet"
   val: "val.parquet"
   test: "test.parquet"
-```
+~~~
 
 ### Split/index metadata (common for image datasets)
 
 If you train from a directory of raw images but produce metadata:
 
-```yaml
+~~~yaml
 index:
   split_file: ${paths.data_dir}/processed/my_dataset/splits.csv
   classmap_file: ${paths.data_dir}/processed/my_dataset/class_to_idx.json
-```
+~~~
 
 If neither `splits` nor `index` is provided, the data loader is expected to infer splits from `path`.
 
@@ -103,7 +103,7 @@ Dynamic metadata must not be written back into YAML files.
 
 ## Example usage
 
-```bash
+~~~bash
 # Use the default dataset
 python -m src.feral-segmentor.core.train data=base
 
@@ -112,6 +112,6 @@ python -m src.feral-segmentor.core.train data.path=${paths.data_dir}/processed/v
 
 # Switch to another dataset variant
 python -m src.feral-segmentor.core.train data=imagenet
-```
+~~~
 
 This directory is part of the project’s configuration contract and should evolve deliberately.

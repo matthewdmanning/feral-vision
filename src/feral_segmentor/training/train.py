@@ -16,8 +16,6 @@ from feral_segmentor.utils import get_logger
 
 logger = get_logger(__name__)
 
-_YOLO_MODEL = "yolo11n-seg.pt"
-
 
 def _resolve_callable(dotted: str) -> Callable | None:
     """Import and return a callable from a dotted module path, or None if "none"."""
@@ -30,7 +28,7 @@ def _resolve_callable(dotted: str) -> Callable | None:
     return getattr(module, attr)
 
 
-def _write_data_yaml(cfg: DictConfig, data_dir: str) -> Path:
+def _write_data_yaml(cfg: DictConfig, data_dir: str | Path) -> Path:
     """Generate a YOLO data.yaml from Hydra DataConfig and return its path."""
     data_path = Path(data_dir)
     names_path = data_path / "labels" / "names.yaml"
@@ -92,7 +90,7 @@ def main(cfg: DictConfig) -> None:
                 class_similarity=list(cfg.data.class_similarity)
             )
 
-    model = YOLO(_YOLO_MODEL)
+    model = YOLO(cfg.model.architecture.id)
     model.train(
         data=str(data_yaml),
         epochs=cfg.train.epochs,

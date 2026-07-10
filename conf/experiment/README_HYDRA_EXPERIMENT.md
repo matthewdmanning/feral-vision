@@ -77,7 +77,7 @@ Lifecycle intent does **not** control deployment by itself.
 
 ## Usage examples
 
-```bash
+~~~bash
 # Run with no preset (explicit configuration only)
 python -m src.feral-segmentor.core.train
 
@@ -86,7 +86,7 @@ python -m src.feral-segmentor.core.train experiment=debug
 
 # Canonical baseline run
 python -m src.feral-segmentor.core.train experiment=baseline
-```
+~~~
 
 ---
 

@@ -20,7 +20,6 @@ Focus areas include robustness in uncontrolled environments and compatibility wi
 
 ## Scope
 
-Research includes:
 - segmentation architectures
 - dataset selection and curation
 - data augmentation strategies
@@ -60,4 +59,3 @@ Outputs will be integrated into Feral Spotter to support image-based assistance 
 ---
 
 ## License
-

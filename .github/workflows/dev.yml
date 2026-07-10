@@ -1,0 +1,96 @@
+name: Dev
+
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: dev-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Style check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Lint
+        run: uvx ruff check . --output-format=github
+      - name: Format
+        run: uvx ruff format --check .
+
+  type-check:
+    name: Type safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --group dev
+      - name: Static analysis
+        run: uv run mypy src
+
+  tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --group dev
+      - name: Run tests with coverage
+        run: uv run python -m pytest -m "not gpu and not slow" -q --tb=short --cov=src --cov-report=xml
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: coverage.xml
+          retention-days: 7
+
+  docs-check:
+    name: Docs compilation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect builder
+        id: detect
+        run: |
+          if [ -f "mkdocs.yml" ] || [ -f "mkdocs.yaml" ]; then
+            echo "builder=mkdocs" >> "$GITHUB_OUTPUT"
+          elif [ -f "docs/conf.py" ]; then
+            echo "builder=sphinx" >> "$GITHUB_OUTPUT"
+          else
+            echo "builder=none" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: astral-sh/setup-uv@v5
+        if: steps.detect.outputs.builder != 'none'
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install deps
+        if: steps.detect.outputs.builder != 'none'
+        run: |
+          if [ "${{ steps.detect.outputs.builder }}" = "sphinx" ]; then
+            uv sync --group dev --group docs-sphinx
+          else
+            uv sync --group dev
+          fi
+      - name: Compile sphinx docs
+        if: steps.detect.outputs.builder == 'sphinx'
+        run: uv run sphinx-build -b html docs docs/_build -W
+      - name: Compile mkdocs
+        if: steps.detect.outputs.builder == 'mkdocs'
+        run: uv run mkdocs build --strict

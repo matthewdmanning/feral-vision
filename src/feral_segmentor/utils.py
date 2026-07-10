@@ -37,6 +37,12 @@ def to_dtype(image: np.ndarray, target_dtype: "np.dtype | type") -> np.ndarray:
     ------
     ValueError
         If the (source, target) dtype pair is not in ``_DTYPE_SCALE``.
+
+    Notes
+    -----
+    Scale factors are looked up from ``_DTYPE_SCALE`` rather than inferred,
+    so unsupported conversions fail loudly instead of silently truncating values.
+    Integer targets are clipped to their valid range before casting.
     """
     target = np.dtype(target_dtype)
     if image.dtype == target:

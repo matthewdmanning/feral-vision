@@ -1,9 +1,10 @@
-"""Foundation tests: structured-config schemas compose, validate, and stay mergeable."""
+"""Structured-config schema tests: compose, validate, and CLI override."""
 
 import pytest
 from hydra import compose, initialize
+from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
-from omegaconf.errors import ConfigAttributeError, ConfigKeyError
+from omegaconf.errors import ConfigAttributeError, ConfigKeyError, MissingMandatoryValue
 
 from feral_segmentor.config.store import register_configs
 
@@ -13,8 +14,14 @@ def _registered():
     register_configs()
 
 
+@pytest.fixture(autouse=True)
+def _clear_hydra():
+    GlobalHydra.instance().clear()
+    yield
+    GlobalHydra.instance().clear()
+
+
 def _compose(overrides=None):
-    # config_path is relative to this test file (tests/ -> ../conf).
     with initialize(version_base=None, config_path="../conf"):
         return compose(config_name="config", overrides=overrides or [])
 
@@ -22,7 +29,6 @@ def _compose(overrides=None):
 def test_default_compose_is_mergeable_dictconfig():
     cfg = _compose()
     assert isinstance(cfg, DictConfig)
-    # Mergeable: a second config merges in cleanly.
     merged = OmegaConf.merge(cfg, {"train": {"epochs": 5}})
     assert merged.train.epochs == 5
 
@@ -38,15 +44,65 @@ def test_unknown_key_rejected_by_struct_schema():
         _compose(["train.nope=1"])
 
 
-def test_default_model_is_config_source():
+def test_model_base_has_architecture_and_weights_fields():
     cfg = _compose()
-    assert cfg.model.source == "config"
-    assert cfg.model.num_classes >= 1
+    assert hasattr(cfg.model, "architecture")
+    assert hasattr(cfg.model, "weights")
+    assert hasattr(cfg.model, "model_outputs")
 
 
-def test_hub_model_variant_has_fetch_fields():
-    cfg = _compose(["model=superanimal_bird"])
-    assert cfg.model.source == "hub"
-    assert cfg.model.repo_id
-    assert list(cfg.model.files)
-    assert cfg.model.weights_dir
+def test_model_architecture_required_fields_are_missing_sentinels():
+    cfg = _compose()
+    with pytest.raises(MissingMandatoryValue):
+        _ = cfg.model.architecture.source
+
+
+def test_model_weights_defaults_null():
+    cfg = _compose()
+    assert cfg.model.weights is None
+
+
+def test_model_variant_composes(tmp_path):
+    with initialize(version_base=None, config_path="../conf"):
+        cfg = compose(
+            config_name="config",
+            overrides=[
+                "model=yolo11n_seg",
+                "model.architecture.source=yolo_hub",
+                "model.architecture.id=yolo11n-seg",
+                "model.architecture.location=models/registry",
+            ],
+        )
+    assert cfg.model.architecture.source == "yolo_hub"
+    assert cfg.model.architecture.id == "yolo11n-seg"
+
+
+def test_model_with_weights_block():
+    from feral_segmentor.config.schema import ModelConfig, SourceConfig, WeightsConfig
+
+    arch = SourceConfig(source="yolo_hub", id="yolo11n-seg", location="models/registry")
+    weights = WeightsConfig(
+        source="yolo_hub",
+        id=["yolo11n-seg.pt"],
+        location="models/checkpoints/yolo11n_seg",
+    )
+    cfg = OmegaConf.structured(
+        ModelConfig(architecture=arch, weights=weights, model_outputs=["seg_instance"])
+    )
+    assert cfg.weights.source == "yolo_hub"
+    assert "yolo11n-seg.pt" in cfg.weights.id
+
+
+def test_model_outputs_list():
+    with initialize(version_base=None, config_path="../conf"):
+        cfg = compose(
+            config_name="config",
+            overrides=[
+                "model=yolo11n_seg",
+                "model.architecture.source=yolo_hub",
+                "model.architecture.id=yolo11n-seg",
+                "model.architecture.location=models/registry",
+                "model.model_outputs=[seg_instance]",
+            ],
+        )
+    assert "seg_instance" in cfg.model.model_outputs

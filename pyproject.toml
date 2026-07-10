@@ -17,10 +17,8 @@ dependencies = [
     "torch>=2.12.1",
     "pycocotools>=2.0",
     "ultralytics>=8.3",
+    "mcp>=1.0",
 ]
-
-[project.scripts]
-feral-segmentor = "feral_segmentor:main"
 
 [build-system]
 requires = ["uv_build>=0.11.7,<0.12.0"]
@@ -32,9 +30,6 @@ ignore_missing_imports = true
 # Pre-existing errors tracked separately; CI enforces no regressions on new code.
 exclude = [
     "src/feral_segmentor/data/creator\\.py",
-    # WIP model-pipeline rewrite — not part of this PR
-    "src/feral_segmentor/models/default\\.py",
-    "src/feral_segmentor/models/sources/",
 ]
 
 [tool.pytest.ini_options]
@@ -49,7 +44,13 @@ docs-sphinx = [
 dev = [
     "coverage>=7.14.2",
     "mypy>=1.10.0",
+    "ruff>=0.9.0",
     "types-PyYAML>=6.0.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
+    "furo>=2025.12.19",
+    "dvc-gs>=3.1.0",
+    "dvc>=3.67.1",
+    "acquire>=3.22",
+    "sphinx>=9.1.0",
 ]

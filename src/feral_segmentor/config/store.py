@@ -1,13 +1,8 @@
 """Register structured-config schemas with Hydra's ConfigStore.
 
-We register one schema per config-group *variant* (e.g. ``model/base_hub``).
+We register one schema per config-group *variant* (e.g. ``model/base_model``).
 Each YAML under ``conf/<group>/`` opts in with ``defaults: [base_<variant>]`` so
-it merges onto the typed node. We intentionally do **not** register a top-level
-``Config`` node: typing the nested group fields as their base class would make a
-heterogeneous subtype (e.g. ``HubModelConfig`` with extra ``repo_id``) fail the
-struct merge into ``ModelConfig``. Per-group registration gives the same
-validation without that pitfall, and the composed object stays a mergeable
-``DictConfig``.
+it merges onto the typed node.
 
 ``register_configs`` is idempotent so it can be called from every Hydra
 entrypoint without double-registration errors.
@@ -19,11 +14,9 @@ from hydra.core.config_store import ConfigStore
 
 from feral_segmentor.config.schema import (
     AugmentationConfig,
-    ConfigModelConfig,
     DataConfig,
-    HubModelConfig,
     InferenceConfig,
-    ScriptModelConfig,
+    ModelConfig,
     # Loss base + variants
     LossFnConfig,
     CrossEntropyConfig,
@@ -53,9 +46,7 @@ from feral_segmentor.config.schema import (
 # `defaults:` list, resolved relative to the group.
 _SCHEMAS: tuple[tuple[str, str, type], ...] = (
     ("data", "base_data", DataConfig),
-    ("model", "base_hub", HubModelConfig),
-    ("model", "base_script", ScriptModelConfig),
-    ("model", "base_config_source", ConfigModelConfig),
+    ("model", "base_model", ModelConfig),
     ("train", "base_train", TrainConfig),
     # Base schemas — type contracts for TrainConfig fields
     ("train/optim", "base_optim", OptimConfig),

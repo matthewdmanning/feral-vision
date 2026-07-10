@@ -8,7 +8,7 @@ Three steps need your input/credentials. Run them in order.
 
 Fill in your bucket name, then run:
 
-```bash
+~~~bash
 # 1. Convert COCO annotations to YOLO label files
 python -m feral_segmentor.data.coco_to_yolo \
     --ann data/raw/annotations/coco_train2017/instances_train2017_animals.json \
@@ -49,13 +49,13 @@ BUCKET="YOUR_BUCKET_NAME"
 gcloud storage rsync -r data/split/images/ gs://${BUCKET}/images/
 gcloud storage rsync -r data/split/labels/ gs://${BUCKET}/labels/
 gcloud storage cp data/raw/labels/names.yaml gs://${BUCKET}/labels/names.yaml
-```
+~~~
 
 ---
 
 ## Task 8 — Build and push Docker image to Artifact Registry
 
-```bash
+~~~bash
 # Fill in your GCP project and region
 PROJECT="YOUR_GCP_PROJECT_ID"
 REGION="us-central1"          # change if needed
@@ -77,13 +77,13 @@ docker build -f docker/Dockerfile -t ${IMAGE} .
 docker push ${IMAGE}
 
 echo "Image: ${IMAGE}"
-```
+~~~
 
 ---
 
 ## Task 9 — Configure T4 instance and run container
 
-```bash
+~~~bash
 # On the T4 GCE instance — run once to mount SSD
 DEVICE="/dev/disk/by-id/google-local-ssd-0"   # adjust if different
 sudo mkfs.ext4 -F ${DEVICE}
@@ -107,4 +107,4 @@ docker run --gpus all \
     -e GCS_BUCKET="YOUR_BUCKET_NAME" \
     -e HYDRA_OVERRIDES="train.epochs=50 train.batch_size=16" \
     ${IMAGE}
-```
+~~~

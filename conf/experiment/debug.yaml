@@ -1,7 +1,7 @@
 # Fast, minimal run for sanity checks and quick iteration.
 
 defaults:
-  - override /trainer: fast_dev
+  - override train: fast_dev
   - _self_
 
 debug: true

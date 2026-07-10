@@ -1,36 +1,104 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "CHANGELOG.md"
-      - "pyproject.toml"
+  release:
+    types: [published]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  bump-version:
-    if: "!startsWith(github.event.head_commit.message, 'bump:')"
+  publish:
+    name: Publish to PyPI
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
         with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          python-version: "3.12"
+          enable-cache: true
+      - name: Build distribution
+        run: uv build
+      - name: Upload to PyPI
+        run: uv publish
+        # Requires PyPI trusted publishing — configure at:
+        # https://pypi.org/manage/account/publishing/
 
-      - name: Bump version and changelog
-        id: cz
-        uses: commitizen-tools/commitizen-action@0.21.0
+  docs-deploy:
+    name: Deploy versioned docs
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect builder
+        id: detect
+        run: |
+          if [ -f "mkdocs.yml" ] || [ -f "mkdocs.yaml" ]; then
+            echo "builder=mkdocs" >> "$GITHUB_OUTPUT"
+          elif [ -f "docs/conf.py" ]; then
+            echo "builder=sphinx" >> "$GITHUB_OUTPUT"
+          else
+            echo "builder=none" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: astral-sh/setup-uv@v5
+        if: steps.detect.outputs.builder != 'none'
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          changelog_increment_filename: body.md
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install deps
+        if: steps.detect.outputs.builder != 'none'
+        run: |
+          if [ "${{ steps.detect.outputs.builder }}" = "sphinx" ]; then
+            uv sync --group dev --group docs-sphinx
+          else
+            uv sync --group dev
+          fi
+      - name: Compile sphinx docs
+        if: steps.detect.outputs.builder == 'sphinx'
+        run: uv run sphinx-build -b html docs docs/_build -W
+      - name: Compile mkdocs
+        if: steps.detect.outputs.builder == 'mkdocs'
+        run: uv run mkdocs build --strict
+      - name: Set docs output path
+        id: docs-path
+        if: steps.detect.outputs.builder != 'none'
+        run: |
+          if [ "${{ steps.detect.outputs.builder }}" = "mkdocs" ]; then
+            echo "path=site" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=docs/_build" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload pages artifact
+        if: steps.detect.outputs.builder != 'none'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ steps.docs-path.outputs.path }}
+      - name: Deploy to GitHub Pages
+        if: steps.detect.outputs.builder != 'none'
+        id: deploy
+        uses: actions/deploy-pages@v4
 
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+  sbom:
+    name: Software bill of materials
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
         with:
-          body_path: body.md
-          tag_name: ${{ steps.cz.outputs.version }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+      - name: Attach SBOM to release
+        run: gh release upload "${{ github.event.release.tag_name }}" sbom.spdx.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

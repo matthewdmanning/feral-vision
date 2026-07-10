@@ -34,7 +34,6 @@ class SourceAdapter:
 
 
 def _inspect_loaded(model: nn.Module) -> tuple[ModelProperties, dict]:
-    nn.Module.output_size
     for _, mod in reversed(list(model.named_modules())):
         if isinstance(mod, nn.Linear):
             return ModelProperties(), {}

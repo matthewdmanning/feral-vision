@@ -6,6 +6,15 @@ from dataclasses import dataclass
 import torch
 
 
+class SegmentationModel(ABC):
+    """Interface for any model usable behind :class:`~feral_segmentor.inference.predictor.Predictor`."""
+
+    @abstractmethod
+    def predict(self, image: torch.Tensor) -> "SegmentationOutput":
+        """Run inference on a single preprocessed image tensor (C, H, W)."""
+        ...
+
+
 @dataclass
 class SegmentationOutput:
     """Unified prediction contract for every segmentation model.
@@ -25,10 +34,3 @@ class SegmentationOutput:
     boxes: torch.Tensor
     scores: torch.Tensor
     labels: torch.Tensor
-
-
-class SegmentationModel(ABC):
-    @abstractmethod
-    def predict(self, image: torch.Tensor) -> SegmentationOutput:
-        """Run inference on a single preprocessed image tensor (C, H, W)."""
-        ...

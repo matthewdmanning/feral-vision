@@ -1,0 +1,1 @@
+"""Model source adapters."""

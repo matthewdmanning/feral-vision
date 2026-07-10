@@ -57,9 +57,9 @@ Promotion between lifecycle states is handled outside training (e.g. CI pipeline
 
 Deployments should always resolve models via aliases, for example:
 
-```text
+~~~text
 models:/<model_name>@prod
-```
+~~~
 
 ---
 
@@ -83,7 +83,7 @@ models:/<model_name>@prod
 
 ## Usage examples
 
-```bash
+~~~bash
 # Default tracking configuration
 python -m src.feral-segmentor.core.train
 
@@ -92,7 +92,7 @@ python -m src.feral-segmentor.core.train mlflow.enabled=false
 
 # LOCAL DEBUG ONLY: override tracking server
 python -m src.feral-segmentor.core.train mlflow.tracking_uri=http://127.0.0.1:5000
-```
+~~~
 
 ---
 

@@ -19,7 +19,8 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 @pytest.fixture
 def tiny_image():
-    path = FIXTURES_DIR / "oxford_samples" / "Abyssinian_1.jpg"
+    """Real BGR image loaded from the committed test fixtures."""
+    path = FIXTURES_DIR / "american_bulldog_103_original.jpg"
     return cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
 
 

@@ -12,6 +12,7 @@ a constant from :mod:`feral_segmentor.constants` (no magic numbers).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 from omegaconf import MISSING
 
@@ -28,48 +29,32 @@ class DataConfig:
     class_similarity: list[float] = field(default_factory=list)
 
 
-# --- Model: architecture (shared) + acquisition source (discriminated) ------
+# --- Model --------------------------------------------------------------
+@dataclass
+class SourceConfig:
+    """Where a model architecture or weights come from. Resolved by source adapter."""
+
+    source: str = MISSING  # discriminator: hf_hub | torch_hub | ultralytics | ...
+    id: str = MISSING  # hub repo ID, model name, dotted class path, or URL
+    location: Optional[str] = None  # local path; None = hub loads directly into memory
+
+
+@dataclass
+class WeightsConfig:
+    """Weight files to fetch and load. Independent of architecture source."""
+
+    source: str = MISSING
+    id: list[str] = field(default_factory=list)  # filenames, hub asset names, etc.
+    location: Optional[str] = None  # local path; None = hub loads directly into memory
+
+
 @dataclass
 class ModelConfig:
-    """Base/interface for the model group.
+    """Single source of truth for a model. architecture is required; weights is optional."""
 
-    Architecture fields are shared by every variant (a model has an
-    architecture regardless of how its weights are obtained). ``source`` is the
-    discriminator consumed by the acquisition factory.
-    """
-
-    name: str = MISSING
-    source: str = MISSING
-    in_channels: int = 3
-    base_channels: int = 16
-    num_classes: int = 2
-
-
-@dataclass
-class HubModelConfig(ModelConfig):
-    """Weights fetched from the Hugging Face Hub."""
-
-    source: str = "hub"
-    repo_id: str = MISSING
-    files: list[str] = field(default_factory=list)
-    weights_dir: str = MISSING
-
-
-@dataclass
-class ScriptModelConfig(ModelConfig):
-    """Weights produced by an imported Python entrypoint (``module:function``)."""
-
-    source: str = "script"
-    entrypoint: str = MISSING
-    weights_dir: str = MISSING
-
-
-@dataclass
-class ConfigModelConfig(ModelConfig):
-    """Model built entirely from config (architecture fields) and saved."""
-
-    source: str = "config"
-    weights_dir: str = MISSING
+    model_outputs: list[str] = field(default_factory=list)
+    architecture: SourceConfig = MISSING
+    weights: Optional[WeightsConfig] = None
 
 
 # --- Training sub-configs ---------------------------------------------------
