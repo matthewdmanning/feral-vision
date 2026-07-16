@@ -6,7 +6,7 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
 from omegaconf.errors import ConfigAttributeError, ConfigKeyError
 
-from feral_segmentor.config.store import register_configs
+from feral_vision.config.store import register_configs
 
 
 @pytest.fixture(autouse=True)
@@ -80,7 +80,7 @@ def test_model_variant_composes(tmp_path):
 
 
 def test_model_with_weights_block():
-    from feral_segmentor.config.schema import ModelConfig, SourceConfig, WeightsConfig
+    from feral_vision.config.schema import ModelConfig, SourceConfig, WeightsConfig
 
     arch = SourceConfig(source="yolo_hub", id="yolo11n-seg", location="models/registry")
     weights = WeightsConfig(

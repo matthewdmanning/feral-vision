@@ -30,7 +30,7 @@ See `ARCHITECTURE.md` for program flow (data → model → training → tracking
 layout:
 
 ```
-src/feral_segmentor/
+src/feral_vision/
   config/          # Hydra structured configs (schema.py, store.py)
   data/            # dataset loading, transforms, augmentation
                    # dataset.py        — AnnotationDataset / StreamingAnnotationDataset (PyTorch protocol only)

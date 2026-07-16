@@ -37,13 +37,13 @@ to complete instantiation.
 
 ```bash
 # Default (AdamW)
-python -m feral_segmentor.training.train
+python -m feral_vision.training.train
 
 # Switch to SGD
-python -m feral_segmentor.training.train train/optim=sgd
+python -m feral_vision.training.train train/optim=sgd
 
 # Override a specific field
-python -m feral_segmentor.training.train train/optim=adamw train.optim.lr=3e-4
+python -m feral_vision.training.train train/optim=adamw train.optim.lr=3e-4
 ```
 
 ---
@@ -61,4 +61,4 @@ my_kwarg: 0.9
 ```
 
 For IDE completion and mypy support, also add a subclass of `OptimConfig` in
-`src/feral_segmentor/config/schema.py` and register it in `store.py`.
+`src/feral_vision/config/schema.py` and register it in `store.py`.

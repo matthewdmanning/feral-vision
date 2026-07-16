@@ -1,7 +1,7 @@
 import pytest
 import albumentations as A
 
-from feral_segmentor.data.augmentations import _instantiate_transform
+from feral_vision.data.augmentations import _instantiate_transform
 
 
 def test_short_name_returns_correct_type():

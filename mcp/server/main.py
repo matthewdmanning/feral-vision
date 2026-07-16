@@ -1,4 +1,4 @@
-"""Model inspector MCP server for feral-segmentor.
+"""Model inspector MCP server for feral-vision.
 
 Tools:
   inspect_model     — call adapter.inspect() and return metadata JSON (no file writes)
@@ -19,7 +19,7 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", ".")).resolve()
-SOURCES_DIR = PROJECT_ROOT / "src" / "feral_segmentor" / "models" / "sources"
+SOURCES_DIR = PROJECT_ROOT / "src" / "feral_vision" / "models" / "sources"
 
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
@@ -76,7 +76,7 @@ def _resolve_adapter(source: str):
     RuntimeError
         If the adapter file is found but contains no ``SourceAdapter`` subclass.
     """
-    from feral_segmentor.models.sources.SourceAdapter import SourceAdapter
+    from feral_vision.models.sources.SourceAdapter import SourceAdapter
 
     adapters = _load_adapters()
     if source not in adapters:
@@ -237,7 +237,7 @@ def read_adapter(source_key: str) -> str:
 def write_adapter(source_key: str, class_name: str, code: str) -> str:
     """Use this function to write or overwrite an adapter file when adding support for a new model source.
 
-    Writes to ``src/feral_segmentor/models/sources/{class_name}Adapter.py``.
+    Writes to ``src/feral_vision/models/sources/{class_name}Adapter.py``.
     The new adapter becomes available to ``inspect_model`` immediately after writing.
 
     Parameters

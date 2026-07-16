@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 
-from feral_segmentor.config.schema import (
+from feral_vision.config.schema import (
     AdamConfig,
     AdamWConfig,
     BCEWithLogitsConfig,
@@ -18,7 +18,7 @@ from feral_segmentor.config.schema import (
     SGDConfig,
     StepLRConfig,
 )
-from feral_segmentor.training.optim import (
+from feral_vision.training.optim import (
     build_loss_fn,
     build_optimizer,
     build_scheduler,

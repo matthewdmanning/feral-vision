@@ -2,5 +2,5 @@
 Inference
 =========
 
-.. automodule:: feral_segmentor.inference.postprocess
+.. automodule:: feral_vision.inference.postprocess
    :members:

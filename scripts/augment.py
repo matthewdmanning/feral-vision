@@ -6,7 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from feral_segmentor.data.augmentations import (
+from feral_vision.data.augmentations import (
     BrightnessShift,
     GammaAdjust,
     HorizontalFlip,

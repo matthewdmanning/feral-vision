@@ -29,7 +29,7 @@ MLFLOW_PID=$!
 sleep 3  # allow server to start
 
 echo "=== [4/4] Starting training ==="
-python -m feral_segmentor.training.train \
+python -m feral_vision.training.train \
     data=coco_train2017 \
     train.data_dir="${DATA_DIR}" \
     tracking.tracking_uri="http://localhost:5000" \

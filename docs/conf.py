@@ -1,11 +1,11 @@
-"""Sphinx configuration for feral-segmentor documentation."""
+"""Sphinx configuration for feral-vision documentation."""
 
 import os
 import sys
 
 sys.path.insert(0, os.path.abspath("../src"))
 
-project = "feral-segmentor"
+project = "feral-vision"
 author = "Matthew Manning"
 release = "0.1.0"
 
@@ -34,5 +34,5 @@ intersphinx_mapping = {
 }
 
 html_theme = "furo"
-html_title = "feral-segmentor"
+html_title = "feral-vision"
 exclude_patterns = ["_build"]

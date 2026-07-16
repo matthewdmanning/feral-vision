@@ -17,9 +17,9 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
-from feral_segmentor.data.annotations import BBoxAnnotation
-from feral_segmentor.training.optim import build_loss_fn, build_optimizer
-from feral_segmentor.training.trainer import Trainer
+from feral_vision.data.annotations import BBoxAnnotation
+from feral_vision.training.optim import build_loss_fn, build_optimizer
+from feral_vision.training.trainer import Trainer
 
 # ---------------------------------------------------------------------------
 # Helpers

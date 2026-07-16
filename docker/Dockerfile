@@ -43,7 +43,7 @@ RUN pip install \
         "mlflow" \
         "opencv-python-headless>=4.13"
 
-# Install feral-segmentor package.
+# Install feral-vision package.
 WORKDIR /app
 COPY pyproject.toml ./
 COPY src/ ./src/

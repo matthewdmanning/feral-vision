@@ -45,8 +45,8 @@ def validate_variant(name: str) -> None:
     from hydra.core.global_hydra import GlobalHydra
     from omegaconf.errors import MissingMandatoryValue
 
-    from feral_segmentor.config.store import register_configs
-    from feral_segmentor.models import register_model  # noqa: F401 -- triggers @register
+    from feral_vision.config.store import register_configs
+    from feral_vision.models import register_model  # noqa: F401 -- triggers @register
 
     register_configs()
     GlobalHydra.instance().clear()

@@ -116,6 +116,6 @@ run — checkpoints included) belong to MLflow, never DVC. See
 `dvc.api.get_url()` param into MLflow — never a raw data directory).
 
 **Known gap:** `dvc.yaml` currently declares `train` and `evaluate` stages
-(`feral_segmentor.pipelines.*`, a module that no longer exists post-reconciliation).
+(`feral_vision.pipelines.*`, a module that no longer exists post-reconciliation).
 Per the boundary above, DVC should not own training or evaluation stages at all —
 this is a real inconsistency in the pipeline definition, not yet fixed.

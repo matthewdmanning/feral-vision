@@ -13,13 +13,13 @@ from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from torch import nn
 
-from feral_segmentor.config.store import register_configs
+from feral_vision.config.store import register_configs
 
 # The register_model module already exists; model_builder may still be renamed/moved.
 # Guard on the name import (ImportError == "cannot import name 'model_builder'") so
 # collection stays green either way.
 try:
-    from feral_segmentor.models.register_model import model_builder
+    from feral_vision.models.register_model import model_builder
 
     _BUILDER_AVAILABLE = True
 except ImportError:

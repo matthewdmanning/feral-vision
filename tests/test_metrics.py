@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from feral_segmentor.training.metrics import dice_score, mean_iou
+from feral_vision.training.metrics import dice_score, mean_iou
 
 
 def test_perfect_match_is_one():

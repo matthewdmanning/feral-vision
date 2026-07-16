@@ -4,16 +4,16 @@ set -euo pipefail
 : "${GCP_PROJECT:?GCP_PROJECT must be set}"
 : "${GCS_BUCKET:?GCS_BUCKET must be set}"
 
-VM_NAME="${VM_NAME:-feral-segmentor-trainer}"
+VM_NAME="${VM_NAME:-feral-vision-trainer}"
 VM_ZONE="${VM_ZONE:-us-central1-a}"
 EPOCHS="${EPOCHS:-1}"
 MODE="${MODE:-docker}"
 STOP_VM="${STOP_VM:-true}"
 REGION="${REGION:-us-central1}"
-REPO="${REPO:-feral-segmentor}"
+REPO="${REPO:-feral-vision}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 
-IMAGE_URI="${REGION}-docker.pkg.dev/${GCP_PROJECT}/${REPO}/feral-segmentor-gcp:${IMAGE_TAG}"
+IMAGE_URI="${REGION}-docker.pkg.dev/${GCP_PROJECT}/${REPO}/feral-vision-gcp:${IMAGE_TAG}"
 
 teardown() {
   if [[ "$STOP_VM" == "true" ]]; then
@@ -49,7 +49,7 @@ elif [[ "$MODE" == "direct" ]]; then
   gcloud compute ssh "$VM_NAME" --zone="$VM_ZONE" --project="$GCP_PROJECT" --command="
     cd /workspace && \
     GCS_BUCKET=${GCS_BUCKET} dvc pull && \
-    uv run python -m feral_segmentor.training.trainer train.epochs=${EPOCHS}
+    uv run python -m feral_vision.training.trainer train.epochs=${EPOCHS}
   "
 else
   echo "Unknown MODE: $MODE (use 'docker' or 'direct')" >&2

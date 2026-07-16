@@ -1,25 +1,25 @@
 stages:
   fetch:
-    cmd: uv run python -m feral_segmentor.data.fetch
+    cmd: uv run python -m feral_vision.data.fetch
     outs:
       - data/raw
 
   preprocess:
-    cmd: uv run python -m feral_segmentor.data.transforms
+    cmd: uv run python -m feral_vision.data.transforms
     deps:
       - data/raw
     outs:
       - data/processed
 
   augment:
-    cmd: uv run python -m feral_segmentor.data.augmentations
+    cmd: uv run python -m feral_vision.data.augmentations
     deps:
       - data/processed
     outs:
       - data/augmented
 
   train:
-    cmd: uv run python -m feral_segmentor.pipelines.base_segmentation_pipeline
+    cmd: uv run python -m feral_vision.pipelines.base_segmentation_pipeline
     deps:
       - data/processed
       - conf
@@ -27,7 +27,7 @@ stages:
       - models/registry/best.pt
 
   evaluate:
-    cmd: uv run python -m feral_segmentor.pipelines.evaluate_segmentation_pipeline
+    cmd: uv run python -m feral_vision.pipelines.evaluate_segmentation_pipeline
     deps:
       - models/registry/best.pt
     metrics:

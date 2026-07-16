@@ -32,7 +32,7 @@ Trainer/runtime concerns (epochs, devices, precision, etc.) must not live here.
 ## Schema
 
 Every model config inherits from the `base_model` structured schema (defined in
-`src/feral_segmentor/config/schema.py`) via `defaults: [base_model, _self_]`.
+`src/feral_vision/config/schema.py`) via `defaults: [base_model, _self_]`.
 
 ~~~yaml
 defaults:

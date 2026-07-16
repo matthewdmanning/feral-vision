@@ -68,9 +68,9 @@ device: cuda
 Override a sub-group at the CLI without touching this file:
 
 ```bash
-python -m feral_segmentor.training.train train/optim=sgd
-python -m feral_segmentor.training.train train/scheduler=plateau
-python -m feral_segmentor.training.train train/loss_fn=bce_with_logits
+python -m feral_vision.training.train train/optim=sgd
+python -m feral_vision.training.train train/scheduler=plateau
+python -m feral_vision.training.train train/loss_fn=bce_with_logits
 ```
 
 ---
@@ -119,13 +119,13 @@ custom variants.
 
 ```bash
 # Default training configuration
-python -m src.feral-segmentor.core.train
+python -m src.feral-vision.core.train
 
 # Quick dev run
-python -m src.feral-segmentor.core.train trainer=fast_dev
+python -m src.feral-vision.core.train trainer=fast_dev
 
 # Override runtime parameters
-python -m src.feral-segmentor.core.train trainer.max_epochs=50 trainer.precision=16
+python -m src.feral-vision.core.train trainer.max_epochs=50 trainer.precision=16
 ```
 =======
 - Override fields at the CLI for quick experiments; create a named variant for reproducible runs.

@@ -3,4 +3,4 @@ defaults:
   - _self_
 
 tracking_uri: sqlite:///mlflow.db
-experiment_name: feral-segmenter
+experiment_name: feral-vision

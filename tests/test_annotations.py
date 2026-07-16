@@ -1,4 +1,4 @@
-"""Contract tests for the Annotation subclasses in feral_segmentor.data.annotations."""
+"""Contract tests for the Annotation subclasses in feral_vision.data.annotations."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from feral_segmentor.data.annotations import (
+from feral_vision.data.annotations import (
     Annotation,
     BBoxAnnotation,
     ClassificationAnnotation,

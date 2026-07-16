@@ -3,7 +3,7 @@ import pytest
 import albumentations as A
 from omegaconf import OmegaConf
 
-from feral_segmentor.data.augmentations import compose_augmentations
+from feral_vision.data.augmentations import compose_augmentations
 
 
 def _aug_cfg(ops):

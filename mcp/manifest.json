@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "model-inspector",
   "version": "0.1.0",
-  "description": "Inspect AI model metadata and manage source adapters for feral-segmentor.",
+  "description": "Inspect AI model metadata and manage source adapters for feral-vision.",
   "author": { "name": "Matthew Manning" },
   "server": {
     "type": "python",
@@ -25,8 +25,8 @@
   "user_config": {
     "projectDir": {
       "type": "directory",
-      "title": "feral-segmentor project root",
-      "description": "Root directory of your feral-segmentor checkout (must contain pyproject.toml).",
+      "title": "feral-vision project root",
+      "description": "Root directory of your feral-vision checkout (must contain pyproject.toml).",
       "required": true
     }
   },

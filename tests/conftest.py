@@ -6,8 +6,8 @@ import pytest
 import torch
 from torch import nn
 
-from feral_segmentor.data.dataset import AnnotationDataset
-from feral_segmentor.io_utils import DatasetSource
+from feral_vision.data.dataset import AnnotationDataset
+from feral_vision.io_utils import DatasetSource
 
 FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures"
 

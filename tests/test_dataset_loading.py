@@ -8,9 +8,9 @@ import numpy as np
 import pytest
 import torch
 
-from feral_segmentor.data.annotations import MaskAnnotation
-from feral_segmentor.data.dataset import AnnotationDataset, StreamingAnnotationDataset
-from feral_segmentor.io_utils import DatasetSource
+from feral_vision.data.annotations import MaskAnnotation
+from feral_vision.data.dataset import AnnotationDataset, StreamingAnnotationDataset
+from feral_vision.io_utils import DatasetSource
 
 
 # ---------------------------------------------------------------------------

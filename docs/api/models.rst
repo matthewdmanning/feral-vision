@@ -1,26 +1,26 @@
 Models
 ======
 
-.. automodule:: feral_segmentor.models.registry
+.. automodule:: feral_vision.models.registry
    :members:
 
-.. automodule:: feral_segmentor.models.default
+.. automodule:: feral_vision.models.default
    :members:
 
-.. automodule:: feral_segmentor.models.ModelProperties
+.. automodule:: feral_vision.models.ModelProperties
    :members:
 
-.. automodule:: feral_segmentor.models.register_model
+.. automodule:: feral_vision.models.register_model
    :members:
 
-.. automodule:: feral_segmentor.models.sources.SourceAdapter
+.. automodule:: feral_vision.models.sources.SourceAdapter
    :members:
 
-.. automodule:: feral_segmentor.models.sources.HFAdapter
+.. automodule:: feral_vision.models.sources.HFAdapter
    :members:
 
-.. automodule:: feral_segmentor.models.sources.TorchHubAdapter
+.. automodule:: feral_vision.models.sources.TorchHubAdapter
    :members:
 
-.. automodule:: feral_segmentor.models.sources.UltralyticsAdapter
+.. automodule:: feral_vision.models.sources.UltralyticsAdapter
    :members:

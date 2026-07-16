@@ -65,7 +65,7 @@ models:/<model_name>@prod
 
 ## Conventions used in this template
 
-- **Experiment name**: project-level and stable (default: `feral-segmentor`)
+- **Experiment name**: project-level and stable (default: `feral-vision`)
 - **Run name**: model-level (default: `${model.name}`)
 - **Run tags**: standardized minimal set
   - `project`
@@ -85,13 +85,13 @@ models:/<model_name>@prod
 
 ~~~bash
 # Default tracking configuration
-python -m src.feral-segmentor.core.train
+python -m src.feral-vision.core.train
 
 # Disable MLflow (useful for quick local debugging)
-python -m src.feral-segmentor.core.train mlflow.enabled=false
+python -m src.feral-vision.core.train mlflow.enabled=false
 
 # LOCAL DEBUG ONLY: override tracking server
-python -m src.feral-segmentor.core.train mlflow.tracking_uri=http://127.0.0.1:5000
+python -m src.feral-vision.core.train mlflow.tracking_uri=http://127.0.0.1:5000
 ~~~
 
 ---

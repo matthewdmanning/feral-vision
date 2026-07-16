@@ -1,7 +1,7 @@
 import torch
 from omegaconf import OmegaConf
 
-from feral_segmentor.training.losses import dice_loss, segmentation_loss
+from feral_vision.training.losses import dice_loss, segmentation_loss
 
 
 def _make_cfg(**overrides):

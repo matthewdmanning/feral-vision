@@ -1,4 +1,4 @@
-FROM feral-segmentor:latest
+FROM feral-vision:latest
 
 RUN apt-get update && apt-get install -y gnupg curl apt-transport-https ca-certificates && \
     curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \

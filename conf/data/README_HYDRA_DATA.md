@@ -105,13 +105,13 @@ Dynamic metadata must not be written back into YAML files.
 
 ~~~bash
 # Use the default dataset
-python -m src.feral-segmentor.core.train data=base
+python -m src.feral-vision.core.train data=base
 
 # Override dataset path
-python -m src.feral-segmentor.core.train data.path=${paths.data_dir}/processed/v2
+python -m src.feral-vision.core.train data.path=${paths.data_dir}/processed/v2
 
 # Switch to another dataset variant
-python -m src.feral-segmentor.core.train data=imagenet
+python -m src.feral-vision.core.train data=imagenet
 ~~~
 
 This directory is part of the project’s configuration contract and should evolve deliberately.

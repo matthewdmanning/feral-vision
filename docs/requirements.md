@@ -1,4 +1,4 @@
-# Feral Segmentor — Project Requirements
+# Feral Vision — Project Requirements
 
 ## 1. Purpose
 

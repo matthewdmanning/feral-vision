@@ -1,8 +1,8 @@
 Config
 ======
 
-.. automodule:: feral_segmentor.config.schema
+.. automodule:: feral_vision.config.schema
    :members:
 
-.. automodule:: feral_segmentor.config.store
+.. automodule:: feral_vision.config.store
    :members:

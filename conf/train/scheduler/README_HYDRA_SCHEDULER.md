@@ -37,13 +37,13 @@ to complete instantiation.
 
 ```bash
 # Default (CosineAnnealingLR)
-python -m feral_segmentor.training.train
+python -m feral_vision.training.train
 
 # Switch to StepLR
-python -m feral_segmentor.training.train train/scheduler=step
+python -m feral_vision.training.train train/scheduler=step
 
 # Override T_max to match a short run
-python -m feral_segmentor.training.train train/scheduler=cosine train.scheduler.T_max=10
+python -m feral_vision.training.train train/scheduler=cosine train.scheduler.T_max=10
 ```
 
 ---
@@ -60,4 +60,4 @@ my_kwarg: 0.5
 ```
 
 For IDE completion and mypy support, also add a subclass of `SchedulerConfig` in
-`src/feral_segmentor/config/schema.py` and register it in `store.py`.
+`src/feral_vision/config/schema.py` and register it in `store.py`.

@@ -35,13 +35,13 @@ No `_partial_` field — loss functions are instantiated directly by
 
 ```bash
 # Default (CrossEntropyLoss)
-python -m feral_segmentor.training.train
+python -m feral_vision.training.train
 
 # Switch to BCE for binary segmentation
-python -m feral_segmentor.training.train train/loss_fn=bce_with_logits
+python -m feral_vision.training.train train/loss_fn=bce_with_logits
 
 # Override label smoothing
-python -m feral_segmentor.training.train train/loss_fn=cross_entropy train.loss_fn.label_smoothing=0.1
+python -m feral_vision.training.train train/loss_fn=cross_entropy train.loss_fn.label_smoothing=0.1
 ```
 
 ---
@@ -58,4 +58,4 @@ gamma: 2.0
 ```
 
 For IDE completion and mypy support, also add a subclass of `LossFnConfig` in
-`src/feral_segmentor/config/schema.py` and register it in `store.py`.
+`src/feral_vision/config/schema.py` and register it in `store.py`.

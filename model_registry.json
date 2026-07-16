@@ -4,7 +4,7 @@
       "architecture": {
         "source": "local",
         "id": "net",
-        "location": "feral_segmentor.models.default.Net"
+        "location": "feral_vision.models.default.Net"
       }
     },
     "model_outputs": []

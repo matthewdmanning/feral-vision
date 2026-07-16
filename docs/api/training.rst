@@ -1,17 +1,17 @@
 Training
 ========
 
-.. automodule:: feral_segmentor.training.trainer
+.. automodule:: feral_vision.training.trainer
    :members:
 
-.. automodule:: feral_segmentor.training.train
+.. automodule:: feral_vision.training.train
    :members:
 
-.. automodule:: feral_segmentor.training.losses
+.. automodule:: feral_vision.training.losses
    :members:
 
-.. automodule:: feral_segmentor.training.metrics
+.. automodule:: feral_vision.training.metrics
    :members:
 
-.. automodule:: feral_segmentor.training.optim
+.. automodule:: feral_vision.training.optim
    :members:

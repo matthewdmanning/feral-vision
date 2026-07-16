@@ -1,14 +1,14 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     id: build-base
-    args: ['build', '-t', 'feral-segmentor:latest', '-f', 'deploy/Dockerfile', '.']
+    args: ['build', '-t', 'feral-vision:latest', '-f', 'deploy/Dockerfile', '.']
 
   - name: 'gcr.io/cloud-builders/docker'
     id: build-gcp
     args:
       - build
       - -t
-      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/feral-segmentor-gcp:$SHORT_SHA'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/feral-vision-gcp:$SHORT_SHA'
       - -f
       - deploy/Dockerfile.gcp
       - .
@@ -16,7 +16,7 @@ steps:
 
   - name: 'gcr.io/cloud-builders/docker'
     id: push
-    args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/feral-segmentor-gcp:$SHORT_SHA']
+    args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/feral-vision-gcp:$SHORT_SHA']
     waitFor: ['build-gcp']
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -28,17 +28,17 @@ steps:
       - '${_VM_NAME}'
       - '--zone=${_VM_ZONE}'
       - >-
-        --command=docker pull ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/feral-segmentor-gcp:$SHORT_SHA
+        --command=docker pull ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/feral-vision-gcp:$SHORT_SHA
         && docker run --gpus all --rm
         -e GCP_PROJECT=$PROJECT_ID
         -e GCS_BUCKET=${_GCS_BUCKET}
-        ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/feral-segmentor-gcp:$SHORT_SHA
+        ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/feral-vision-gcp:$SHORT_SHA
     waitFor: ['push']
 
 substitutions:
   _REGION: us-central1
-  _REPO: feral-segmentor
-  _VM_NAME: feral-segmentor-trainer
+  _REPO: feral-vision
+  _VM_NAME: feral-vision-trainer
   _VM_ZONE: us-central1-a
   _GCS_BUCKET: ''
 

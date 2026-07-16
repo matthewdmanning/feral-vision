@@ -17,13 +17,13 @@ correct format for that extension — there is no additional validation layer.
 Sources
 -------
 
-``cfg.data.source`` (:mod:`feral_segmentor.data.fetch`) is a pluggable dispatch
+``cfg.data.source`` (:mod:`feral_vision.data.fetch`) is a pluggable dispatch
 point, not a fixed set of options. Current sources:
 
 - ``coco`` — downloads COCO train2017 (animal supercategory) via
-  :func:`~feral_segmentor.data.fetch.fetch_coco`.
+  :func:`~feral_vision.data.fetch.fetch_coco`.
 - anything else — treated as a local filesystem path already in the layout above,
-  via :func:`~feral_segmentor.data.fetch.fetch_data`.
+  via :func:`~feral_vision.data.fetch.fetch_data`.
 
 Additional sources are added by extending the dispatch in ``fetch.py``; each must
 resolve to the layout above.

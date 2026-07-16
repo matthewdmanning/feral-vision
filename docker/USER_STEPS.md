@@ -10,7 +10,7 @@ Fill in your bucket name, then run:
 
 ~~~bash
 # 1. Convert COCO annotations to YOLO label files
-python -m feral_segmentor.data.coco_to_yolo \
+python -m feral_vision.data.coco_to_yolo \
     --ann data/raw/annotations/coco_train2017/instances_train2017_animals.json \
     --out data/raw/labels/coco_train2017/ \
     --names data/raw/labels/names.yaml
@@ -59,7 +59,7 @@ gcloud storage cp data/raw/labels/names.yaml gs://${BUCKET}/labels/names.yaml
 # Fill in your GCP project and region
 PROJECT="YOUR_GCP_PROJECT_ID"
 REGION="us-central1"          # change if needed
-REPO="feral-segmentor"
+REPO="feral-vision"
 TAG="0.1.0"
 
 # Create Artifact Registry repo (one-time)
@@ -101,7 +101,7 @@ gcloud storage buckets add-iam-policy-binding gs://${BUCKET} \
     --role="roles/storage.objectAdmin"
 
 # Run training container (on the T4 instance)
-IMAGE="REGION-docker.pkg.dev/PROJECT/feral-segmentor/trainer:0.1.0"
+IMAGE="REGION-docker.pkg.dev/PROJECT/feral-vision/trainer:0.1.0"
 docker run --gpus all \
     -v /mnt/disks/ssd:/data \
     -e GCS_BUCKET="YOUR_BUCKET_NAME" \

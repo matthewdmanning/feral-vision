@@ -68,7 +68,7 @@ def main() -> None:
 
     from omegaconf import OmegaConf
 
-    from feral_segmentor.models.register_model import _get_adapter, register_model
+    from feral_vision.models.register_model import _get_adapter, register_model
 
     cfg_dict: dict = {
         "architecture": {"source": args.source, "id": args.model_id, "location": None}

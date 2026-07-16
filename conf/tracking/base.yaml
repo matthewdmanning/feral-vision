@@ -10,14 +10,14 @@ enabled: true
 tracking_uri: ${oc.env:MLFLOW_TRACKING_URI,null}
 
 # Experiment naming policy: project-level by default
-experiment_name: feral-segmentor
+experiment_name: feral-vision
 
 # Run naming policy: model-level by default
 run_name: ${model.name}
 
 # Standard run tags (runtime may add dynamic tags like git SHA / DVC / dataset digest)
 tags:
-  project: feral-segmentor
+  project: feral-vision
   env: ${project.env}
   model_name: ${model.name}
   data_name: ${data.name}
@@ -43,8 +43,8 @@ registry:
   enabled: true
 
   # Registered model name in MLflow Model Registry.
-  # Project-level by default. If you want per-model registries, use "feral-segmentor.${model.name}".
-  model_name: feral-segmentor.${model.name}
+  # Project-level by default. If you want per-model registries, use "feral-vision.${model.name}".
+  model_name: feral-vision.${model.name}
 
   # Lifecycle vocabulary (aliases). Deploy using: models:/<model_name>@prod, etc.
   aliases:

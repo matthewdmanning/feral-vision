@@ -1,7 +1,7 @@
-feral-segmentor
+feral-vision
 ===============
 
-Image segmentor optimised to detect feral cats on mobile devices.
+Computer vision toolkit optimised to detect feral animals on mobile devices.
 
 .. toctree::
    :maxdepth: 2
