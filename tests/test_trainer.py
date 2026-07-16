@@ -2,8 +2,8 @@
 
 Uses real nn.Module/optimizer/scheduler instances throughout (no mocks). The
 validation-metric tests use the real fixture-backed AnnotationDataset from
-conftest.py rather than a stand-in, to exercise Trainer.fit's actual
-val_dataset contract end to end.
+conftest.py (trainer_fixture_dataset) rather than a stand-in, to exercise
+Trainer.fit's actual val_dataset contract end to end.
 """
 
 from __future__ import annotations
@@ -150,11 +150,11 @@ def test_scheduler_steps_once_per_epoch(tmp_path, epochs, gamma):
 
 
 def test_base_validate_returns_empty_dict_and_falls_back_to_train_loss(
-    tmp_path, fixture_dataset
+    tmp_path, trainer_fixture_dataset
 ):
     trainer = _build_trainer(tmp_path, epochs=3)
 
-    history = trainer.fit(_tiny_dataloader(), val_dataset=fixture_dataset)
+    history = trainer.fit(_tiny_dataloader(), val_dataset=trainer_fixture_dataset)
 
     assert set(history) == {"train_loss", "best_loss"}
     assert history["best_loss"] == min(history["train_loss"])
@@ -162,7 +162,7 @@ def test_base_validate_returns_empty_dict_and_falls_back_to_train_loss(
 
 @pytest.mark.parametrize("epochs", [1, 3])
 def test_validate_metric_is_tracked_per_epoch_using_real_dataset(
-    tmp_path, fixture_dataset, epochs
+    tmp_path, trainer_fixture_dataset, epochs
 ):
     model = nn.Linear(3, 2)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
@@ -174,13 +174,13 @@ def test_validate_metric_is_tracked_per_epoch_using_real_dataset(
         best_model_path=tmp_path / "best.pt",
     )
 
-    history = trainer.fit(_tiny_dataloader(), val_dataset=fixture_dataset)
+    history = trainer.fit(_tiny_dataloader(), val_dataset=trainer_fixture_dataset)
 
-    assert history["val_len"] == [float(len(fixture_dataset))] * epochs
+    assert history["val_len"] == [float(len(trainer_fixture_dataset))] * epochs
 
 
 def test_validate_metric_drives_checkpoint_selection_over_train_loss(
-    tmp_path, fixture_dataset
+    tmp_path, trainer_fixture_dataset
 ):
     model = nn.Linear(3, 2)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
@@ -192,10 +192,10 @@ def test_validate_metric_drives_checkpoint_selection_over_train_loss(
         best_model_path=tmp_path / "best.pt",
     )
 
-    trainer.fit(_tiny_dataloader(), val_dataset=fixture_dataset)
+    trainer.fit(_tiny_dataloader(), val_dataset=trainer_fixture_dataset)
 
     # tracked_loss comes from the metric (val_len), not train_loss.
-    assert trainer.best_loss == float(len(fixture_dataset))
+    assert trainer.best_loss == float(len(trainer_fixture_dataset))
 
 
 # ---------------------------------------------------------------------------
@@ -251,8 +251,8 @@ def _make_bbox_train_cfg(
 def _bbox_dataloader(
     target_boxes: torch.Tensor,
     cfg: DictConfig,
+    image_size: int,
     n_batches: int = 2,
-    image_size: int = 16,
 ):
     """Batches of (random RGB image, target_boxes repeated per-sample), batch size from cfg.train."""
     batch_size = cfg.train.batch_size
@@ -264,29 +264,29 @@ def _bbox_dataloader(
 
 
 @pytest.mark.parametrize(
-    "in_channels,num_boxes,box_format",
-    [(3, 1, "cxcywh"), (3, 3, "xyxy"), (1, 2, "cxcywh")],
+    "in_channels,num_boxes,box_format,image_size",
+    [(3, 1, "cxcywh", 8), (3, 3, "xyxy", 16), (1, 2, "cxcywh", 20)],
 )
-def test_bbox_test_net_output_shape_matches_num_boxes(
-    bbox_test_net_factory, in_channels, num_boxes, box_format
+def test_bbox_net_output_shape_matches_num_boxes(
+    bbox_net_factory, in_channels, num_boxes, box_format, image_size
 ):
+    """image_size varies per case to prove _BBoxNet's adaptive pooling is
+    genuinely size-invariant, rather than assuming it from a fixed input."""
     cfg = _make_bbox_train_cfg()
-    net = bbox_test_net_factory(
+    net = bbox_net_factory(
         in_channels=in_channels, num_boxes=num_boxes, box_format=box_format
     )
 
-    out = net(torch.randn(cfg.train.batch_size, in_channels, 16, 16))
+    out = net(torch.randn(cfg.train.batch_size, in_channels, image_size, image_size))
 
     assert out.shape == (cfg.train.batch_size, num_boxes, 4)
     assert out.dtype == torch.float32
 
 
 @pytest.mark.parametrize("invalid_format", ["not_a_format", "", "CXCYWH"])
-def test_bbox_test_net_factory_rejects_invalid_box_format(
-    bbox_test_net_factory, invalid_format
-):
+def test_bbox_net_factory_rejects_invalid_box_format(bbox_net_factory, invalid_format):
     with pytest.raises(ValueError, match="box_format"):
-        bbox_test_net_factory(box_format=invalid_format)
+        bbox_net_factory(box_format=invalid_format)
 
 
 @pytest.mark.parametrize(
@@ -321,7 +321,7 @@ def test_bbox_test_net_factory_rejects_invalid_box_format(
 )
 def test_fit_trains_bbox_net_toward_real_annotation_boxes(
     tmp_path,
-    bbox_test_net_factory,
+    bbox_net_factory,
     box_format,
     batch_size,
     optim_target,
@@ -335,7 +335,7 @@ def test_fit_trains_bbox_net_toward_real_annotation_boxes(
     _write_yolo_txt(ann_path, rows)
     target = torch.from_numpy(BBoxAnnotation(path=ann_path).load().boxes)
 
-    model = bbox_test_net_factory(num_boxes=len(rows), box_format=box_format)
+    model = bbox_net_factory(num_boxes=len(rows), box_format=box_format)
     optimizer = build_optimizer(model.parameters(), cfg.train.optim)
     loss_fn = build_loss_fn(cfg.train.loss_fn)
     trainer = Trainer(
@@ -347,7 +347,7 @@ def test_fit_trains_bbox_net_toward_real_annotation_boxes(
     )
     params_before = [p.clone() for p in model.parameters()]
 
-    history = trainer.fit(_bbox_dataloader(target, cfg))
+    history = trainer.fit(_bbox_dataloader(target, cfg, image_size=16))
 
     assert len(history["train_loss"]) == cfg.train.epochs
     assert all(math.isfinite(loss) for loss in history["train_loss"])

@@ -1,232 +1,89 @@
-from pathlib import Path
-from unittest.mock import MagicMock
+"""Shared pytest fixtures for the test suite."""
 
-import cv2
-import numpy as np
+from pathlib import Path
+
 import pytest
 import torch
-import torch.nn as nn
+from torch import nn
 
-from feral_segmentor.models.base import SegmentationOutput
+from feral_segmentor.data.dataset import AnnotationDataset
+from feral_segmentor.io_utils import DatasetSource
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
+FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures"
 
-
-# ---------------------------------------------------------------------------
-# Image fixtures
-# ---------------------------------------------------------------------------
+_VALID_BBOX_FORMATS = frozenset({"cxcywh", "xyxy"})
 
 
-@pytest.fixture
-def tiny_image():
-    """Real BGR image loaded from the committed test fixtures."""
-    path = FIXTURES_DIR / "american_bulldog_103_original.jpg"
-    return cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+@pytest.fixture(params=[FIXTURE_ROOT, str(FIXTURE_ROOT)])
+def fixture_dataset_root(request):
+    return request.param
 
 
 @pytest.fixture
-def fixture_dataset_root():
-    """Path to the 8-sample test dataset (images/ + annotations/ subdirs)."""
-    return FIXTURES_DIR
+def fixture_dataset(fixture_dataset_root):
+    return AnnotationDataset(DatasetSource(fixture_dataset_root))
 
 
 @pytest.fixture
-def fixture_dataset():
-    """AnnotationDataset over the 8 committed fixture samples."""
-    from feral_segmentor.data.dataset import AnnotationDataset
-    from feral_segmentor.io_utils import DatasetSource
-
-    return AnnotationDataset(DatasetSource(FIXTURES_DIR))
-
-
-@pytest.fixture
-def synthetic_bgr_image():
-    """Random uint8 BGR image — no disk dependency."""
-    rng = np.random.default_rng(0)
-    return rng.integers(0, 256, (256, 256, 3), dtype=np.uint8)
-
-
-# ---------------------------------------------------------------------------
-# Tensor fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def image_tensor():
-    """Single CHW float32 image tensor."""
-    return torch.rand(3, 256, 256)
-
-
-@pytest.fixture
-def batch_image_tensor():
-    """BCHW float32 batch."""
-    return torch.rand(2, 3, 256, 256)
-
-
-@pytest.fixture
-def mask_tensor():
-    """Single HW int64 segmentation mask."""
-    return torch.randint(0, 2, (256, 256))
-
-
-@pytest.fixture
-def batch_mask_tensor():
-    """BHW int64 batch of masks."""
-    return torch.randint(0, 2, (2, 256, 256))
-
-
-@pytest.fixture
-def logits_tensor():
-    """BCHW float32 logits matching batch/class/spatial defaults."""
-    return torch.randn(2, 2, 256, 256)
-
-
-# ---------------------------------------------------------------------------
-# DataLoader fixture
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def tiny_dataloader():
-    """In-memory DataLoader with 4 synthetic (image, mask) batches."""
-    data = [
-        (
-            torch.rand(2, 3, 256, 256),
-            torch.randint(0, 2, (2, 256, 256)),
-        )
-        for _ in range(4)
-    ]
-    return data
-
-
-# ---------------------------------------------------------------------------
-# Mock model fixtures
-# ---------------------------------------------------------------------------
-
-
-class _MinimalSegmenter(nn.Module):
-    """Deterministic stand-in: returns zero logits of correct shape."""
-
-    def __init__(self, num_classes: int = 2):
-        super().__init__()
-        self.num_classes = num_classes
-        # one parameter so optimizers have something to update
-        self._p = nn.Parameter(torch.zeros(1))
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        b, _, h, w = x.shape
-        return self._p * torch.zeros(b, self.num_classes, h, w)
-
-    def predict(self, image: torch.Tensor) -> SegmentationOutput:
-        logits = self.forward(image.unsqueeze(0)).squeeze(0)
-        return SegmentationOutput(
-            mask_logits=logits,
-            boxes=torch.zeros(0, 4),
-            scores=torch.zeros(0),
-            labels=torch.zeros(0, dtype=torch.long),
-        )
-
-
-@pytest.fixture
-def mock_model():
-    """Lightweight nn.Module with correct forward/predict signatures."""
-    return _MinimalSegmenter()
-
-
-@pytest.fixture
-def mock_teacher():
-    """MagicMock replacing TeacherModel — no YOLO download."""
-    teacher = MagicMock(spec=nn.Module)
-    teacher.return_value = torch.zeros(2, 2, 256, 256)
-    return teacher
-
-
-# ---------------------------------------------------------------------------
-# Bounding-box model fixtures
-# ---------------------------------------------------------------------------
-
-
-def make_bbox_test_net(
-    in_channels: int = 3,
-    num_boxes: int = 1,
-    box_format: str = "cxcywh",
-) -> nn.Module:
-    """Build a minimal bbox-regression network for use as a real model in tests.
-
-    Parameters
-    ----------
-    in_channels : int
-        Number of input image channels (3 for RGB).
-    num_boxes : int
-        Number of boxes predicted per image.
-    box_format : {"cxcywh", "xyxy"}
-        Encoding of the raw (unconstrained, unnormalised) output coordinates.
-
-    Returns
-    -------
-    nn.Module
-        Network mapping ``(B, in_channels, H, W)`` to ``(B, num_boxes, 4)``.
-
-    Raises
-    ------
-    ValueError
-        If ``box_format`` is not ``"cxcywh"`` or ``"xyxy"``.
+def trainer_fixture_dataset():
+    """Single-root dataset fixture for tests that don't exercise DatasetSource's
+    Path-vs-str root contract (see the parametrized fixture_dataset for that).
     """
-    if box_format not in ("cxcywh", "xyxy"):
-        raise ValueError(f"box_format must be 'cxcywh' or 'xyxy', got {box_format!r}")
+    return AnnotationDataset(DatasetSource(FIXTURE_ROOT))
 
-    class _BBoxRegressionNet(nn.Module):
-        """Tiny conv + global-pool + linear head producing raw box coordinates."""
 
-        def __init__(self, c_in: int, k: int, fmt: str) -> None:
-            super().__init__()
-            self.num_boxes = k
-            self.box_format = fmt
-            self.feat = nn.Sequential(
-                nn.Conv2d(c_in, 16, kernel_size=3, padding=1),
-                nn.ReLU(inplace=True),
-                nn.AdaptiveAvgPool2d((1, 1)),
+@pytest.fixture
+def mask_to_tensor():
+    def _mask_to_tensor(annotations):
+        return torch.from_numpy(annotations[0].mask).long()
+
+    return _mask_to_tensor
+
+
+class _BBoxNet(nn.Module):
+    """Tiny conv net regressing an image batch to ``(num_boxes, 4)`` box coordinates."""
+
+    def __init__(
+        self,
+        in_channels: int,
+        num_boxes: int,
+        box_format: str,
+        hidden_channels: int = 8,
+    ) -> None:
+        super().__init__()
+        if box_format not in _VALID_BBOX_FORMATS:
+            raise ValueError(
+                f"box_format must be one of {sorted(_VALID_BBOX_FORMATS)}, got {box_format!r}"
             )
-            self.head = nn.Linear(16, k * 4)
+        self.box_format = box_format
+        self.num_boxes = num_boxes
+        self.backbone = nn.Sequential(
+            nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d(1),
+        )
+        self.head = nn.Linear(hidden_channels, num_boxes * 4)
 
-        def forward(self, x: torch.Tensor) -> torch.Tensor:
-            z = self.feat(x).flatten(1)
-            return self.head(z).view(-1, self.num_boxes, 4)
-
-    return _BBoxRegressionNet(in_channels, num_boxes, box_format)
-
-
-@pytest.fixture
-def bbox_test_net_factory():
-    """Factory fixture returning make_bbox_test_net for per-test box-count/format control."""
-    return make_bbox_test_net
-
-
-# ---------------------------------------------------------------------------
-# Optimizer / scheduler fixtures
-# ---------------------------------------------------------------------------
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        batch_size = images.shape[0]
+        features = self.backbone(images).flatten(1)
+        boxes = torch.sigmoid(self.head(features))
+        return boxes.view(batch_size, self.num_boxes, 4)
 
 
 @pytest.fixture
-def mock_optimizer(mock_model):
-    return torch.optim.SGD(mock_model.parameters(), lr=1e-3)
+def bbox_net_factory():
+    """Factory fixture building a tiny real (non-mocked) bbox-regression net.
 
+    Returns a callable ``(in_channels=3, num_boxes=1, box_format="cxcywh") ->
+    nn.Module`` producing real gradients, usable directly with Trainer.fit.
+    """
 
-@pytest.fixture
-def mock_scheduler(mock_optimizer):
-    return torch.optim.lr_scheduler.StepLR(mock_optimizer, step_size=1, gamma=0.5)
+    def _factory(
+        in_channels: int = 3, num_boxes: int = 1, box_format: str = "cxcywh"
+    ) -> _BBoxNet:
+        return _BBoxNet(
+            in_channels=in_channels, num_boxes=num_boxes, box_format=box_format
+        )
 
-
-# ---------------------------------------------------------------------------
-# SegmentationOutput fixture
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def dummy_output():
-    return SegmentationOutput(
-        mask_logits=torch.randn(2, 256, 256),
-        boxes=torch.tensor([[4.0, 4.0, 12.0, 12.0]]),
-        scores=torch.tensor([0.9]),
-        labels=torch.tensor([1], dtype=torch.long),
-    )
+    return _factory

@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch.nn.functional as F
 from torch import nn
 
-from feral_segmentor.models.registry import register
+from feral_segmentor.models.register_model import register
 
 
 @register("net")

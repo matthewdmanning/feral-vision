@@ -4,7 +4,7 @@ import pytest
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
-from omegaconf.errors import ConfigAttributeError, ConfigKeyError, MissingMandatoryValue
+from omegaconf.errors import ConfigAttributeError, ConfigKeyError
 
 from feral_segmentor.config.store import register_configs
 
@@ -51,10 +51,12 @@ def test_model_base_has_architecture_and_weights_fields():
     assert hasattr(cfg.model, "model_outputs")
 
 
-def test_model_architecture_required_fields_are_missing_sentinels():
+def test_model_base_architecture_defaults_to_local_net():
+    """base.yaml no longer leaves architecture as MISSING sentinels (issue #16) —
+    it defaults to the in-repo `local`/`net` architecture."""
     cfg = _compose()
-    with pytest.raises(MissingMandatoryValue):
-        _ = cfg.model.architecture.source
+    assert cfg.model.architecture.source == "local"
+    assert cfg.model.architecture.id == "net"
 
 
 def test_model_weights_defaults_null():

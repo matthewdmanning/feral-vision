@@ -5,8 +5,8 @@ defaults:
 model_outputs: []
 
 architecture:
-  source: ???
-  id: ???
-  location: ???
+  source: local
+  id: net
+  location: null
 
 weights: null

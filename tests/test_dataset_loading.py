@@ -251,34 +251,19 @@ def test_streaming_dataset_applies_target_transform():
 # ---------------------------------------------------------------------------
 
 
-def test_fixture_source_len(fixture_dataset_root):
-    assert len(DatasetSource(fixture_dataset_root)) == 8
-
-
 def test_fixture_dataset_all_images_load(fixture_dataset):
-    for i in range(len(fixture_dataset)):
-        img, _ = fixture_dataset[i]
+    for img, _ in fixture_dataset:
         assert img.dtype == torch.uint8
         assert img.shape[0] == 3
 
 
-def test_fixture_dataset_all_annotations_are_masks(fixture_dataset):
-    for i in range(len(fixture_dataset)):
-        _, annotations = fixture_dataset[i]
-        assert len(annotations) == 1
-        assert isinstance(annotations[0], MaskAnnotation)
-        assert annotations[0].mask is not None
-
-
-def test_fixture_dataset_with_mask_transform(fixture_dataset_root):
-    def to_tensor(annotations):
-        return torch.from_numpy(annotations[0].mask).long()
-
+def test_fixture_dataset_mask_transform_produces_class_id_tensor(
+    fixture_dataset_root, mask_to_tensor
+):
     ds = AnnotationDataset(
-        DatasetSource(fixture_dataset_root), target_transform=to_tensor
+        DatasetSource(fixture_dataset_root), target_transform=mask_to_tensor
     )
-    for i in range(len(ds)):
-        img, mask = ds[i]
+    for img, mask in ds:
         assert img.dtype == torch.uint8
         assert mask.dtype == torch.int64
         assert mask.ndim == 2

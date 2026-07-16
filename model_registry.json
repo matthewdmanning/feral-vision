@@ -1,4 +1,14 @@
 {
+  "net": {
+    "config": {
+      "architecture": {
+        "source": "local",
+        "id": "net",
+        "location": "feral_segmentor.models.default.Net"
+      }
+    },
+    "model_outputs": []
+  },
   "yolo11n-seg": {
     "config": {
       "architecture": {

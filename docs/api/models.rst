@@ -7,9 +7,6 @@ Models
 .. automodule:: feral_segmentor.models.default
    :members:
 
-.. automodule:: feral_segmentor.models.base
-   :members:
-
 .. automodule:: feral_segmentor.models.ModelProperties
    :members:
 
