@@ -219,14 +219,14 @@ def build_trainer(cfg: Any) -> Trainer:
     Trainer
         Fully wired trainer ready to call :meth:`~Trainer.fit`.
     """
-    from feral_segmentor.models.registry import build_model
+    from feral_segmentor.models.register_model import model_builder
     from feral_segmentor.training.optim import (
         build_loss_fn,
         build_optimizer,
         build_scheduler,
     )
 
-    model = build_model(cfg.model)
+    model = model_builder(cfg.model)
     optimizer = build_optimizer(model.parameters(), cfg.train.optim)
     scheduler = build_scheduler(optimizer, cfg.train.scheduler)
     loss_fn = build_loss_fn(cfg.train.loss_fn)
