@@ -9,6 +9,7 @@ Trainer.fit's actual val_dataset contract end to end.
 from __future__ import annotations
 
 import math
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -52,6 +53,50 @@ def _build_trainer(tmp_path: Path, epochs: int = 2) -> Trainer:
         cfg=_make_cfg(epochs),
         best_model_path=tmp_path / "best.pt",
     )
+
+
+class _RecordingMlflow:
+    """In-memory MLflow stand-in recording one training run's effects."""
+
+    def __init__(self) -> None:
+        self.tracking_uri: str | None = None
+        self.experiment_name: str | None = None
+        self.metrics: list[tuple[str, float, int]] = []
+        self.artifacts: list[tuple[str, str]] = []
+        self._active = False
+
+    def set_tracking_uri(self, tracking_uri: str) -> None:
+        """Record the configured tracking server URI."""
+        self.tracking_uri = tracking_uri
+
+    def set_experiment(self, experiment_name: str) -> None:
+        """Record the configured experiment name."""
+        self.experiment_name = experiment_name
+
+    def active_run(self) -> bool | None:
+        """Return a truthy sentinel while the managed run is active."""
+        return True if self._active else None
+
+    def start_run(self) -> _RecordingMlflow:
+        """Return this object as a context manager for one managed run."""
+        return self
+
+    def __enter__(self) -> _RecordingMlflow:
+        """Mark the in-memory run active."""
+        self._active = True
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        """Mark the in-memory run inactive."""
+        self._active = False
+
+    def log_metric(self, name: str, value: float, step: int) -> None:
+        """Record a metric emitted by the trainer."""
+        self.metrics.append((name, value, step))
+
+    def log_artifact(self, path: str, artifact_path: str) -> None:
+        """Record a persisted model artifact."""
+        self.artifacts.append((path, artifact_path))
 
 
 class _ValLenTrainer(Trainer):
@@ -117,6 +162,37 @@ def test_fit_creates_nested_parent_dir_for_checkpoint(tmp_path):
     trainer.fit(_tiny_dataloader())
 
     assert nested.exists()
+
+
+def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(
+    monkeypatch, tmp_path
+):
+    """Records the canonical training evidence when tracking is configured."""
+    mlflow = _RecordingMlflow()
+    monkeypatch.setitem(sys.modules, "mlflow", mlflow)
+    cfg = SimpleNamespace(
+        train=SimpleNamespace(epochs=1),
+        tracking=SimpleNamespace(
+            tracking_uri="http://mlflow.example:5000",
+            experiment_name="trainer-tests",
+        ),
+    )
+    best_path = tmp_path / "best.pt"
+    model = nn.Linear(3, 2)
+    trainer = Trainer(
+        model=model,
+        optimizer=torch.optim.SGD(model.parameters(), lr=0.01),
+        loss_fn=_trivial_loss,
+        cfg=cfg,
+        best_model_path=best_path,
+    )
+
+    trainer.fit(_tiny_dataloader(n=1))
+
+    assert mlflow.tracking_uri == "http://mlflow.example:5000"
+    assert mlflow.experiment_name == "trainer-tests"
+    assert [name for name, _, _ in mlflow.metrics] == ["train_loss"]
+    assert mlflow.artifacts == [(str(best_path), "checkpoints")]
 
 
 # ---------------------------------------------------------------------------

@@ -49,9 +49,10 @@ COPY pyproject.toml ./
 COPY src/ ./src/
 RUN pip install -e .
 
-# Entrypoint script.
+# Entrypoint and project-specific training workflow.
 COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY scripts/container_train.sh /container_train.sh
+RUN chmod +x /entrypoint.sh /container_train.sh
 
 # /data is the SSD mount point: docker run -v /mnt/disks/ssd:/data
 VOLUME ["/data"]

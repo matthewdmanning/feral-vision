@@ -4,26 +4,26 @@ Three steps need your input/credentials. Run them in order.
 
 ---
 
-## Task 2 — Convert labels + split + push to GCS
+## Task 2 — Convert annotations, split, and push to GCS
 
 Fill in your bucket name, then run:
 
 ~~~bash
-# 1. Convert COCO annotations to YOLO label files
+# 1. Convert COCO annotations to YOLO annotation files
 python -m feral_vision.data.coco_to_yolo \
     --ann data/raw/annotations/coco_train2017/instances_train2017_animals.json \
-    --out data/raw/labels/coco_train2017/ \
-    --names data/raw/labels/names.yaml
+    --out data/raw/annotations/yolo_train2017/ \
+    --names data/raw/annotations/names.yaml
 
 # 2. Split into train/val (80/20, seeded)
 python - <<'EOF'
-import json, random, shutil
+import random, shutil
 from pathlib import Path
 
 SEED = 42
 VAL_RATIO = 0.2
 SRC_IMAGES = Path("data/raw/images/coco_train2017")
-SRC_LABELS = Path("data/raw/labels/coco_train2017")
+SRC_ANNOTATIONS = Path("data/raw/annotations/yolo_train2017")
 
 all_stems = sorted(p.stem for p in SRC_IMAGES.glob("*.jpg"))
 random.seed(SEED)
@@ -33,22 +33,26 @@ val_stems = set(all_stems[:n_val])
 train_stems = set(all_stems[n_val:])
 
 for split, stems in [("train", train_stems), ("val", val_stems)]:
+    split_root = Path(f"data/split/{split}")
     for stem in stems:
         img_src = SRC_IMAGES / f"{stem}.jpg"
-        lbl_src = SRC_LABELS / f"{stem}.txt"
-        (Path(f"data/split/images/{split}")).mkdir(parents=True, exist_ok=True)
-        (Path(f"data/split/labels/{split}")).mkdir(parents=True, exist_ok=True)
-        if img_src.exists(): shutil.copy2(img_src, f"data/split/images/{split}/{stem}.jpg")
-        if lbl_src.exists(): shutil.copy2(lbl_src, f"data/split/labels/{split}/{stem}.txt")
+        annotation_src = SRC_ANNOTATIONS / f"{stem}.txt"
+        (split_root / "images").mkdir(parents=True, exist_ok=True)
+        (split_root / "annotations").mkdir(parents=True, exist_ok=True)
+        if img_src.exists(): shutil.copy2(img_src, split_root / "images" / f"{stem}.jpg")
+        if annotation_src.exists(): shutil.copy2(annotation_src, split_root / "annotations" / f"{stem}.txt")
+
+    shutil.copy2("data/raw/annotations/names.yaml", split_root / "annotations/names.yaml")
 
 print(f"train: {len(train_stems)}, val: {len(val_stems)}")
 EOF
 
 # 3. Push to GCS  ← FILL IN YOUR BUCKET NAME
 BUCKET="YOUR_BUCKET_NAME"
-gcloud storage rsync -r data/split/images/ gs://${BUCKET}/images/
-gcloud storage rsync -r data/split/labels/ gs://${BUCKET}/labels/
-gcloud storage cp data/raw/labels/names.yaml gs://${BUCKET}/labels/names.yaml
+for SPLIT in train val; do
+    gcloud storage rsync -r data/split/${SPLIT}/images/ gs://${BUCKET}/${SPLIT}/images/
+    gcloud storage rsync -r data/split/${SPLIT}/annotations/ gs://${BUCKET}/${SPLIT}/annotations/
+done
 ~~~
 
 ---
@@ -105,6 +109,14 @@ IMAGE="REGION-docker.pkg.dev/PROJECT/feral-vision/trainer:0.1.0"
 docker run --gpus all \
     -v /mnt/disks/ssd:/data \
     -e GCS_BUCKET="YOUR_BUCKET_NAME" \
+    -e GCS_DATA_PREFIX="train" \
+    -e DATA_DIR="/data/train" \
+    -e MLFLOW_ARTIFACT_PREFIX="mlflow" \
+    -e TRAIN_DATA="default" \
     -e HYDRA_OVERRIDES="train.epochs=50 train.batch_size=16" \
     ${IMAGE}
 ~~~
+
+The container records metrics and the best checkpoint in its MLflow run. MLflow
+stores those artifacts under the runtime-selected artifact prefix; do not copy
+checkpoints to a parallel GCS location.

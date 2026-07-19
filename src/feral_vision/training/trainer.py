@@ -10,9 +10,10 @@ units and is the only path that imports them; it is exercised by the DVC
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import math
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator
 
 if TYPE_CHECKING:
     from feral_vision.data.dataset import AnnotationDataset
@@ -52,6 +53,47 @@ def _try_log_metric(name: str, value: float, step: int) -> None:
             mlflow.log_metric(name, value, step=step)
     except Exception:  # pragma: no cover - logging must never break training
         pass
+
+
+def _try_log_artifact(path: Path, artifact_path: str) -> None:
+    """Log an artifact when an MLflow run is active without breaking training."""
+    try:
+        import mlflow
+
+        if mlflow.active_run() is not None:
+            mlflow.log_artifact(str(path), artifact_path=artifact_path)
+    except Exception:  # pragma: no cover - logging must never break training
+        pass
+
+
+@contextmanager
+def _active_mlflow_run(cfg: Any) -> Iterator[None]:
+    """Start a configured MLflow run, or continue when tracking is unavailable."""
+    tracking = getattr(cfg, "tracking", None)
+    if tracking is None:
+        yield
+        return
+
+    try:
+        import mlflow
+
+        tracking_uri = getattr(tracking, "tracking_uri", None)
+        experiment_name = getattr(tracking, "experiment_name", None)
+        if tracking_uri is not None:
+            mlflow.set_tracking_uri(tracking_uri)
+        if experiment_name is not None:
+            mlflow.set_experiment(experiment_name)
+        if mlflow.active_run() is not None:
+            yield
+            return
+        run = mlflow.start_run()
+    except Exception:  # pragma: no cover - tracking must never break training
+        logger.warning("MLflow tracking is unavailable; continuing without a run")
+        yield
+        return
+
+    with run:
+        yield
 
 
 class Trainer:
@@ -148,6 +190,18 @@ class Trainer:
         torch.save(self.model.state_dict(), self.best_model_path)
 
     def fit(
+        self,
+        dataloader: Iterable[Any],
+        val_dataset: AnnotationDataset | None = None,
+    ) -> dict[str, Any]:
+        """Train while recording the configured MLflow run when available."""
+        with _active_mlflow_run(self.cfg):
+            history = self._fit(dataloader, val_dataset)
+            if self.best_model_path.exists():
+                _try_log_artifact(self.best_model_path, artifact_path="checkpoints")
+            return history
+
+    def _fit(
         self,
         dataloader: Iterable[Any],
         val_dataset: AnnotationDataset | None = None,

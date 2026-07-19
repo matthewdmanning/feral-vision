@@ -11,9 +11,15 @@ MODE="${MODE:-docker}"
 STOP_VM="${STOP_VM:-true}"
 REGION="${REGION:-us-central1}"
 REPO="${REPO:-feral-vision}"
+IMAGE_NAME="${IMAGE_NAME:-trainer}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+SSD_MOUNT="${SSD_MOUNT:-/mnt/disks/ssd}"
+DATA_DIR="${DATA_DIR:-/data}"
+GCS_DATA_PREFIX="${GCS_DATA_PREFIX:-}"
+MLFLOW_ARTIFACT_PREFIX="${MLFLOW_ARTIFACT_PREFIX:-mlflow}"
+TRAIN_DATA="${TRAIN_DATA:-default}"
 
-IMAGE_URI="${REGION}-docker.pkg.dev/${GCP_PROJECT}/${REPO}/feral-vision-gcp:${IMAGE_TAG}"
+IMAGE_URI="${REGION}-docker.pkg.dev/${GCP_PROJECT}/${REPO}/${IMAGE_NAME}:${IMAGE_TAG}"
 
 teardown() {
   if [[ "$STOP_VM" == "true" ]]; then
@@ -40,8 +46,13 @@ if [[ "$MODE" == "docker" ]]; then
   gcloud compute ssh "$VM_NAME" --zone="$VM_ZONE" --project="$GCP_PROJECT" --command="
     docker pull ${IMAGE_URI} && \
     docker run --gpus all --rm \
+      -v ${SSD_MOUNT}:/data \
+      -e DATA_DIR=${DATA_DIR} \
       -e GCP_PROJECT=${GCP_PROJECT} \
       -e GCS_BUCKET=${GCS_BUCKET} \
+      -e GCS_DATA_PREFIX=${GCS_DATA_PREFIX} \
+      -e MLFLOW_ARTIFACT_PREFIX=${MLFLOW_ARTIFACT_PREFIX} \
+      -e TRAIN_DATA=${TRAIN_DATA} \
       -e HYDRA_OVERRIDES='train.epochs=${EPOCHS}' \
       ${IMAGE_URI}
   "

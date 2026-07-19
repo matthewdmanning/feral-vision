@@ -15,3 +15,9 @@ Do not leave stale Git worktrees or branches behind. Before finishing work,
 remove worktrees and local branches created for the task once they are no longer
 needed. Check their status first, and never remove an active, dirty, or
 user-owned worktree or branch without explicit approval.
+
+## Code placement
+
+Keep reusable, project-agnostic code in `src/`. Put project-specific workflow,
+deployment, and operational code in `scripts/`; do not turn project orchestration
+into a reusable library API without a demonstrated cross-project use.
