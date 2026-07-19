@@ -1,29 +1,40 @@
-name: Train
+name: Training smoke
 
 on:
-  push:
+  pull_request:
     branches: [main]
     paths:
-      - "dvc.yaml"
-      - "dvc.lock"
-      - "**/*.dvc"
       - "conf/**"
-      - "src/**"
+      - "src/feral_vision/training/**"
+      - "src/feral_vision/models/**"
+      - "tests/test_trainer.py"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/train.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: training-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  repro:
-    name: DVC reproduce
+  trainer-smoke:
+    name: Canonical trainer smoke test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync
-      - run: uv run dvc repro
+      - name: Install test dependencies
+        run: uv sync --group dev
+      - name: Exercise the canonical trainer on CPU fixtures
+        env:
+          PYTHONHASHSEED: "0"
+        run: >-
+          uv run python -c "import pytest, torch; torch.manual_seed(0);
+          raise SystemExit(pytest.main(['tests/test_trainer.py', '-q', '--tb=short']))"
