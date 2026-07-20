@@ -1,10 +1,16 @@
 # Data configuration
 
-Data configuration selects the dataset source and the parameters needed to
-resolve it to the repository's canonical dataset layout. It is a Hydra concern;
-DVC owns the underlying data artifacts. See [ARCHITECTURE.md](../../ARCHITECTURE.md)
-for the data-flow and tooling boundary.
+## Purpose
 
-Choose a semantic dataset variant for a reproducible run. Dataset acquisition,
-derivation, and version identity are described by the project vocabulary in
-[CONTEXT.md](../../CONTEXT.md).
+Data configuration selects the dataset source and parameters needed to resolve
+the canonical dataset layout.
+
+## Selection
+
+Choose a semantic dataset variant as part of a reproducible Run Recipe.
+
+## Ownership
+
+Hydra owns configuration values and DVC owns data artifacts. The data-flow and
+tooling boundary are defined in [ARCHITECTURE.md](../../ARCHITECTURE.md); the
+project vocabulary is in [CONTEXT.md](../../CONTEXT.md).

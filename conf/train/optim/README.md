@@ -1,7 +1,15 @@
 # Optimizer configuration
 
-Optimizer configuration selects the optimizer and its tunable parameters for
-the canonical trainer. Choose a semantic optimizer variant through the training
-concern; optimizer construction remains owned by training code.
+## Purpose
 
-See [ARCHITECTURE.md](../../../ARCHITECTURE.md) for the canonical training path.
+Optimizer configuration selects optimizer parameters for the canonical trainer.
+
+## Selection
+
+Choose a semantic optimizer variant through the training concern in a complete
+Run Recipe.
+
+## Ownership
+
+Training code owns optimizer construction. The canonical training path is
+defined in [ARCHITECTURE.md](../../../ARCHITECTURE.md).

@@ -1,7 +1,16 @@
 # Scheduler configuration
 
-Scheduler configuration selects the learning-rate schedule used by the
-canonical trainer. Choose a semantic scheduler variant through the training
-concern; scheduler construction remains owned by training code.
+## Purpose
 
-See [ARCHITECTURE.md](../../../ARCHITECTURE.md) for the canonical training path.
+Scheduler configuration selects the learning-rate schedule used by the
+canonical trainer.
+
+## Selection
+
+Choose a semantic scheduler variant through the training concern in a complete
+Run Recipe.
+
+## Ownership
+
+Training code owns scheduler construction. The canonical training path is
+defined in [ARCHITECTURE.md](../../../ARCHITECTURE.md).
