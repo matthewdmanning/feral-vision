@@ -33,7 +33,7 @@ boundaries).
 
 `data/augmentations.py`. Pure albumentations — a static registry of stock
 albumentations transform classes (`_TRANSFORMS`), assembled per `cfg.augmentation`
-(`conf/augmentation/default.yaml`) and composed using albumentations' own
+(`conf/augmentation/standard.yaml`) and composed using albumentations' own
 composition mechanism directly. There is **no custom Augmentation/Compose wrapper
 class** anywhere in this codebase. One existed previously (a hand-rolled fluent
 chain class) and was deleted specifically because it replicated logic the
@@ -56,9 +56,9 @@ Each model *source* (HF Hub, torch hub, ultralytics, ...) has a `SourceAdapter`
 subclass in `models/sources/` implementing `fetch(cfg) -> nn.Module` and
 `inspect(cfg) -> (ModelProperties, dict)`, keyed by a module-level `SOURCE_KEY` and
 resolved dynamically via `register_model.get_adapter(source)`. In-repo architectures
-(`nn.Module` subclasses defined in this codebase, e.g. `models/default.py`) instead
-register into `models/registry.py`'s `@register`/`build_model`/`get_model`
-architecture registry, selected by `cfg.model.arch`.
+(`nn.Module` subclasses defined in this codebase, e.g. `models/default.py`) register
+through `models/register_model.py`'s `@register` decorator and are resolved by
+`model_builder()` from their configured local architecture identifier.
 
 **Weights are independent of architecture source.** `ModelConfig.weights:
 Optional[WeightsConfig]` is a separate config branch from
@@ -77,7 +77,7 @@ the durable metadata store (see [[project-model-registry]]).
 ## 6. Training — single canonical path
 
 **`training/trainer.py` is the only correct training path.** `build_trainer(cfg)`
-wires `build_model` (`models/registry.py`) and `build_optimizer` /
+wires `model_builder` (`models/register_model.py`) and `build_optimizer` /
 `build_scheduler` / `build_loss_fn` (`training/optim.py`, all thin
 `hydra.utils.instantiate` wrappers over `conf/train/{optim,scheduler,loss_fn}/*.yaml`)
 into a `Trainer`. `Trainer.fit(dataloader, val_dataset)` runs the epoch loop, logs
@@ -91,14 +91,9 @@ is *one possible* loss implementation, not the default, and its distillation bra
 is a holdover from the deleted student/teacher model design. Do not describe or
 default to `segmentation_loss`/distillation as canonical training behavior.
 
-**`training/train.py` (direct `ultralytics.YOLO(...).train()`) is a known,
-non-canonical competing path.** It bypasses `Trainer`/`build_trainer` entirely, so
-runs through it are not wired to the same model/optimizer/loss config path as
-everything else — this breaks reproducibility (two divergent ways to produce a
-"trained model" from the same config). It is **not** a valid alternative flow; it
-is an inconsistency to be resolved (removed or folded into `trainer.py`) as a
-follow-up. Until then, treat `trainer.py` as the only source of truth for "how
-training happens," and flag any doc/config/PR that treats `train.py` as equivalent.
+The former direct `ultralytics.YOLO(...).train()` endpoint was removed because it
+bypassed `Trainer`/`build_trainer` and created a divergent, unreproducible path.
+`trainer.py` remains the only source of truth for how training happens.
 
 ## 7. Tooling boundaries
 

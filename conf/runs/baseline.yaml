@@ -1,0 +1,9 @@
+# Canonical reproducible local training recipe.
+defaults:
+  - /data@_global_.data: local
+  - /model@_global_.model: net
+  - /train@_global_.train: baseline
+  - /inference@_global_.inference: local
+  - /tracking@_global_.tracking: mlflow
+  - /augmentation@_global_.augmentation: standard
+  - _self_

@@ -40,7 +40,8 @@ pytestmark = pytest.mark.skipif(
 #       raising and returns a tensor.
 #
 # Scope: only the "local" (in-repo architecture, no network) path — conf/model/
-# base.yaml's default (architecture.source == "local", architecture.id == "net").
+# the baseline recipe's local model (architecture.source == "local",
+# architecture.id == "net").
 # Remote sources (hf_hub/torch_hub/ultralytics/...) are intentionally out of scope
 # for this file: none of this repo's deps ship a real mock-server fixture for them.
 # ---------------------------------------------------------------------------
@@ -72,9 +73,9 @@ def _clear_hydra():
 
 
 def _compose_model_cfg():
-    """Compose the real conf/ tree's default model config (architecture.source == 'local')."""
+    """Compose the baseline Run Recipe's local model config."""
     with initialize(version_base=None, config_path="../conf"):
-        cfg = compose(config_name="config")
+        cfg = compose(config_name="runs/baseline")
     return cfg.model
 
 

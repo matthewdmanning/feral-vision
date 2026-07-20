@@ -36,7 +36,7 @@ class SourceConfig:
 
     source: str = MISSING  # discriminator: hf_hub | torch_hub | ultralytics | ...
     id: str = MISSING  # hub repo ID, model name, dotted class path, or URL
-    location: Optional[str] = None  # local path; None = hub loads directly into memory
+    location: str = MISSING  # stable source location or dotted local class path
 
 
 @dataclass
@@ -52,7 +52,6 @@ class WeightsConfig:
 class ModelConfig:
     """Single source of truth for a model. architecture is required; weights is optional."""
 
-    model_outputs: list[str] = field(default_factory=list)
     architecture: SourceConfig = MISSING
     weights: Optional[WeightsConfig] = None
 

@@ -1,0 +1,11 @@
+# In-repository test model; its source location is deliberately explicit.
+defaults:
+  - model_schema
+  - _self_
+
+architecture:
+  source: local
+  id: net
+  location: feral_vision.models.default.Net
+
+weights: null

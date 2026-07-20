@@ -52,13 +52,14 @@ def validate_variant(name: str) -> None:
     GlobalHydra.instance().clear()
     try:
         with initialize(version_base=None, config_path="../conf"):
-            cfg = compose(config_name="config", overrides=[f"model={name}"])
+            cfg = compose(config_name="runs/baseline", overrides=[f"model={name}"])
     finally:
         GlobalHydra.instance().clear()
 
     try:
         source = cfg.model.architecture.source
         arch_id = cfg.model.architecture.id
+        location = cfg.model.architecture.location
     except MissingMandatoryValue as exc:
         raise AssertionError(
             f"conf/model/{name}.yaml: architecture.source/id left as MISSING (???)"
@@ -66,6 +67,7 @@ def validate_variant(name: str) -> None:
 
     assert source, f"conf/model/{name}.yaml: architecture.source is empty"
     assert arch_id, f"conf/model/{name}.yaml: architecture.id is empty"
+    assert location, f"conf/model/{name}.yaml: architecture.location is empty"
 
     if source == "local":
         register_model.registered_config(arch_id)  # raises KeyError if unregistered

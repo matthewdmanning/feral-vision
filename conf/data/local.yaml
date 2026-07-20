@@ -1,0 +1,9 @@
+# Local dataset in the repository's canonical images/ + annotations/ layout.
+defaults:
+  - data_schema
+  - _self_
+
+source: local
+root: data
+image_size: 32
+val_split: 0.2

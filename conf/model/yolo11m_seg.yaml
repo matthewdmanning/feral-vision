@@ -1,13 +1,10 @@
 defaults:
-  - base
+  - model_schema
   - _self_
-
-model_outputs:
-  - seg_instance
 
 architecture:
   source: ultralytics
   id: yolo11m-seg.pt
-  location: null
+  location: ultralytics.YOLO
 
 weights: null

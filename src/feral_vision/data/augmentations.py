@@ -12,6 +12,8 @@ from feral_vision.utils import get_logger, to_dtype
 
 log = get_logger(__name__)
 
+register_configs()
+
 # Static registry of every instantiable Albumentations transform.
 # Enumerated from the archived release; update only if the library is replaced.
 _TRANSFORMS: dict[str, type[A.BasicTransform]] = {
@@ -227,7 +229,7 @@ def run_augment_stage(cfg: DictConfig) -> None:
         log.info("wrote %s", dest)
 
 
-@hydra.main(version_base=None, config_path="../../../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../../../conf", config_name="runs/baseline")
 def main(cfg: DictConfig) -> None:
     register_configs()
     run_augment_stage(cfg)

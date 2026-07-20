@@ -1,3 +1,7 @@
+defaults:
+  - adam_schema
+  - _self_
+
 # conf/train/optim/adam.yaml
 # Adam — partial; call opt_factory(model.parameters()).
 # Source: https://pytorch.org/docs/stable/generated/torch.optim.Adam.html
