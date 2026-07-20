@@ -1,13 +1,18 @@
 # Configuration
 
-`conf/` holds version-controlled parameters for Feral Vision. Program flow and
-tool ownership are defined in [ARCHITECTURE.md](../ARCHITECTURE.md), not here.
+## Purpose
 
-Each configuration concern owns a co-located README that explains its purpose,
-the choice it represents, and its owner. Typed field contracts belong in Python
-schemas; YAML contains variant values; executable selections belong in named Run
-Recipes. Do not duplicate those sources as README field tables or variant
-inventories.
+`conf/` holds version-controlled parameter values for Feral Vision. It does not
+define program flow or tooling boundaries.
 
-Run `runs/baseline` for the canonical local recipe or `runs/smoke` for a
-CPU-safe configuration check. There is no root `config.yaml` selection layer.
+## Selection
+
+Choose a complete named Run Recipe: `runs/baseline` is the canonical local
+recipe and `runs/smoke` is CPU-safe for validation. There is no root
+`config.yaml` selection layer.
+
+## Ownership
+
+Python schemas own field contracts, YAML files own semantic variant values, and
+Run Recipes own executable selection. The canonical program flow and tooling
+ownership are defined in [ARCHITECTURE.md](../ARCHITECTURE.md).
