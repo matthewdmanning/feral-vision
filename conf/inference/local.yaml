@@ -1,8 +1,8 @@
 defaults:
-  - base_inference
+  - inference_schema
   - _self_
 
 threshold: 0.5
-device: gpu
+device: cpu
 tta: false
 min_box_area: 1

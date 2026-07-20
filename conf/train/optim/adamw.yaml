@@ -1,3 +1,7 @@
+defaults:
+  - adamw_schema
+  - _self_
+
 # conf/train/optim/adamw.yaml
 # AdamW — partial; call opt_factory(model.parameters()).
 # Source: https://pytorch.org/docs/stable/optim.html

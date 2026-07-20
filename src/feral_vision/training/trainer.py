@@ -250,7 +250,9 @@ def main() -> None:
 
     register_configs()
 
-    @hydra.main(version_base=None, config_path="../../conf", config_name="config")
+    @hydra.main(
+        version_base=None, config_path="../../../conf", config_name="runs/baseline"
+    )
     def _run(cfg: Any) -> None:
         from torch.utils.data import DataLoader
 

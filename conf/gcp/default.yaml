@@ -1,5 +1,0 @@
-gcp_project: ${oc.env:GCP_PROJECT}
-gcs_bucket: ${oc.env:GCS_BUCKET}
-vm_name: feral-vision-trainer
-vm_zone: us-central1-a
-machine_type: n1-standard-8

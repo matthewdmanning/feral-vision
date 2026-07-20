@@ -21,6 +21,8 @@ from feral_vision.utils import get_logger
 
 logger = get_logger(__name__)
 
+register_configs()
+
 # Logits carry a class dimension, so a 4-D input is (B, C, H, W).
 _LOGITS_NDIM = 4
 # Metric value written when evaluation inputs are unavailable.
@@ -109,7 +111,7 @@ def dice_score(
     return _per_class_scores(pred, target, num_classes, dice=True)
 
 
-@hydra.main(version_base=None, config_path="../../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../../../conf", config_name="runs/baseline")
 def main(cfg: DictConfig) -> None:
     register_configs()
 

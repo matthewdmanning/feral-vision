@@ -22,9 +22,12 @@ from feral_vision.constants import (
     COCO_IMAGE_URL_TEMPLATE,
     COCO_SUPERCATEGORY_FILTER,
 )
+from feral_vision.config.store import register_configs
 from feral_vision.utils import get_logger
 
 logger = get_logger(__name__)
+
+register_configs()
 
 # Output subdirectory names under data root.
 _IMAGES_SUBDIR = "images/coco_train2017"
@@ -164,7 +167,7 @@ def fetch_data(source: str = "local") -> Path:
     return path
 
 
-@hydra.main(version_base=None, config_path="../../../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../../../conf", config_name="runs/baseline")
 def main(cfg: DictConfig) -> None:
     """Hydra entrypoint for the fetch DVC stage."""
     source = cfg.data.source
@@ -176,8 +179,4 @@ def main(cfg: DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    # Schemas must be registered before Hydra composes the config.
-    from feral_vision.config.store import register_configs
-
-    register_configs()
     main()

@@ -1,3 +1,7 @@
+defaults:
+  - cross_entropy_schema
+  - _self_
+
 # conf/train/loss_fn/cross_entropy.yaml
 # CrossEntropyLoss — instantiated directly (no partial needed).
 # Source: https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html

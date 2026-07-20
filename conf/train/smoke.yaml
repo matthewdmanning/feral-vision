@@ -1,0 +1,12 @@
+# Portable, inexpensive trainer configuration.
+defaults:
+  - train_schema
+  - optim: adamw
+  - scheduler: cosine
+  - loss_fn: cross_entropy
+  - _self_
+
+epochs: 1
+batch_size: 2
+num_workers: 0
+device: cpu

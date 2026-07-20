@@ -1,7 +1,7 @@
 """Register structured-config schemas with Hydra's ConfigStore.
 
-We register one schema per config-group *variant* (e.g. ``model/base_model``).
-Each YAML under ``conf/<group>/`` opts in with ``defaults: [base_<variant>]`` so
+We register one schema per config-group *contract*. Each semantic YAML under
+``conf/<group>/`` opts in with its group's ``*_schema`` entry so
 it merges onto the typed node.
 
 ``register_configs`` is idempotent so it can be called from every Hydra
@@ -17,22 +17,19 @@ from feral_vision.config.schema import (
     DataConfig,
     InferenceConfig,
     ModelConfig,
-    # Loss base + variants
-    LossFnConfig,
+    # Loss variants
     CrossEntropyConfig,
     BCEWithLogitsConfig,
     MSELossConfig,
     L1LossConfig,
     NLLLossConfig,
-    # Optim base + variants
-    OptimConfig,
+    # Optim variants
     AdamWConfig,
     AdamConfig,
     SGDConfig,
     RMSpropConfig,
     RAdamConfig,
-    # Scheduler base + variants
-    SchedulerConfig,
+    # Scheduler variants
     CosineAnnealingConfig,
     LinearLRConfig,
     StepLRConfig,
@@ -42,38 +39,34 @@ from feral_vision.config.schema import (
     TrainConfig,
 )
 
-# (group, schema-name, node) — schema-name is what YAML references in its
-# `defaults:` list, resolved relative to the group.
+# (group, schema-name, node) — schema names are implementation contracts, not
+# user-selectable configuration variants.
 _SCHEMAS: tuple[tuple[str, str, type], ...] = (
-    ("data", "base_data", DataConfig),
-    ("model", "base_model", ModelConfig),
-    ("train", "base_train", TrainConfig),
-    # Base schemas — type contracts for TrainConfig fields
-    ("train/optim", "base_optim", OptimConfig),
-    ("train/loss_fn", "base_loss_fn", LossFnConfig),
-    ("train/scheduler", "base_scheduler", SchedulerConfig),
-    # Optim variants
-    ("train/optim", "adamw", AdamWConfig),
-    ("train/optim", "adam", AdamConfig),
-    ("train/optim", "sgd", SGDConfig),
-    ("train/optim", "rmsprop", RMSpropConfig),
-    ("train/optim", "radam", RAdamConfig),
+    ("data", "data_schema", DataConfig),
+    ("model", "model_schema", ModelConfig),
+    ("train", "train_schema", TrainConfig),
+    # Concrete sub-config contracts.
+    ("train/optim", "adamw_schema", AdamWConfig),
+    ("train/optim", "adam_schema", AdamConfig),
+    ("train/optim", "sgd_schema", SGDConfig),
+    ("train/optim", "rmsprop_schema", RMSpropConfig),
+    ("train/optim", "radam_schema", RAdamConfig),
     # Scheduler variants
-    ("train/scheduler", "cosine", CosineAnnealingConfig),
-    ("train/scheduler", "linear", LinearLRConfig),
-    ("train/scheduler", "step", StepLRConfig),
-    ("train/scheduler", "plateau", ReduceLROnPlateauConfig),
-    ("train/scheduler", "warmrestarts", CosineWarmRestartsConfig),
+    ("train/scheduler", "cosine_schema", CosineAnnealingConfig),
+    ("train/scheduler", "linear_schema", LinearLRConfig),
+    ("train/scheduler", "step_schema", StepLRConfig),
+    ("train/scheduler", "plateau_schema", ReduceLROnPlateauConfig),
+    ("train/scheduler", "warmrestarts_schema", CosineWarmRestartsConfig),
     # Loss variants
-    ("train/loss_fn", "cross_entropy", CrossEntropyConfig),
-    ("train/loss_fn", "bce_with_logits", BCEWithLogitsConfig),
-    ("train/loss_fn", "mse", MSELossConfig),
-    ("train/loss_fn", "l1", L1LossConfig),
-    ("train/loss_fn", "nll", NLLLossConfig),
+    ("train/loss_fn", "cross_entropy_schema", CrossEntropyConfig),
+    ("train/loss_fn", "bce_with_logits_schema", BCEWithLogitsConfig),
+    ("train/loss_fn", "mse_schema", MSELossConfig),
+    ("train/loss_fn", "l1_schema", L1LossConfig),
+    ("train/loss_fn", "nll_schema", NLLLossConfig),
     # Other configs
-    ("inference", "base_inference", InferenceConfig),
-    ("tracking", "base_tracking", TrackingConfig),
-    ("augmentation", "base_augmentation", AugmentationConfig),
+    ("inference", "inference_schema", InferenceConfig),
+    ("tracking", "tracking_schema", TrackingConfig),
+    ("augmentation", "augmentation_schema", AugmentationConfig),
 )
 
 _registered = False

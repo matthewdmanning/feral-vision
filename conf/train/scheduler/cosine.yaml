@@ -1,3 +1,7 @@
+defaults:
+  - cosine_schema
+  - _self_
+
 # conf/train/scheduler/cosine.yaml
 # CosineAnnealingLR — partial; call sched_factory(optimizer).
 # T_max should match cfg.train.epochs; override via CLI if needed.

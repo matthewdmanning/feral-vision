@@ -1,5 +1,5 @@
 defaults:
-  - base_data
+  - data_schema
   - _self_
 
 source: coco

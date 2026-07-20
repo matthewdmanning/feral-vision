@@ -1,0 +1,9 @@
+# CPU-safe recipe for composition and trainer smoke checks.
+defaults:
+  - /data@_global_.data: local
+  - /model@_global_.model: net
+  - /train@_global_.train: smoke
+  - /inference@_global_.inference: local
+  - /tracking@_global_.tracking: mlflow
+  - /augmentation@_global_.augmentation: standard
+  - _self_

@@ -7,6 +7,8 @@ from feral_vision.utils import get_logger
 
 logger = get_logger(__name__)
 
+register_configs()
+
 
 def _flatten_params(obj, prefix: str = "") -> dict[str, object]:
     """Flatten a nested config mapping into dotted scalar keys for mlflow."""
@@ -20,7 +22,7 @@ def _flatten_params(obj, prefix: str = "") -> dict[str, object]:
     return flat
 
 
-@hydra.main(version_base=None, config_path="../../conf", config_name="config")
+@hydra.main(version_base=None, config_path="../../conf", config_name="runs/baseline")
 def main(cfg: DictConfig) -> None:
     register_configs()
 

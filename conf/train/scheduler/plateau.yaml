@@ -1,3 +1,7 @@
+defaults:
+  - plateau_schema
+  - _self_
+
 # conf/train/scheduler/plateau.yaml
 # ReduceLROnPlateau — partial; call sched_factory(optimizer).
 # Source: https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html

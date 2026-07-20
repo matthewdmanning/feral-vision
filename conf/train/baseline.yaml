@@ -1,10 +1,10 @@
-# conf/train/base.yaml
-
+# Canonical trainer parameters.
 defaults:
-  - base_train  # merges onto TrainConfig schema for struct-mode validation
+  - train_schema
   - optim: adamw
   - scheduler: cosine
   - loss_fn: cross_entropy
+  - _self_
 
 epochs: 50
 batch_size: 32

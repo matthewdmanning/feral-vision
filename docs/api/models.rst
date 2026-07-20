@@ -1,9 +1,6 @@
 Models
 ======
 
-.. automodule:: feral_vision.models.registry
-   :members:
-
 .. automodule:: feral_vision.models.default
    :members:
 

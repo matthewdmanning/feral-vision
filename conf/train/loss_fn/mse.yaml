@@ -1,3 +1,7 @@
+defaults:
+  - mse_schema
+  - _self_
+
 # conf/train/loss_fn/mse.yaml
 # MSELoss — instantiated directly (no partial needed).
 # Source: https://pytorch.org/docs/stable/generated/torch.nn.MSELoss.html
