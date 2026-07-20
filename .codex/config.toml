@@ -1,0 +1,19 @@
+[mcp_servers.model-inspector]
+command = "uv"
+args = [
+    "run",
+    "python",
+    "mcp/server/main.py",
+]
+
+[mcp_servers.model-inspector.env]
+PROJECT_ROOT = "."
+
+[[hooks.SessionStart]]
+matcher = "^startup$"
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = 'python3 "$(git rev-parse --show-toplevel)/.codex/hooks/github_auth.py"'
+timeout = 30
+statusMessage = "Restoring GitHub CLI authentication"

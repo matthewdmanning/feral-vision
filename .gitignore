@@ -37,3 +37,6 @@ example_augment.txt
 yolo11n-seg.pt
 docs/_build
 .vscode/tasks.json
+
+# Local Codex authentication
+.codex/hooks/github_auth.py
