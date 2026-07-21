@@ -112,11 +112,13 @@ docker run --gpus all \
     -e GCS_DATA_PREFIX="train" \
     -e DATA_DIR="/data/train" \
     -e MLFLOW_ARTIFACT_PREFIX="mlflow" \
-    -e TRAIN_DATA="default" \
+    -e RUN_RECIPE="baseline" \
     -e HYDRA_OVERRIDES="train.epochs=50 train.batch_size=16" \
     ${IMAGE}
 ~~~
 
 The container records metrics and the best checkpoint in its MLflow run. MLflow
-stores those artifacts under the runtime-selected artifact prefix; do not copy
-checkpoints to a parallel GCS location.
+stores those artifacts under the runtime-selected artifact prefix; when the
+container exits, it also synchronizes the MLflow backend store to
+`${MLFLOW_ARTIFACT_PREFIX}/tracking/`. Do not copy checkpoints to a parallel
+GCS location.
