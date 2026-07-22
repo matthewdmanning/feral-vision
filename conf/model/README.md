@@ -13,4 +13,4 @@ Choose a semantic model variant as part of a complete Run Recipe.
 
 Model source adapters own source-specific behavior and inspected output
 metadata; YAML must not duplicate that metadata. The model-acquisition boundary
-is defined in [ARCHITECTURE.md](../../ARCHITECTURE.md).
+is defined in [the program flow](../../docs/architecture/program-flow.md).

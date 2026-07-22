@@ -46,14 +46,9 @@ RUN pip install \
 # Install feral-vision package.
 WORKDIR /app
 COPY pyproject.toml ./
+COPY dvc.yaml ./
 COPY src/ ./src/
 RUN pip install -e .
 
-# Entrypoint script.
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
 # /data is the SSD mount point: docker run -v /mnt/disks/ssd:/data
 VOLUME ["/data"]
-
-ENTRYPOINT ["/entrypoint.sh"]

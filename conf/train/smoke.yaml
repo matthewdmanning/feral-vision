@@ -1,7 +1,7 @@
 # Portable, inexpensive trainer configuration.
 defaults:
   - train_schema
-  - optim: adamw
+  - optim: adam
   - scheduler: cosine
   - loss_fn: cross_entropy
   - _self_

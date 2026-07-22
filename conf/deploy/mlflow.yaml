@@ -1,0 +1,18 @@
+# Shared MLflow deployment settings. Supply environment-specific identifiers
+# through the deployment environment; keep the database URI in Secret Manager.
+gcp:
+  project: ${oc.env:GCP_PROJECT}
+  region: us-central1
+
+service:
+  name: mlflow
+  image_uri: ${oc.env:MLFLOW_IMAGE_URI}
+  account: ${oc.env:MLFLOW_SERVICE_ACCOUNT}
+
+cloud_sql:
+  instance: ${oc.env:CLOUD_SQL_INSTANCE}
+  backend_store_uri_secret: mlflow-backend-store-uri
+
+artifacts:
+  bucket: ${oc.env:GCS_BUCKET}
+  prefix: mlflow

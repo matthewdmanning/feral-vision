@@ -14,17 +14,15 @@ via Hydra:
 This builds the model (:mod:`feral_vision.models.register_model`), optimizer,
 scheduler, and loss function from ``conf/train/`` (see :doc:`../api/training`),
 then runs :meth:`~feral_vision.training.trainer.Trainer.fit`. Metrics are
-logged to MLflow when a run is active, and the best checkpoint is written to
-``models/registry/best.pt``.
+logged to MLflow when a run is active. When artifact logging succeeds, only the
+selected best model artifact is recorded; intermediate checkpoints remain local
+and are not retained in the artifact store.
 
-GCP training
-------------
+Cloud training
+--------------
 
-Requires ``GCP_PROJECT`` and ``GCS_BUCKET`` environment variables:
-
-.. code-block:: bash
-
-   GCP_PROJECT=my-proj GCS_BUCKET=my-bucket bash scripts/gcp_train.sh
+The former GCE launch script is deprecated. The required deployment topology
+and first-run readiness gate are defined in ``docs/planning/product-scope.md``.
 
 Data pipeline
 -------------

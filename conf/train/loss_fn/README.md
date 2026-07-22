@@ -12,4 +12,4 @@ Recipe.
 ## Ownership
 
 Training code owns loss implementation and instantiation. The canonical
-training path is defined in [ARCHITECTURE.md](../../../ARCHITECTURE.md).
+training path is defined in [the program flow](../../../docs/architecture/program-flow.md).

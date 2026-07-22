@@ -8,6 +8,7 @@ wheels/
 outputs/
 coverage.json
 coverage.xml
+metrics.json
 mlflow.db
 
 # Virtual environments
@@ -29,6 +30,8 @@ mlflow.db
 
 # Dev Files
 .claude/**
+.codex/config.toml
+.codex/hooks/github_auth.py
 CLAUDE.md
 bash.exe.stackdump
 .coverage

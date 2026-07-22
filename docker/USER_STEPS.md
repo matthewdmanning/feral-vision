@@ -1,59 +1,61 @@
-# User Action Required: GCS + Docker + T4 Setup
+# Docker and MLflow setup
 
-Three steps need your input/credentials. Run them in order.
+This document retains image and MLflow setup instructions. The former Docker/GCE
+launch orchestration is deprecated; there is no supported first-run procedure
+until the readiness work in [Product Scope](../docs/planning/product-scope.md)
+is complete.
 
----
+## Deploy persistent MLflow tracking
 
-## Task 2 — Convert labels + split + push to GCS
-
-Fill in your bucket name, then run:
+MLflow run metadata must use Cloud SQL PostgreSQL; a GCS bucket is the artifact
+store, not a SQLite filesystem. Create a database and store this Unix-socket
+connection URI in Secret Manager:
 
 ~~~bash
-# 1. Convert COCO annotations to YOLO label files
-python -m feral_vision.data.coco_to_yolo \
-    --ann data/raw/annotations/coco_train2017/instances_train2017_animals.json \
-    --out data/raw/labels/coco_train2017/ \
-    --names data/raw/labels/names.yaml
-
-# 2. Split into train/val (80/20, seeded)
-python - <<'EOF'
-import json, random, shutil
-from pathlib import Path
-
-SEED = 42
-VAL_RATIO = 0.2
-SRC_IMAGES = Path("data/raw/images/coco_train2017")
-SRC_LABELS = Path("data/raw/labels/coco_train2017")
-
-all_stems = sorted(p.stem for p in SRC_IMAGES.glob("*.jpg"))
-random.seed(SEED)
-random.shuffle(all_stems)
-n_val = int(len(all_stems) * VAL_RATIO)
-val_stems = set(all_stems[:n_val])
-train_stems = set(all_stems[n_val:])
-
-for split, stems in [("train", train_stems), ("val", val_stems)]:
-    for stem in stems:
-        img_src = SRC_IMAGES / f"{stem}.jpg"
-        lbl_src = SRC_LABELS / f"{stem}.txt"
-        (Path(f"data/split/images/{split}")).mkdir(parents=True, exist_ok=True)
-        (Path(f"data/split/labels/{split}")).mkdir(parents=True, exist_ok=True)
-        if img_src.exists(): shutil.copy2(img_src, f"data/split/images/{split}/{stem}.jpg")
-        if lbl_src.exists(): shutil.copy2(lbl_src, f"data/split/labels/{split}/{stem}.txt")
-
-print(f"train: {len(train_stems)}, val: {len(val_stems)}")
-EOF
-
-# 3. Push to GCS  ← FILL IN YOUR BUCKET NAME
+PROJECT="YOUR_GCP_PROJECT_ID"
+REGION="us-central1"
+SQL_INSTANCE="${PROJECT}:${REGION}:feral-vision-mlflow"
+DB_NAME="mlflow"
+DB_USER="mlflow"
+DB_PASSWORD="CHOOSE_A_STRONG_PASSWORD"
 BUCKET="YOUR_BUCKET_NAME"
-gcloud storage rsync -r data/split/images/ gs://${BUCKET}/images/
-gcloud storage rsync -r data/split/labels/ gs://${BUCKET}/labels/
-gcloud storage cp data/raw/labels/names.yaml gs://${BUCKET}/labels/names.yaml
+
+gcloud sql instances create feral-vision-mlflow \
+    --database-version=POSTGRES_16 --region=${REGION} --project=${PROJECT}
+gcloud sql databases create ${DB_NAME} --instance=feral-vision-mlflow --project=${PROJECT}
+gcloud sql users create ${DB_USER} --instance=feral-vision-mlflow \
+    --password="${DB_PASSWORD}" --project=${PROJECT}
+printf 'postgresql://%s:%s@/%s?host=/cloudsql/%s' \
+    "${DB_USER}" "${DB_PASSWORD}" "${DB_NAME}" "${SQL_INSTANCE}" \
+    | gcloud secrets create mlflow-backend-store-uri --data-file=- --project=${PROJECT}
+~~~
+
+Build and deploy the MLflow server. Its Cloud Run service account needs
+``roles/cloudsql.client`` and ``roles/storage.objectUser`` on the artifact
+bucket.
+
+~~~bash
+REPO="feral-vision"
+MLFLOW_IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/mlflow:0.1.0"
+gcloud builds submit --tag=${MLFLOW_IMAGE} --file=docker/mlflow.Dockerfile .
+
+GCP_PROJECT=${PROJECT} GCS_BUCKET=${BUCKET} CLOUD_SQL_INSTANCE=${SQL_INSTANCE} \
+MLFLOW_IMAGE_URI=${MLFLOW_IMAGE} \
+MLFLOW_SERVICE_ACCOUNT="MLFLOW_SERVICE_ACCOUNT@${PROJECT}.iam.gserviceaccount.com" \
+UV_CACHE_DIR=/tmp/uv-cache uv run python scripts/deploy_mlflow.py
+~~~
+
+Retrieve the service URL and pass it as ``MLFLOW_TRACKING_URI`` to every
+training container.
+
+~~~bash
+MLFLOW_TRACKING_URI="$(gcloud run services describe mlflow --region=${REGION} \
+    --format='value(status.url)')"
 ~~~
 
 ---
 
-## Task 8 — Build and push Docker image to Artifact Registry
+## Build and push a training image
 
 ~~~bash
 # Fill in your GCP project and region
@@ -80,31 +82,3 @@ echo "Image: ${IMAGE}"
 ~~~
 
 ---
-
-## Task 9 — Configure T4 instance and run container
-
-~~~bash
-# On the T4 GCE instance — run once to mount SSD
-DEVICE="/dev/disk/by-id/google-local-ssd-0"   # adjust if different
-sudo mkfs.ext4 -F ${DEVICE}
-sudo mkdir -p /mnt/disks/ssd
-sudo mount ${DEVICE} /mnt/disks/ssd
-sudo chmod a+w /mnt/disks/ssd
-
-# Grant service account GCS access (run from your local machine)
-PROJECT="YOUR_GCP_PROJECT_ID"
-BUCKET="YOUR_BUCKET_NAME"
-SA="$(gcloud compute instances describe YOUR_INSTANCE_NAME \
-    --format='value(serviceAccounts[0].email)')"
-gcloud storage buckets add-iam-policy-binding gs://${BUCKET} \
-    --member="serviceAccount:${SA}" \
-    --role="roles/storage.objectAdmin"
-
-# Run training container (on the T4 instance)
-IMAGE="REGION-docker.pkg.dev/PROJECT/feral-vision/trainer:0.1.0"
-docker run --gpus all \
-    -v /mnt/disks/ssd:/data \
-    -e GCS_BUCKET="YOUR_BUCKET_NAME" \
-    -e HYDRA_OVERRIDES="train.epochs=50 train.batch_size=16" \
-    ${IMAGE}
-~~~

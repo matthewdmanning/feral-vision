@@ -2,7 +2,7 @@
 
 This document is the canonical planning source for Feral Vision's product
 scope and delivery constraints. For the data-to-model program flow and tool
-ownership, see [ARCHITECTURE.md](../../ARCHITECTURE.md).
+ownership, see [the program flow](../architecture/program-flow.md).
 
 ## Product scope
 
@@ -34,27 +34,36 @@ The following are out of scope:
   may be local, remote, or a PyTorch Hub entrypoint.
 - MLflow records training metrics whenever a tracking run is active.
 
-## GCP training contract
+## Cloud-training delivery contract
 
-- Project training runs on a GCE T4 GPU instance in the Docker image based on
-  `nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04`; the image is stored in
-  Google Artifact Registry.
+- Production training targets Docker on a GCE GPU instance. GitHub Actions is
+  validation-only. The production image is stored in Google Artifact Registry.
 - GCP access uses the instance service account through Workload Identity; do
   not use service-account key files.
 - Before training, input data is synchronized from GCS to the attached SSD,
   mounted in the container at `/data`.
 - Bucket names, project IDs, and instance settings are supplied at runtime via
   environment variables or `gcloud`, never baked into the image.
-- The GCP container workflow runs MLflow as a sidecar on the training instance.
-  Per the
-  [tooling boundary](../../ARCHITECTURE.md#7-tooling-boundaries), run-generated
-  model artifacts, including checkpoints, belong to MLflow. When its artifact
-  store is GCS, MLflow writes them to its configured artifact prefix; do not
-  upload checkpoints to a parallel GCS location directly.
+- MLflow is deployed as a shared Cloud Run service. Its backend store is a
+  Cloud SQL PostgreSQL database and its artifact store is a GCS bucket. The
+  training container receives the Cloud Run tracking URI; it does not start a
+  local MLflow server or copy a SQLite database to GCS. Per the
+  [tooling boundary](../architecture/program-flow.md#7-tooling-boundaries), run-generated
+  model artifacts belong to MLflow. When artifact logging succeeds, only the
+  selected best model artifact is recorded in its configured GCS prefix; do not
+  upload intermediate checkpoints to a parallel GCS location directly.
+
+This is a required deployment topology, not evidence that a first cloud run is
+ready. Before the first production run, the package must produce the readiness
+and preflight evidence in [issue #37](https://github.com/matthewdmanning/feral-vision/issues/37),
+the phase-aware recovery and final summary in [issue #38](https://github.com/matthewdmanning/feral-vision/issues/38),
+and the complete model-artifact and lineage behavior in
+[issue #20](https://github.com/matthewdmanning/feral-vision/issues/20). Until
+then, the Docker procedure is an implementation path, not a first-run
+acceptance runbook.
 
 ## Non-functional constraints
 
-- Training must continue when no MLflow server is active; metric logging is a
-  no-op in that case.
-- The container runtime targets Python 3.12, PyTorch 2.12 or later, and CUDA
-  12.1.
+- Local development may continue when no MLflow server is active; metric logging
+  is a no-op in that case. First cloud-run acceptance requires durable MLflow
+  evidence as stated above.

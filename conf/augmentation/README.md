@@ -13,4 +13,4 @@ Choose a semantic augmentation variant as part of a complete Run Recipe.
 
 `data/augmentations.py` owns assembly and composition; YAML only declares the
 active operations. The augmentation boundary is defined in
-[ARCHITECTURE.md](../../ARCHITECTURE.md).
+[the program flow](../../docs/architecture/program-flow.md).

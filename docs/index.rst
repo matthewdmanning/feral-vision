@@ -10,7 +10,6 @@ Computer vision toolkit optimised to detect feral animals on mobile devices.
    guide/quickstart
    guide/dataset
    guide/training
-   guide/inference
 
 .. toctree::
    :maxdepth: 2

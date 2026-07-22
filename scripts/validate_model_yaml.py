@@ -3,8 +3,8 @@
 Composes each model config variant via Hydra and asserts:
   - architecture.source is set (not the Hydra MISSING "???" sentinel).
   - architecture.id is set.
-  - if source == "local", architecture.id resolves in model_registry.json (i.e.
-    the in-repo class it names has actually been registered).
+  - if source == "local", architecture.location resolves to an importable
+    in-repository class.
 
 Not a pytest test: yaml correctness is a config concern, not source-code
 behavior, so it's checked here rather than in tests/.
@@ -46,7 +46,6 @@ def validate_variant(name: str) -> None:
     from omegaconf.errors import MissingMandatoryValue
 
     from feral_vision.config.store import register_configs
-    from feral_vision.models import register_model  # noqa: F401 -- triggers @register
 
     register_configs()
     GlobalHydra.instance().clear()
@@ -70,7 +69,11 @@ def validate_variant(name: str) -> None:
     assert location, f"conf/model/{name}.yaml: architecture.location is empty"
 
     if source == "local":
-        register_model.registered_config(arch_id)  # raises KeyError if unregistered
+        module_path, _, class_name = location.rpartition(".")
+        module = __import__(module_path, fromlist=[class_name])
+        assert hasattr(module, class_name), (
+            f"conf/model/{name}.yaml: architecture.location is not importable"
+        )
 
 
 def main() -> None:

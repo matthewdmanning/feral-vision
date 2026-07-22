@@ -17,19 +17,3 @@ stages:
       - data/processed
     outs:
       - data/augmented
-
-  train:
-    cmd: uv run python -m feral_vision.pipelines.base_segmentation_pipeline
-    deps:
-      - data/processed
-      - conf
-    outs:
-      - models/registry/best.pt
-
-  evaluate:
-    cmd: uv run python -m feral_vision.pipelines.evaluate_segmentation_pipeline
-    deps:
-      - models/registry/best.pt
-    metrics:
-      - metrics.json
-

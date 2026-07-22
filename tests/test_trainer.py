@@ -9,11 +9,14 @@ Trainer.fit's actual val_dataset contract end to end.
 from __future__ import annotations
 
 import math
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import mlflow
 import pytest
 import torch
+import yaml
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
@@ -31,10 +34,16 @@ def _make_cfg(epochs: int) -> SimpleNamespace:
     return SimpleNamespace(train=SimpleNamespace(epochs=epochs))
 
 
-def _tiny_dataloader(n: int = 4, in_features: int = 3, out_features: int = 2):
-    """List of (inputs, targets) batches usable as a real Iterable dataloader."""
+def _tiny_dataloader(
+    n: int = 4, channels: int = 3, classes: int = 2, image_size: int = 8
+):
+    """List of 2D image batches usable as a real Iterable dataloader."""
     return [
-        (torch.randn(2, in_features), torch.randn(2, out_features)) for _ in range(n)
+        (
+            torch.randn(2, channels, image_size, image_size),
+            torch.randn(2, classes, image_size, image_size),
+        )
+        for _ in range(n)
     ]
 
 
@@ -43,7 +52,7 @@ def _trivial_loss(outputs, targets):
 
 
 def _build_trainer(tmp_path: Path, epochs: int = 2) -> Trainer:
-    model = nn.Linear(3, 2)
+    model = nn.Conv2d(3, 2, kernel_size=1)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     return Trainer(
         model=model,
@@ -59,6 +68,21 @@ class _ValLenTrainer(Trainer):
 
     def _validate(self, dataset) -> dict[str, float]:
         return {"val_len": float(len(dataset))}
+
+
+class _BestModelTrainer(Trainer):
+    """Produces a deliberately worse final epoch for artifact-selection tests."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._epoch = 0
+
+    def _train_one_epoch(self, dataloader) -> float:
+        self._input_example = torch.ones(2, 3, 8, 8)
+        with torch.no_grad():
+            self.model.weight.fill_(float(self._epoch + 1))
+        self._epoch += 1
+        return float(self._epoch)
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +128,7 @@ def test_fit_writes_best_checkpoint(tmp_path):
 
 def test_fit_creates_nested_parent_dir_for_checkpoint(tmp_path):
     nested = tmp_path / "nested" / "registry" / "best.pt"
-    model = nn.Linear(3, 2)
+    model = nn.Conv2d(3, 2, kernel_size=1)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     trainer = Trainer(
         model=model,
@@ -119,6 +143,102 @@ def test_fit_creates_nested_parent_dir_for_checkpoint(tmp_path):
     assert nested.exists()
 
 
+def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(tmp_path):
+    """Logs a two-dimensional image model with MLflow's PyTorch flavor."""
+    tracking_uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
+    mlflow.set_tracking_uri(tracking_uri)
+    artifact_root = tmp_path / "artifacts"
+    client = mlflow.tracking.MlflowClient(tracking_uri)
+    experiment_id = client.create_experiment(
+        "trainer-tests", artifact_location=artifact_root.as_uri()
+    )
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    data_tracker = data_root / "data.dvc"
+    data_tracker.write_text("outs:\n- md5: immutable-data-version\n")
+    cfg = SimpleNamespace(
+        train=SimpleNamespace(epochs=1),
+        data=SimpleNamespace(root=str(data_root)),
+        model=SimpleNamespace(architecture=SimpleNamespace(id="trainer-test-model")),
+        tracking=SimpleNamespace(
+            tracking_uri=tracking_uri,
+            experiment_name="trainer-tests",
+        ),
+    )
+    best_path = tmp_path / "best.pt"
+    model = nn.Conv2d(3, 2, kernel_size=1)
+    trainer = Trainer(
+        model=model,
+        optimizer=torch.optim.SGD(model.parameters(), lr=0.01),
+        loss_fn=_trivial_loss,
+        cfg=cfg,
+        best_model_path=best_path,
+    )
+
+    dataloader = [(torch.randn(2, 3, 8, 8), torch.randn(2, 2, 8, 8))]
+    trainer.fit(dataloader)
+
+    mlmodel_files = list(artifact_root.rglob("MLmodel"))
+    assert len(mlmodel_files) == 1
+    model_metadata = yaml.safe_load(mlmodel_files[0].read_text())
+    assert model_metadata["signature"] is not None
+    assert model_metadata["saved_input_example_info"] is not None
+    run = client.search_runs([experiment_id])[0]
+    assert run.data.params["dvc_data_version"].startswith("data.dvc@sha256:")
+    logged_trackers = list(artifact_root.rglob("data.dvc"))
+    assert len(logged_trackers) == 1
+    assert logged_trackers[0].read_text() == data_tracker.read_text()
+    resolved_configs = list(artifact_root.rglob("resolved_config.json"))
+    assert len(resolved_configs) == 1
+    assert json.loads(resolved_configs[0].read_text()) == {
+        "data": {"root": str(data_root)},
+        "model": {"architecture": {"id": "trainer-test-model"}},
+        "tracking": {
+            "experiment_name": "trainer-tests",
+            "tracking_uri": tracking_uri,
+        },
+        "train": {"epochs": 1},
+    }
+    model_versions = client.search_model_versions("name = 'trainer-test-model'")
+    assert len(model_versions) == 1
+    assert model_versions[0].run_id == run.info.run_id
+
+
+def test_fit_logs_best_model_weights_not_final_epoch_weights(tmp_path):
+    """MLflow stores only the selected best model artifact for a run."""
+    tracking_uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
+    mlflow.set_tracking_uri(tracking_uri)
+    artifact_root = tmp_path / "artifacts"
+    client = mlflow.tracking.MlflowClient(tracking_uri)
+    client.create_experiment(
+        "best-model-tests", artifact_location=artifact_root.as_uri()
+    )
+    cfg = SimpleNamespace(
+        train=SimpleNamespace(epochs=2),
+        data=SimpleNamespace(root=str(tmp_path)),
+        tracking=SimpleNamespace(
+            tracking_uri=tracking_uri,
+            experiment_name="best-model-tests",
+        ),
+    )
+    model = nn.Conv2d(3, 1, kernel_size=1, bias=False)
+    trainer = _BestModelTrainer(
+        model=model,
+        optimizer=torch.optim.SGD(model.parameters(), lr=0.01),
+        loss_fn=_trivial_loss,
+        cfg=cfg,
+        best_model_path=tmp_path / "best.pt",
+    )
+
+    trainer.fit([])
+
+    mlmodel_file = next(artifact_root.rglob("MLmodel"))
+    logged_model = mlflow.pytorch.load_model(str(mlmodel_file.parent))
+    input_example = torch.ones(2, 3, 8, 8)
+    assert torch.allclose(logged_model(input_example), torch.full((2, 1, 8, 8), 3.0))
+    assert torch.allclose(trainer.model(input_example), torch.full((2, 1, 8, 8), 6.0))
+
+
 # ---------------------------------------------------------------------------
 # fit() — scheduler stepping
 # ---------------------------------------------------------------------------
@@ -126,7 +246,7 @@ def test_fit_creates_nested_parent_dir_for_checkpoint(tmp_path):
 
 @pytest.mark.parametrize("epochs,gamma", [(1, 0.5), (2, 0.5), (3, 0.1)])
 def test_scheduler_steps_once_per_epoch(tmp_path, epochs, gamma):
-    model = nn.Linear(3, 2)
+    model = nn.Conv2d(3, 2, kernel_size=1)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=gamma)
     trainer = Trainer(
@@ -164,7 +284,7 @@ def test_base_validate_returns_empty_dict_and_falls_back_to_train_loss(
 def test_validate_metric_is_tracked_per_epoch_using_real_dataset(
     tmp_path, trainer_fixture_dataset, epochs
 ):
-    model = nn.Linear(3, 2)
+    model = nn.Conv2d(3, 2, kernel_size=1)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     trainer = _ValLenTrainer(
         model=model,
@@ -182,7 +302,7 @@ def test_validate_metric_is_tracked_per_epoch_using_real_dataset(
 def test_validate_metric_drives_checkpoint_selection_over_train_loss(
     tmp_path, trainer_fixture_dataset
 ):
-    model = nn.Linear(3, 2)
+    model = nn.Conv2d(3, 2, kernel_size=1)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     trainer = _ValLenTrainer(
         model=model,
