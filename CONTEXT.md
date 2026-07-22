@@ -91,13 +91,13 @@ _Avoid_: Model lifecycle management, model tracking
 A reusable description of a model's architecture, acquisition source, expected outputs, and optional starting weights, independent of any run.
 _Avoid_: Checkpoint, model version
 
-**Model Catalog**:
-The project's durable collection of static Model Definitions and the metadata needed to construct or inspect them, independent of a training run.
-_Avoid_: Model Registry, experiment tracker, run record
-
 **MLflow Model Registry**:
-The MLflow service that owns Registered Models and their Model Versions, including the lifecycle relationship from a trained Model Artifact to its originating Run Record.
-_Avoid_: Model Catalog, experiment tracker
+The MLflow service that owns Registered Models, their static Model Definition metadata, and their Model Versions, including the lifecycle relationship from a trained Model Artifact to its originating Run Record.
+_Avoid_: Model Catalog, experiment tracker, project registry
+
+**Offline Registration Journal**:
+A temporary local record of model-definition registrations made while the MLflow Model Registry is unreachable; it is replayed when the registry becomes reachable.
+_Avoid_: Model Catalog, durable registry
 
 **Registered Model**:
 A named identity in the MLflow Model Registry that groups related Model Versions.

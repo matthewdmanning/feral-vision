@@ -1,8 +1,9 @@
-"""Register a model in model_registry.json.
+"""Register static model-definition metadata in the MLflow Model Registry.
 
-This is the only step that writes to model_registry.json.
 Inspection (inspect_model MCP tool or adapter.inspect()) produces metadata;
-this script consumes it and persists the result.
+this script consumes it and stores the result in MLflow. When the configured
+tracking service is unavailable, it queues the registration in a temporary
+offline journal for replay.
 
 Usage:
     uv run python scripts/register_model.py \\
@@ -24,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -31,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 
 def main() -> None:
-    """Use this function to run the register-model CLI, which inspects a model and writes the result to model_registry.json."""
+    """Inspect a model and register its static metadata with MLflow."""
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -64,7 +66,17 @@ def main() -> None:
         dest="fetch_if_needed",
         help="Download model weights to inspect architecture when hub metadata is unavailable",
     )
+    parser.add_argument(
+        "--tracking-uri",
+        default=os.environ.get("MLFLOW_TRACKING_URI"),
+        help="MLflow tracking URI; absent or unreachable queues a temporary offline journal",
+    )
     args = parser.parse_args()
+
+    if args.tracking_uri:
+        import mlflow
+
+        mlflow.set_tracking_uri(args.tracking_uri)
 
     from omegaconf import OmegaConf
 
@@ -90,6 +102,7 @@ def main() -> None:
         json.dumps(
             {
                 "registered": args.model_id,
+                "tracking_uri": args.tracking_uri,
                 "model_outputs": [t.value for t in props.model_outputs],
                 "metadata": metadata,
             },
