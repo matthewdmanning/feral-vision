@@ -93,9 +93,9 @@ def _try_log_metric(name: str, value: float, step: int) -> None:
 
 def _dvc_data_version(tracker_path: Path) -> str:
     """Identify a staged DVC tracker without running DVC."""
-    if tracker_path.name == "data.dvc":
+    if tracker_path.name in {"data.dvc", "dvc.lock"}:
         digest = hashlib.sha256(tracker_path.read_bytes()).hexdigest()
-        return f"data.dvc@sha256:{digest}"
+        return f"{tracker_path.name}@sha256:{digest}"
 
     try:
         commit = subprocess.check_output(
@@ -114,11 +114,14 @@ def _try_log_dvc_lineage(cfg: Any) -> None:
         import mlflow
 
         data_root = getattr(getattr(cfg, "data", None), "root", None)
-        staged_tracker = Path(str(data_root)) / "data.dvc" if data_root else None
-        tracker_path = (
-            staged_tracker
-            if staged_tracker is not None and staged_tracker.exists()
-            else _DVC_PIPELINE_PATH
+        staged_trackers = (
+            [Path(str(data_root)) / name for name in ("dvc.lock", "data.dvc")]
+            if data_root
+            else []
+        )
+        tracker_path = next(
+            (candidate for candidate in staged_trackers if candidate.exists()),
+            _DVC_PIPELINE_PATH,
         )
         if mlflow.active_run() is not None and tracker_path.exists():
             mlflow.log_param("dvc_data_version", _dvc_data_version(tracker_path))

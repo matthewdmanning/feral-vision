@@ -120,5 +120,6 @@ bypassed `Trainer`/`build_trainer` and created a divergent, unreproducible path.
 
 "Model artifacts" (anything produced by or describing a specific training/inference
 run — checkpoints included) belong to MLflow, never DVC. See
-[[dvc-mlflow-integration]] for the linking patterns (log a `.dvc` tracker file or
-`dvc.api.get_url()` param into MLflow — never a raw data directory).
+[[dvc-mlflow-integration]] for the linking patterns (log the staged `dvc.lock` or
+`.dvc` tracker file, or a `dvc.api.get_url()` param, into MLflow — never a raw data
+directory).
