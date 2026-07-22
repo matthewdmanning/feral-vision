@@ -35,8 +35,9 @@ dvc pull
 # Augmentation
 uv run python scripts/augment.py --src tests/fixtures --dst data/augmented/coco_train17 --ops motion_blur original
 
-# GCP training (requires GCP_PROJECT and GCS_BUCKET)
-GCP_PROJECT=my-proj GCS_BUCKET=my-bucket bash scripts/gcp_train.sh
+# GCP training (also requires the persistent Cloud Run MLflow endpoint)
+GCP_PROJECT=my-proj GCS_BUCKET=my-bucket \
+MLFLOW_TRACKING_URI=https://mlflow-abc-uc.a.run.app bash scripts/gcp_train.sh
 ```
 
 ## Dataset contract
@@ -45,6 +46,9 @@ Every dataset root has `images/` and `annotations/` directories. Annotation
 files match image stems: masks use `.png` or `.jpg`, YOLO boxes use `.txt`, and
 classification labels use `.json`; `names.yaml` records class indices. The data
 source dispatch in `data/fetch.py` must resolve every source to this layout.
+
+Always use 2D data when writing tests or examples of models. Never use 1D or
+flat inputs.
 
 ## Configuration rules
 
@@ -58,8 +62,10 @@ the concern's purpose and use a complete named Run Recipe for reproducible work.
 
 ## Environment and documentation
 
-GCP training requires `GCP_PROJECT` and `GCS_BUCKET`. Find installed-version
-documentation first; use Context7 only when local documentation is unavailable.
+GCP training requires `GCP_PROJECT`, `GCS_BUCKET`, and `MLFLOW_TRACKING_URI`.
+The tracking service stores run metadata in Cloud SQL and artifacts in GCS.
+Find installed-version documentation first; use Context7 only when local
+documentation is unavailable.
 For product scope and delivery constraints, see
 [Product Scope](../planning/product-scope.md). The domain glossary is
 [CONTEXT.md](../../CONTEXT.md).
@@ -71,6 +77,11 @@ Issues and pull-request work. Prefer the connected GitHub app when it supports
 the operation. For CLI work, authenticate `gh` from the local `.env.local`
 token without printing or committing secret values, then verify with
 `gh auth status`.
+
+`GITHUB_PERSONAL_ACCESS_TOKEN` in this checkout's `.env.local` was validated
+on 2026-07-21 at 12:00 noon. If `gh` reports an invalid token, repair its saved
+credential from that local token before pursuing device authentication or
+requesting a replacement token.
 
 ## Git workspace hygiene
 
