@@ -139,9 +139,9 @@ def get_compute_instance(
     service = build(
         "compute", "v1", http=http, cache_discovery=False, static_discovery=False
     )
-    response = service.instances().get(
-        project=project, zone=zone, instance=instance
-    ).execute()
+    response = (
+        service.instances().get(project=project, zone=zone, instance=instance).execute()
+    )
     if not isinstance(response, dict):
         raise TypeError("Compute instances.get returned a non-object response")
     return response

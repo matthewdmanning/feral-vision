@@ -33,9 +33,7 @@ class _RecordingHttpMockSequence(HttpMockSequence):
     ) -> tuple[object, bytes]:
         """Record each request before returning Google's configured mock response."""
         self.requests.append((uri, method))
-        return super().request(
-            uri, method=method, body=body, headers=headers, **kwargs
-        )
+        return super().request(uri, method=method, body=body, headers=headers, **kwargs)
 
 
 def _compute_discovery_document() -> str:
@@ -60,9 +58,7 @@ def test_get_compute_instance_calls_selected_compute_endpoint() -> None:
         "name": "feral-vision-trainer",
         "zone": "https://www.googleapis.com/compute/v1/projects/project/zones/us-central1-a",
         "status": "RUNNING",
-        "serviceAccounts": [
-            {"email": "trainer@project.iam.gserviceaccount.com"}
-        ],
+        "serviceAccounts": [{"email": "trainer@project.iam.gserviceaccount.com"}],
     }
     http = _RecordingHttpMockSequence(
         [
