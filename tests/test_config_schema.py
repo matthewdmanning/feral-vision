@@ -85,9 +85,7 @@ def test_model_with_weights_block():
         id=["yolo11n-seg.pt"],
         location="models/checkpoints/yolo11n_seg",
     )
-    cfg = OmegaConf.structured(
-        ModelConfig(architecture=arch, weights=weights)
-    )
+    cfg = OmegaConf.structured(ModelConfig(architecture=arch, weights=weights))
     assert cfg.weights.source == "yolo_hub"
     assert "yolo11n-seg.pt" in cfg.weights.id
 

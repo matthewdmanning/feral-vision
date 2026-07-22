@@ -2,6 +2,8 @@
 # Mirror the validation performed by the Dev and Training smoke GitHub workflows.
 set -euo pipefail
 
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
+
 uv sync --group dev --group docs-sphinx
 uvx ruff check . --output-format=github
 uvx ruff format --check .

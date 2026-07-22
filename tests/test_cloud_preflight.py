@@ -36,13 +36,27 @@ class _SuccessfulRuntime:
         """Return deterministic output for each supported readiness probe."""
         outputs = {
             ("docker", "info"): "Docker 27.0",
-            ("nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"): "NVIDIA L4, 550.54",
+            (
+                "nvidia-smi",
+                "--query-gpu=name,driver_version",
+                "--format=csv,noheader",
+            ): "NVIDIA L4, 550.54",
             ("findmnt", "--target", "/data"): "/dev/sdb /data ext4 rw",
             ("python", "--version"): "Python 3.12.13",
             ("python", "-c", "import torch; print(torch.version.cuda)"): "12.1",
-            ("gcloud", "auth", "list", "--filter=status:ACTIVE", "--format=value(account)"): "trainer@project.iam.gserviceaccount.com",
+            (
+                "gcloud",
+                "auth",
+                "list",
+                "--filter=status:ACTIVE",
+                "--format=value(account)",
+            ): "trainer@project.iam.gserviceaccount.com",
         }
-        if command[:3] == ("docker", "pull", "us-central1-docker.pkg.dev/project/repo/trainer@sha256:" + "a" * 64):
+        if command[:3] == (
+            "docker",
+            "pull",
+            "us-central1-docker.pkg.dev/project/repo/trainer@sha256:" + "a" * 64,
+        ):
             return "pulled digest"
         if command[:3] == ("gcloud", "storage", "ls"):
             return "accessible"
@@ -58,7 +72,9 @@ class _SuccessfulRuntime:
 
 def test_preflight_records_all_required_evidence_without_gcp_calls() -> None:
     """A successful probe records the full immutable identity and runtime evidence."""
-    result = run_preflight(_request(), runner=_SuccessfulRuntime(), http_status=lambda _: 200)
+    result = run_preflight(
+        _request(), runner=_SuccessfulRuntime(), http_status=lambda _: 200
+    )
 
     assert result.status == "passed"
     assert result.run_identity["data_reference"].endswith("#123456789")
@@ -82,7 +98,10 @@ def test_preflight_records_all_required_evidence_without_gcp_calls() -> None:
 def test_preflight_refuses_mutable_image_and_data_references() -> None:
     """Mutable tags and unversioned GCS paths cannot produce passing evidence."""
     result = run_preflight(
-        _request(image="us-central1-docker.pkg.dev/project/repo/trainer:latest", data_reference="gs://training-data/feral/current"),
+        _request(
+            image="us-central1-docker.pkg.dev/project/repo/trainer:latest",
+            data_reference="gs://training-data/feral/current",
+        ),
         runner=_SuccessfulRuntime(),
         http_status=lambda _: 200,
     )

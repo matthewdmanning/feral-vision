@@ -46,6 +46,7 @@ def validate_variant(name: str) -> None:
     from omegaconf.errors import MissingMandatoryValue
 
     from feral_vision.config.store import register_configs
+
     register_configs()
     GlobalHydra.instance().clear()
     try:
@@ -70,9 +71,9 @@ def validate_variant(name: str) -> None:
     if source == "local":
         module_path, _, class_name = location.rpartition(".")
         module = __import__(module_path, fromlist=[class_name])
-        assert hasattr(
-            module, class_name
-        ), f"conf/model/{name}.yaml: architecture.location is not importable"
+        assert hasattr(module, class_name), (
+            f"conf/model/{name}.yaml: architecture.location is not importable"
+        )
 
 
 def main() -> None:

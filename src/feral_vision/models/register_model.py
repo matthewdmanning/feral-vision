@@ -17,7 +17,9 @@ from feral_vision.utils import get_logger
 
 
 logger = get_logger(__name__)
-_OFFLINE_REGISTRY_PATH = Path(tempfile.gettempdir()) / "feral-vision-mlflow-registry.json"
+_OFFLINE_REGISTRY_PATH = (
+    Path(tempfile.gettempdir()) / "feral-vision-mlflow-registry.json"
+)
 _CONFIG_TAG = "feral_vision.model_config"
 _OUTPUTS_TAG = "feral_vision.model_outputs"
 _METADATA_TAG = "feral_vision.model_metadata"
@@ -118,7 +120,9 @@ def _load_entry(name: str) -> dict[str, Any]:
     except Exception:
         offline = _load_offline_registry()
         if name not in offline:
-            raise KeyError(f"model {name!r} is unavailable in MLflow or the offline journal")
+            raise KeyError(
+                f"model {name!r} is unavailable in MLflow or the offline journal"
+            )
         return offline[name]
 
 

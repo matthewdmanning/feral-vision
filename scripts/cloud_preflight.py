@@ -64,12 +64,16 @@ class PreflightRequest:
         )
         missing = [name for name in required if not isinstance(values.get(name), str)]
         if missing:
-            raise ValueError(f"Manifest has missing or invalid fields: {', '.join(missing)}")
+            raise ValueError(
+                f"Manifest has missing or invalid fields: {', '.join(missing)}"
+            )
         overrides = values.get("runtime_overrides", [])
         if not isinstance(overrides, list) or not all(
             isinstance(value, str) for value in overrides
         ):
-            raise ValueError("Manifest field runtime_overrides must be a list of strings")
+            raise ValueError(
+                "Manifest field runtime_overrides must be a list of strings"
+            )
         return cls(
             **{name: values[name] for name in required},
             runtime_overrides=tuple(overrides),
@@ -131,7 +135,11 @@ def _manifest_checks(request: PreflightRequest) -> list[Check]:
             bool(_IMMUTABLE_GCS.fullmatch(request.data_reference)),
             request.data_reference,
         ),
-        Check("named_run_recipe", bool(_RECIPE.fullmatch(request.run_recipe)), request.run_recipe),
+        Check(
+            "named_run_recipe",
+            bool(_RECIPE.fullmatch(request.run_recipe)),
+            request.run_recipe,
+        ),
         Check(
             "mlflow_artifact_prefix",
             bool(_GCS_PREFIX.fullmatch(request.mlflow_artifact_prefix)),
@@ -144,7 +152,9 @@ def _recipe_check(request: PreflightRequest) -> Check:
     """Compose the selected recipe and require its runtime data-root override."""
     try:
         register_configs()
-        with initialize_config_dir(version_base=None, config_dir=str(PROJECT_ROOT / "conf")):
+        with initialize_config_dir(
+            version_base=None, config_dir=str(PROJECT_ROOT / "conf")
+        ):
             cfg = compose(
                 config_name=f"runs/{request.run_recipe}",
                 overrides=list(request.runtime_overrides),
@@ -186,8 +196,7 @@ def run_preflight(
     checks = _manifest_checks(request)
     if all(check.passed for check in checks):
         artifact_probe = (
-            f"{request.mlflow_artifact_prefix.rstrip('/')}/"
-            f"_preflight/{uuid4()}.probe"
+            f"{request.mlflow_artifact_prefix.rstrip('/')}/_preflight/{uuid4()}.probe"
         )
         checks.extend(
             [
@@ -195,10 +204,16 @@ def run_preflight(
                 _command_check("docker_available", ("docker", "info"), runner),
                 _command_check(
                     "nvidia_gpu_visible",
-                    ("nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"),
+                    (
+                        "nvidia-smi",
+                        "--query-gpu=name,driver_version",
+                        "--format=csv,noheader",
+                    ),
                     runner,
                 ),
-                _command_check("ssd_mounted", ("findmnt", "--target", request.data_root), runner),
+                _command_check(
+                    "ssd_mounted", ("findmnt", "--target", request.data_root), runner
+                ),
                 _command_check("runtime_python", ("python", "--version"), runner),
                 _command_check(
                     "runtime_cuda",
@@ -207,7 +222,13 @@ def run_preflight(
                 ),
                 _command_check(
                     "workload_identity",
-                    ("gcloud", "auth", "list", "--filter=status:ACTIVE", "--format=value(account)"),
+                    (
+                        "gcloud",
+                        "auth",
+                        "list",
+                        "--filter=status:ACTIVE",
+                        "--format=value(account)",
+                    ),
                     runner,
                 ),
                 _command_check(
@@ -233,13 +254,17 @@ def run_preflight(
                 _recipe_check(request),
             ]
         )
-        account_check = next(check for check in checks if check.name == "workload_identity")
+        account_check = next(
+            check for check in checks if check.name == "workload_identity"
+        )
         checks.append(
             _service_account_check(account_check.detail if account_check.passed else "")
         )
         try:
             status = http_status(request.mlflow_tracking_uri)
-            checks.append(Check("mlflow_reachable", 200 <= status < 400, f"HTTP {status}"))
+            checks.append(
+                Check("mlflow_reachable", 200 <= status < 400, f"HTTP {status}")
+            )
         except OSError as exc:
             checks.append(Check("mlflow_reachable", False, str(exc)))
 
