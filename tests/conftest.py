@@ -87,3 +87,30 @@ def bbox_net_factory():
         )
 
     return _factory
+
+
+@pytest.fixture
+def image_model_factory():
+    """Build tiny 2D image models and release their test state after each test."""
+    models: list[nn.Module] = []
+
+    def _factory(
+        in_channels: int = 3, out_channels: int = 2, bias: bool = True
+    ) -> nn.Conv2d:
+        model = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=bias)
+        models.append(model)
+        return model
+
+    yield _factory
+
+    for model in models:
+        model.zero_grad(set_to_none=True)
+        model.to("cpu")
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+@pytest.fixture
+def image_model(image_model_factory):
+    """Fresh default 2D image model for tests that only need parameters."""
+    return image_model_factory()

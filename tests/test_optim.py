@@ -27,7 +27,8 @@ from feral_vision.training.optim import (
 
 @pytest.fixture
 def module() -> nn.Module:
-    return nn.Linear(1, 1)
+    """Small 2D image model supplying parameters to optimizer builders."""
+    return nn.Conv2d(3, 2, kernel_size=1)
 
 
 # --- build_optimizer ---------------------------------------------------------
