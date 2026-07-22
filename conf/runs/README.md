@@ -14,4 +14,4 @@ Select a different concern with a Hydra override, for example
 
 Run Recipes compose the selected concerns; concern YAML files own their variant
 values. The canonical execution path is defined in
-[ARCHITECTURE.md](../../ARCHITECTURE.md).
+[the program flow](../../docs/architecture/program-flow.md).

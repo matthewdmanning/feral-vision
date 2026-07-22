@@ -163,4 +163,4 @@ def test_configuration_concern_readme_has_the_canonical_structure(
 
     for heading in _REQUIRED_README_HEADINGS:
         assert heading in contents
-    assert "ARCHITECTURE.md" in contents
+    assert "docs/architecture/program-flow.md" in contents

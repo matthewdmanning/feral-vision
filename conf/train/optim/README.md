@@ -12,4 +12,4 @@ Run Recipe.
 ## Ownership
 
 Training code owns optimizer construction. The canonical training path is
-defined in [ARCHITECTURE.md](../../../ARCHITECTURE.md).
+defined in [the program flow](../../../docs/architecture/program-flow.md).

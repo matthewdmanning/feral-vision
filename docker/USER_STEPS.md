@@ -1,63 +1,11 @@
-# User Action Required: GCS + Docker + T4 Setup
+# Docker/GCE training procedure
 
-Three steps need your input/credentials. Run them in order.
+This is the operational procedure for the current Docker/GCE path. The required
+deployment contract and the first-run readiness gate are defined in
+[Product Scope](../docs/planning/product-scope.md). Do not treat this procedure
+as a production acceptance runbook until #37, #38, and #20 are complete.
 
----
-
-## Task 2 — Convert annotations, split, and push to GCS
-
-Fill in your bucket name, then run:
-
-~~~bash
-# 1. Convert COCO annotations to YOLO annotation files
-python -m feral_vision.data.coco_to_yolo \
-    --ann data/raw/annotations/coco_train2017/instances_train2017_animals.json \
-    --out data/raw/annotations/yolo_train2017/ \
-    --names data/raw/annotations/names.yaml
-
-# 2. Split into train/val (80/20, seeded)
-python - <<'EOF'
-import random, shutil
-from pathlib import Path
-
-SEED = 42
-VAL_RATIO = 0.2
-SRC_IMAGES = Path("data/raw/images/coco_train2017")
-SRC_ANNOTATIONS = Path("data/raw/annotations/yolo_train2017")
-
-all_stems = sorted(p.stem for p in SRC_IMAGES.glob("*.jpg"))
-random.seed(SEED)
-random.shuffle(all_stems)
-n_val = int(len(all_stems) * VAL_RATIO)
-val_stems = set(all_stems[:n_val])
-train_stems = set(all_stems[n_val:])
-
-for split, stems in [("train", train_stems), ("val", val_stems)]:
-    split_root = Path(f"data/split/{split}")
-    for stem in stems:
-        img_src = SRC_IMAGES / f"{stem}.jpg"
-        annotation_src = SRC_ANNOTATIONS / f"{stem}.txt"
-        (split_root / "images").mkdir(parents=True, exist_ok=True)
-        (split_root / "annotations").mkdir(parents=True, exist_ok=True)
-        if img_src.exists(): shutil.copy2(img_src, split_root / "images" / f"{stem}.jpg")
-        if annotation_src.exists(): shutil.copy2(annotation_src, split_root / "annotations" / f"{stem}.txt")
-
-    shutil.copy2("data/raw/annotations/names.yaml", split_root / "annotations/names.yaml")
-
-print(f"train: {len(train_stems)}, val: {len(val_stems)}")
-EOF
-
-# 3. Push to GCS  ← FILL IN YOUR BUCKET NAME
-BUCKET="YOUR_BUCKET_NAME"
-for SPLIT in train val; do
-    gcloud storage rsync -r data/split/${SPLIT}/images/ gs://${BUCKET}/${SPLIT}/images/
-    gcloud storage rsync -r data/split/${SPLIT}/annotations/ gs://${BUCKET}/${SPLIT}/annotations/
-done
-~~~
-
----
-
-## Task 8 — Deploy persistent MLflow tracking
+## Deploy persistent MLflow tracking
 
 MLflow run metadata must use Cloud SQL PostgreSQL; a GCS bucket is the artifact
 store, not a SQLite filesystem. Create a database and store this Unix-socket
@@ -107,7 +55,7 @@ MLFLOW_TRACKING_URI="$(gcloud run services describe mlflow --region=${REGION} \
 
 ---
 
-## Task 9 — Build and push Docker image to Artifact Registry
+## Build and push a training image
 
 ~~~bash
 # Fill in your GCP project and region
@@ -135,7 +83,13 @@ echo "Image: ${IMAGE}"
 
 ---
 
-## Task 10 — Configure T4 instance and run container
+## Stage an already prepared data artifact and run the container
+
+The VM must use an attached service account with least-privilege access to read
+the selected data artifact and write only to the selected MLflow artifact
+prefix. Do not place a service-account key file on the VM. The automated
+preflight that verifies these requirements is not implemented yet; see
+[Product Scope](../docs/planning/product-scope.md).
 
 ~~~bash
 # On the T4 GCE instance — run once to mount SSD
@@ -145,17 +99,9 @@ sudo mkdir -p /mnt/disks/ssd
 sudo mount ${DEVICE} /mnt/disks/ssd
 sudo chmod a+w /mnt/disks/ssd
 
-# Grant service account GCS access (run from your local machine)
-PROJECT="YOUR_GCP_PROJECT_ID"
-BUCKET="YOUR_BUCKET_NAME"
-SA="$(gcloud compute instances describe YOUR_INSTANCE_NAME \
-    --format='value(serviceAccounts[0].email)')"
-gcloud storage buckets add-iam-policy-binding gs://${BUCKET} \
-    --member="serviceAccount:${SA}" \
-    --role="roles/storage.objectAdmin"
-
-# The selected data prefix must also contain its DVC tracker. The container
-# stages and logs this file with the MLflow run; it never invokes DVC itself.
+# Prepare and version data outside this container. The selected prefix must
+# contain images/, annotations/, and its data.dvc tracker. The container stages
+# these files and never invokes DVC itself.
 gcloud storage cp data.dvc gs://${BUCKET}/train/data.dvc
 
 # Run training container (on the T4 instance)
@@ -171,7 +117,8 @@ docker run --gpus all \
     ${IMAGE}
 ~~~
 
-The container records metrics and the best checkpoint in its MLflow run. The
-shared Cloud Run MLflow service stores run metadata in Cloud SQL and artifacts
-in its configured GCS bucket. Do not copy checkpoints or SQLite database files
-to a parallel GCS location.
+When the tracking endpoint is reachable, the container attempts to record
+metrics and the selected best model artifact in MLflow. The shared Cloud Run
+service stores run metadata in Cloud SQL and artifacts in its configured GCS
+bucket. Do not copy checkpoints or SQLite database files to a parallel GCS
+location.

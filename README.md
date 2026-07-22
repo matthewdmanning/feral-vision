@@ -6,9 +6,10 @@ and trap-neuter-return work.
 
 ## Start here
 
-- [Program flow and tooling ownership](ARCHITECTURE.md)
+- [Program flow and tooling ownership](docs/architecture/program-flow.md)
 - [Product scope and delivery constraints](docs/planning/product-scope.md)
 - [User and API documentation](docs/index.rst)
+- [Docker/GCE training procedure](docker/USER_STEPS.md)
 
 ## Development
 

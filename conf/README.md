@@ -15,4 +15,4 @@ recipe and `runs/smoke` is CPU-safe for validation. There is no root
 
 Python schemas own field contracts, YAML files own semantic variant values, and
 Run Recipes own executable selection. The canonical program flow and tooling
-ownership are defined in [ARCHITECTURE.md](../ARCHITECTURE.md).
+ownership are defined in [the program flow](../docs/architecture/program-flow.md).

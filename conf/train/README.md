@@ -14,4 +14,4 @@ its optimizer, scheduler, and loss concerns.
 
 The trainer owns training flow and checkpoint behavior; this concern owns only
 tunable values. The canonical boundary is defined in
-[ARCHITECTURE.md](../../ARCHITECTURE.md).
+[the program flow](../../docs/architecture/program-flow.md).

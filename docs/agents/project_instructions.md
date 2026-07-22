@@ -12,7 +12,7 @@ that depends on it.
 
 ## Program flow and repository orientation
 
-Read [ARCHITECTURE.md](../../ARCHITECTURE.md) before architecture or integration
+Read [the program flow](../architecture/program-flow.md) before architecture or integration
 work. It is the single source of truth for the data-to-model program flow and
 tooling ownership; link to it instead of restating that flow elsewhere.
 
@@ -35,9 +35,8 @@ dvc pull
 # Augmentation
 uv run python scripts/augment.py --src tests/fixtures --dst data/augmented/coco_train17 --ops motion_blur original
 
-# GCP training (also requires the persistent Cloud Run MLflow endpoint)
-GCP_PROJECT=my-proj GCS_BUCKET=my-bucket \
-MLFLOW_TRACKING_URI=https://mlflow-abc-uc.a.run.app bash scripts/gcp_train.sh
+# Cloud training procedure and readiness status
+# See docker/USER_STEPS.md and docs/planning/product-scope.md.
 ```
 
 ## Dataset contract
@@ -62,13 +61,11 @@ the concern's purpose and use a complete named Run Recipe for reproducible work.
 
 ## Environment and documentation
 
-GCP training requires `GCP_PROJECT`, `GCS_BUCKET`, and `MLFLOW_TRACKING_URI`.
-The tracking service stores run metadata in Cloud SQL and artifacts in GCS.
-Find installed-version documentation first; use Context7 only when local
-documentation is unavailable.
-For product scope and delivery constraints, see
-[Product Scope](../planning/product-scope.md). The domain glossary is
-[CONTEXT.md](../../CONTEXT.md).
+For the cloud-training contract and first-run readiness status, see
+[Product Scope](../planning/product-scope.md). The operational procedure is
+[Docker/GCE training](../../docker/USER_STEPS.md). The domain glossary is
+[Glossary](../domain/glossary.md). Find installed-version documentation first; use
+Context7 only when local documentation is unavailable.
 
 ## GitHub access
 
@@ -96,7 +93,7 @@ worktree or branch without explicit approval.
 ## Scope and tool boundaries
 
 Scope strictly to the task at hand. See
-[ARCHITECTURE.md](../../ARCHITECTURE.md#7-tooling-boundaries) for DVC, Hydra,
+[the tooling boundaries](../architecture/program-flow.md#7-tooling-boundaries) for DVC, Hydra,
 MLflow, source-code, and model-registry ownership. Never log raw data
 directories to MLflow; use DVC references or locks for data lineage instead.
 

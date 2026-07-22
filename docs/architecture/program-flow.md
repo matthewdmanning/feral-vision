@@ -12,7 +12,7 @@ section below stale, update this document in the same change.
 
 `data/fetch.py`, DVC `fetch` stage. `cfg.data.source` selects a fetch strategy and
 resolves to the canonical `<root>/images/`, `<root>/annotations/` layout (see
-[Dataset Folder Schema](CLAUDE.md#dataset-folder-schema)).
+[Dataset Folder Schema](../../CLAUDE.md#dataset-folder-schema)).
 
 Data acquisition, augmentation, and DVC versioning are human-directed data
 operations performed before deployment. Cloud training has one data path:
@@ -92,8 +92,10 @@ wires `model_builder` (`models/register_model.py`) and `build_optimizer` /
 `hydra.utils.instantiate` wrappers over `conf/train/{optim,scheduler,loss_fn}/*.yaml`)
 into a `Trainer`. `Trainer.fit(dataloader, val_dataset)` runs the epoch loop, logs
 each metric to MLflow via `_try_log_metric` (a no-op if no run is active), tracks
-the best score, and writes a local best checkpoint. At completion, MLflow stores
-only that selected best model artifact; intermediate checkpoints are not uploaded.
+the best score, and writes a local best checkpoint. When an MLflow run is active,
+the trainer attempts to log only that selected best model artifact; intermediate
+checkpoints are not uploaded. Complete model-artifact and data-lineage acceptance
+remain defined by [issue #20](https://github.com/matthewdmanning/feral-vision/issues/20).
 
 The loss function is config-selected (`conf/train/loss_fn/*.yaml`:
 `cross_entropy`, `mse`, `l1`, `nll`, `bce_with_logits`). `training/losses.py`'s

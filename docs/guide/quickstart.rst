@@ -37,4 +37,4 @@ Run inference
 
 Inference is not currently wired up. ``feral_vision.inference.predictor`` was
 removed pending a redesign of how a plain ``nn.Module.forward()`` output maps to a
-prediction contract — see ``ARCHITECTURE.md`` in the repository root for details.
+prediction contract — see ``docs/architecture/program-flow.md`` for details.

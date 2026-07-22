@@ -13,4 +13,4 @@ inference is wired through the canonical path.
 ## Ownership
 
 This concern does not define a prediction contract or predictor API. Those
-boundaries are owned by [ARCHITECTURE.md](../../ARCHITECTURE.md).
+boundaries are owned by [the program flow](../../docs/architecture/program-flow.md).

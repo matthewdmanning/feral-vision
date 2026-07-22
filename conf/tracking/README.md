@@ -12,5 +12,5 @@ Choose a semantic tracking variant as part of a complete Run Recipe.
 
 MLflow owns run-generated metrics, artifacts, checkpoints, and run metadata;
 DVC owns data artifacts. The complete ownership boundary is defined in
-[ARCHITECTURE.md](../../ARCHITECTURE.md); issue #20 owns the remaining lineage
+[the program flow](../../docs/architecture/program-flow.md); issue #20 owns the remaining lineage
 implementation.

@@ -8,6 +8,7 @@ wheels/
 outputs/
 coverage.json
 coverage.xml
+metrics.json
 mlflow.db
 
 # Virtual environments
