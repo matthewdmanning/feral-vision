@@ -33,6 +33,7 @@ _GCS_PREFIX = re.compile(r"^gs://[^/#]+(?:/.*)?$")
 _RECIPE = re.compile(r"^[a-z][a-z0-9_-]*$")
 CommandRunner = Callable[[Sequence[str]], str]
 HttpGet = Callable[[str], int]
+ComputeInstanceGetter = Callable[[str, str, str], dict[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,9 @@ class PreflightRequest:
     runtime_overrides: tuple[str, ...]
     mlflow_tracking_uri: str
     mlflow_artifact_prefix: str
+    gcp_project: str
+    gce_zone: str
+    gce_instance: str
     data_root: str
     expected_python: str
     expected_cuda: str
@@ -58,6 +62,9 @@ class PreflightRequest:
             "run_recipe",
             "mlflow_tracking_uri",
             "mlflow_artifact_prefix",
+            "gcp_project",
+            "gce_zone",
+            "gce_instance",
             "data_root",
             "expected_python",
             "expected_cuda",
@@ -111,6 +118,33 @@ def _http_status(uri: str) -> int:
     """Return the MLflow endpoint's HTTP status without beginning a run."""
     with urlopen(f"{uri.rstrip('/')}/health", timeout=10) as response:  # noqa: S310
         return response.status
+
+
+def get_compute_instance(
+    project: str, zone: str, instance: str, *, http: Any | None = None
+) -> dict[str, Any]:
+    """Read the selected GCE instance through the Compute Engine API."""
+    from googleapiclient.discovery import build
+
+    if http is None:
+        import google.auth
+        import httplib2
+        from google_auth_httplib2 import AuthorizedHttp
+
+        credentials, _ = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/compute.readonly"]
+        )
+        http = AuthorizedHttp(credentials, httplib2.Http())
+
+    service = build(
+        "compute", "v1", http=http, cache_discovery=False, static_discovery=False
+    )
+    response = service.instances().get(
+        project=project, zone=zone, instance=instance
+    ).execute()
+    if not isinstance(response, dict):
+        raise TypeError("Compute instances.get returned a non-object response")
+    return response
 
 
 def _command_check(name: str, command: Sequence[str], runner: CommandRunner) -> Check:
@@ -186,14 +220,53 @@ def _service_account_check(account: str) -> Check:
     )
 
 
+def _compute_instance_check(
+    request: PreflightRequest, getter: ComputeInstanceGetter
+) -> tuple[Check, str]:
+    """Require the manifest's GCE instance to be running with an attached identity."""
+    try:
+        instance = getter(request.gcp_project, request.gce_zone, request.gce_instance)
+    except Exception as exc:
+        return Check("compute_instance_ready", False, str(exc)), ""
+
+    status = instance.get("status")
+    accounts = instance.get("serviceAccounts", [])
+    emails = [
+        account.get("email")
+        for account in accounts
+        if isinstance(account, dict) and isinstance(account.get("email"), str)
+    ]
+    if status != "RUNNING":
+        return (
+            Check(
+                "compute_instance_ready",
+                False,
+                f"{request.gce_instance} status is {status!r}; expected 'RUNNING'",
+            ),
+            "",
+        )
+    if not emails:
+        return (
+            Check(
+                "compute_instance_ready",
+                False,
+                f"{request.gce_instance} has no attached service account",
+            ),
+            "",
+        )
+    return Check("compute_instance_ready", True, emails[0]), emails[0]
+
+
 def run_preflight(
     request: PreflightRequest,
     *,
     runner: CommandRunner = _run,
     http_status: HttpGet = _http_status,
+    compute_instance_getter: ComputeInstanceGetter = get_compute_instance,
 ) -> PreflightResult:
     """Probe a selected GCE runtime and return evidence without launching training."""
     checks = _manifest_checks(request)
+    service_account = "unavailable"
     if all(check.passed for check in checks):
         artifact_probe = (
             f"{request.mlflow_artifact_prefix.rstrip('/')}/_preflight/{uuid4()}.probe"
@@ -221,17 +294,6 @@ def run_preflight(
                     runner,
                 ),
                 _command_check(
-                    "workload_identity",
-                    (
-                        "gcloud",
-                        "auth",
-                        "list",
-                        "--filter=status:ACTIVE",
-                        "--format=value(account)",
-                    ),
-                    runner,
-                ),
-                _command_check(
                     "data_artifact_readable",
                     ("gcloud", "storage", "ls", request.data_reference),
                     runner,
@@ -254,12 +316,10 @@ def run_preflight(
                 _recipe_check(request),
             ]
         )
-        account_check = next(
-            check for check in checks if check.name == "workload_identity"
+        compute_check, service_account = _compute_instance_check(
+            request, compute_instance_getter
         )
-        checks.append(
-            _service_account_check(account_check.detail if account_check.passed else "")
-        )
+        checks.extend((compute_check, _service_account_check(service_account)))
         try:
             status = http_status(request.mlflow_tracking_uri)
             checks.append(
@@ -272,7 +332,7 @@ def run_preflight(
     runtime_identity = {
         "host": command_output.get("docker_available", "unavailable"),
         "gpu": command_output.get("nvidia_gpu_visible", "unavailable"),
-        "service_account": command_output.get("workload_identity", "unavailable"),
+        "service_account": service_account,
         "python": command_output.get("runtime_python", "unavailable"),
         "cuda": command_output.get("runtime_cuda", "unavailable"),
     }
@@ -300,6 +360,9 @@ def run_preflight(
             "runtime_overrides": list(request.runtime_overrides),
             "mlflow_tracking_uri": request.mlflow_tracking_uri,
             "mlflow_artifact_prefix": request.mlflow_artifact_prefix,
+            "gcp_project": request.gcp_project,
+            "gce_zone": request.gce_zone,
+            "gce_instance": request.gce_instance,
             "preflight_id": str(uuid4()),
         },
         runtime_identity=runtime_identity,
