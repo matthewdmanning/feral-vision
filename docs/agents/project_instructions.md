@@ -7,6 +7,13 @@ Read only the sections and linked documents required for the task you were
 instructed to perform. Follow an explicitly required reference before acting;
 otherwise, do not load unrelated guidance merely because it is listed here.
 
+## Session prerequisites
+
+At the beginning of a session, check that `gh` is installed, `origin` is set,
+MCP servers respond, and any scripts needed for the task are available. Report
+each missing or broken prerequisite with a concise fix, then stop before work
+that depends on it.
+
 ## Agent references
 
 - [Development workflow](development.md) — repository layout, commands, and
