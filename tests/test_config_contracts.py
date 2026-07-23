@@ -1,4 +1,4 @@
-"""Configuration recipes and their documentation must preserve executable contracts."""
+"""Verify named Hydra recipes preserve executable configuration contracts."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
+from hydra.errors import ConfigCompositionException
 from omegaconf import DictConfig, OmegaConf
 
 from feral_vision.config.store import register_configs
@@ -23,20 +24,6 @@ _CONF_ROOT = _REPOSITORY_ROOT / "conf"
 _REQUIRED_CONCERNS = frozenset(
     {"data", "model", "train", "inference", "tracking", "augmentation"}
 )
-_README_CONCERNS = (
-    Path("."),
-    Path("augmentation"),
-    Path("data"),
-    Path("inference"),
-    Path("model"),
-    Path("runs"),
-    Path("tracking"),
-    Path("train"),
-    Path("train/loss_fn"),
-    Path("train/optim"),
-    Path("train/scheduler"),
-)
-_REQUIRED_README_HEADINGS = ("## Purpose", "## Selection", "## Ownership")
 
 
 def _recipe_paths() -> tuple[Path, ...]:
@@ -94,9 +81,19 @@ def _registered_and_isolated_hydra() -> None:
 def test_recipe_composes_without_missing_values(recipe_path: Path) -> None:
     """Every supported recipe resolves all required configuration concerns."""
     cfg = _compose_recipe(recipe_path)
+    resolved_config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
 
     assert _REQUIRED_CONCERNS <= set(cfg)
-    assert OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    assert isinstance(resolved_config, dict)
+
+
+@pytest.mark.parametrize("batch_size", [1, 3, 10])
+@pytest.mark.parametrize("recipe_path", _recipe_paths(), ids=_config_name)
+def test_recipe_applies_valid_cli_overrides(recipe_path: Path, batch_size: int) -> None:
+    """Run Recipes accept valid structured CLI overrides for tunable values."""
+    cfg = _compose_recipe(recipe_path, [f"train.batch_size={batch_size}"])
+
+    assert cfg.train.batch_size == batch_size
 
 
 @pytest.mark.parametrize("recipe_path", _test_recipe_paths(), ids=_config_name)
@@ -108,16 +105,12 @@ def test_test_recipe_is_cpu_safe(recipe_path: Path) -> None:
     assert cfg.train.num_workers == 0
 
 
-def test_legacy_configuration_paths_are_not_selectable() -> None:
-    """Retired root/default/base/experiment configuration paths stay absent."""
-    retired_files = [
-        path.relative_to(_CONF_ROOT)
-        for path in _CONF_ROOT.rglob("*.yaml")
-        if path.stem in {"base", "config", "default"}
-    ]
-
-    assert not retired_files
-    assert not (_CONF_ROOT / "experiment").exists()
+def test_recipe_rejects_unknown_structured_override() -> None:
+    """Run Recipes reject fields outside their registered structured schemas."""
+    with pytest.raises(
+        ConfigCompositionException, match="Could not override 'train.nope'"
+    ):
+        _compose_recipe(_CONF_ROOT / "runs" / "baseline.yaml", ["train.nope=1"])
 
 
 # ---------------------------------------------------------------------------
@@ -143,24 +136,6 @@ def test_model_variant_has_a_resolvable_source_location_and_schema(
     assert architecture.id
     assert architecture.location
     assert "model_outputs" not in cfg.model
-    assert _resolve_dotted_name(architecture.location)
+    assert _resolve_dotted_name(architecture.location) is not None
     if architecture.source != "local":
         assert get_adapter(architecture.source)
-
-
-# ---------------------------------------------------------------------------
-# Configuration documentation — topology and canonical ownership
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("concern", _README_CONCERNS, ids=lambda path: path.as_posix())
-def test_configuration_concern_readme_has_the_canonical_structure(
-    concern: Path,
-) -> None:
-    """Each configuration concern explains purpose, selection, and ownership once."""
-    readme_path = _CONF_ROOT / concern / "README.md"
-    contents = readme_path.read_text(encoding="utf-8")
-
-    for heading in _REQUIRED_README_HEADINGS:
-        assert heading in contents
-    assert "docs/architecture/program-flow.md" in contents

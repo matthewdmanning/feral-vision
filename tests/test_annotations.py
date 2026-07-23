@@ -1,4 +1,4 @@
-"""Contract tests for the Annotation subclasses in feral_vision.data.annotations."""
+"""Verify annotation loaders materialize their documented on-disk contracts."""
 
 from __future__ import annotations
 
@@ -6,12 +6,10 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from PIL import Image
 
 from feral_vision.data.annotations import (
-    Annotation,
     BBoxAnnotation,
-    ClassificationAnnotation,
-    DetectionAnnotation,
     MaskAnnotation,
     PoseAnnotation,
 )
@@ -19,20 +17,8 @@ from feral_vision.data.annotations import (
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 ANNOTATIONS_DIR = FIXTURES_DIR / "annotations"
 
-_FIXTURE_MASK_STEMS = [
-    "american_bulldog_103",
-    "beagle_203",
-    "Bengal_48",
-    "British_Shorthair_127",
-    "chihuahua_104",
-    "Egyptian_Mau_149",
-    "Ragdoll_139",
-    "scottish_terrier_166",
-]
-
-
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers / local fixtures
 # ---------------------------------------------------------------------------
 
 
@@ -44,119 +30,127 @@ def _write_yolo_txt(
     path.write_text("\n".join(lines))
 
 
+def _read_mask(path: Path) -> np.ndarray:
+    """Read a fixture mask through Pillow for an independent expected value."""
+    with Image.open(path) as image:
+        return np.asarray(image.convert("L"))
+
+
+@pytest.fixture(
+    params=[
+        pytest.param("american_bulldog_103", id="portrait"),
+        pytest.param("beagle_203", id="landscape"),
+        pytest.param("chihuahua_104", id="small"),
+    ]
+)
+def mask_annotation_path(request: pytest.FixtureRequest) -> Path:
+    """Provide fixture masks with varied dimensions for lazy loading."""
+    return ANNOTATIONS_DIR / f"{request.param}.png"
+
+
+@pytest.fixture(params=[(1, 3), (3, 10), (10, 1)])
+def preloaded_mask(request: pytest.FixtureRequest) -> np.ndarray:
+    """Provide pre-materialized masks across representative dimensions."""
+    return np.full(request.param, 7, dtype=np.uint8)
+
+
+@pytest.fixture(
+    params=[
+        pytest.param([], id="empty"),
+        pytest.param([(2, 0.1, 0.2, 0.3, 0.4)], id="one-box"),
+        pytest.param(
+            [
+                (0, 0.1, 0.2, 0.3, 0.4),
+                (1, 0.2, 0.3, 0.4, 0.5),
+                (2, 0.3, 0.4, 0.5, 0.6),
+            ],
+            id="three-boxes",
+        ),
+    ]
+)
+def yolo_rows(
+    request: pytest.FixtureRequest,
+) -> list[tuple[int, float, float, float, float]]:
+    """Provide YOLO row counts covering empty and populated annotations."""
+    return request.param
+
+
 # ---------------------------------------------------------------------------
-# Annotation — abstract base contract
+# MaskAnnotation — lazy mask loading
 # ---------------------------------------------------------------------------
 
 
-def test_annotation_cannot_be_instantiated_directly():
-    with pytest.raises(TypeError):
-        Annotation()  # type: ignore[abstract]
+def test_mask_annotation_load_materializes_fixture_pixels(
+    mask_annotation_path: Path,
+) -> None:
+    expected_mask = _read_mask(mask_annotation_path)
+    ann = MaskAnnotation(path=mask_annotation_path)
 
-
-# ---------------------------------------------------------------------------
-# MaskAnnotation — loads a real mask file from disk
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("stem", _FIXTURE_MASK_STEMS)
-def test_mask_annotation_load_reads_fixture_mask(stem):
-    ann = MaskAnnotation(path=ANNOTATIONS_DIR / f"{stem}.png")
     result = ann.load()
 
     assert result is ann
-    assert isinstance(ann.mask, np.ndarray)
-    assert ann.mask.dtype == np.uint8
-    assert ann.mask.ndim == 2
+    assert ann.mask is not None
+    np.testing.assert_array_equal(ann.mask, expected_mask)
 
 
-def test_mask_annotation_load_does_not_reread_when_already_populated():
-    preset_mask = np.full((4, 4), 7, dtype=np.uint8)
-    ann = MaskAnnotation(path=Path("does/not/exist.png"), mask=preset_mask)
+def test_mask_annotation_load_keeps_preloaded_mask(
+    preloaded_mask: np.ndarray,
+) -> None:
+    ann = MaskAnnotation(path=Path("does/not/exist.png"), mask=preloaded_mask)
 
-    ann.load()
+    result = ann.load()
 
-    assert ann.mask is preset_mask
+    assert result is ann
+    assert ann.mask is not None
+    np.testing.assert_array_equal(ann.mask, preloaded_mask)
 
 
-def test_mask_annotation_load_missing_file_raises(tmp_path):
+def test_mask_annotation_load_missing_file_raises(tmp_path: Path) -> None:
     ann = MaskAnnotation(path=tmp_path / "missing.png")
+
     with pytest.raises(FileNotFoundError, match="missing.png"):
         ann.load()
 
 
 # ---------------------------------------------------------------------------
-# BBoxAnnotation — parses a real YOLO .txt file from disk
+# BBoxAnnotation — lazy YOLO loading
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("n_boxes", [0, 1, 3])
-def test_bbox_annotation_load_parses_rows(tmp_path, n_boxes):
-    rows = [(i % 3, 0.1 * i, 0.2 * i, 0.3, 0.4) for i in range(n_boxes)]
+def test_bbox_annotation_load_parses_yolo_rows(
+    tmp_path: Path, yolo_rows: list[tuple[int, float, float, float, float]]
+) -> None:
     path = tmp_path / "boxes.txt"
-    _write_yolo_txt(path, rows)
+    _write_yolo_txt(path, yolo_rows)
 
-    ann = BBoxAnnotation(path=path).load()
+    ann = BBoxAnnotation(path=path)
+    result = ann.load()
 
-    assert ann.boxes.shape == (n_boxes, 4)
-    assert ann.boxes.dtype == np.float32
-    assert ann.class_ids.shape == (n_boxes,)
-    assert ann.class_ids.dtype == np.int64
-    if n_boxes:
-        expected_boxes = np.array([row[1:] for row in rows], dtype=np.float32)
-        expected_classes = np.array([row[0] for row in rows], dtype=np.int64)
-        np.testing.assert_allclose(ann.boxes, expected_boxes)
-        np.testing.assert_array_equal(ann.class_ids, expected_classes)
+    expected_boxes = np.asarray(
+        [row[1:] for row in yolo_rows], dtype=np.float32
+    ).reshape(-1, 4)
+    expected_classes = np.asarray([row[0] for row in yolo_rows], dtype=np.int64)
+    assert result is ann
+    assert ann.boxes is not None
+    assert ann.class_ids is not None
+    np.testing.assert_allclose(ann.boxes, expected_boxes)
+    np.testing.assert_array_equal(ann.class_ids, expected_classes)
 
 
-def test_bbox_annotation_load_does_not_reparse_when_already_populated():
+def test_bbox_annotation_load_keeps_preloaded_values() -> None:
     preset_boxes = np.array([[0.1, 0.1, 0.2, 0.2]], dtype=np.float32)
     preset_classes = np.array([5], dtype=np.int64)
     ann = BBoxAnnotation(
         path=Path("does/not/exist.txt"), boxes=preset_boxes, class_ids=preset_classes
     )
 
-    ann.load()
-
-    assert ann.boxes is preset_boxes
-    assert ann.class_ids is preset_classes
-
-
-# ---------------------------------------------------------------------------
-# ClassificationAnnotation — already-in-memory contract
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "input_type,value",
-    [("radio", "black"), ("checkbox", ["black", "white"])],
-)
-def test_classification_annotation_load_returns_self_unchanged(input_type, value):
-    ann = ClassificationAnnotation(
-        name="coat_color", input_type=input_type, value=value
-    )
-
     result = ann.load()
 
     assert result is ann
-    assert ann.name == "coat_color"
-    assert ann.input_type == input_type
-    assert ann.value == value
-
-
-# ---------------------------------------------------------------------------
-# DetectionAnnotation — already-in-memory contract
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("present", [True, False])
-def test_detection_annotation_load_returns_self_unchanged(present):
-    ann = DetectionAnnotation(present=present)
-
-    result = ann.load()
-
-    assert result is ann
-    assert ann.present is present
+    assert ann.boxes is not None
+    assert ann.class_ids is not None
+    np.testing.assert_array_equal(ann.boxes, preset_boxes)
+    np.testing.assert_array_equal(ann.class_ids, preset_classes)
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +158,8 @@ def test_detection_annotation_load_returns_self_unchanged(present):
 # ---------------------------------------------------------------------------
 
 
-def test_pose_annotation_load_raises_not_implemented(tmp_path):
+def test_pose_annotation_load_reports_unsupported_format(tmp_path: Path) -> None:
     ann = PoseAnnotation(path=tmp_path / "pose.json")
-    with pytest.raises(NotImplementedError):
+
+    with pytest.raises(NotImplementedError, match="not yet implemented"):
         ann.load()

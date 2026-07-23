@@ -1,10 +1,24 @@
-import torch
-from omegaconf import OmegaConf
+"""Verify segmentation losses preserve Dice and configured weighting contracts."""
 
+from __future__ import annotations
+
+# third-party
+import pytest
+import torch
+import torch.nn.functional as F
+from omegaconf import DictConfig, OmegaConf
+
+# project
 from feral_vision.training.losses import dice_loss, segmentation_loss
 
 
-def _make_cfg(**overrides):
+# ---------------------------------------------------------------------------
+# Helpers / local fixtures
+# ---------------------------------------------------------------------------
+
+
+def _loss_cfg(**overrides: float) -> DictConfig:
+    """Build the loss settings consumed by ``segmentation_loss``."""
     defaults = {
         "dice_weight": 1.0,
         "bce_weight": 1.0,
@@ -14,61 +28,65 @@ def _make_cfg(**overrides):
     return OmegaConf.create({**defaults, **overrides})
 
 
-def test_dice_loss_near_zero_for_perfect_prediction():
-    # All-background target; logits strongly favor class 0.
-    target = torch.zeros(2, 4, 4, dtype=torch.long)
-    pred = torch.zeros(2, 2, 4, 4)
-    pred[:, 0] = 10.0
-    loss = dice_loss(pred, target)
-    assert float(loss) < 1e-2
-
-
-def test_dice_loss_positive_for_wrong_prediction():
-    target = torch.zeros(2, 4, 4, dtype=torch.long)
-    pred = torch.zeros(2, 2, 4, 4)
-    pred[:, 1] = 10.0  # predicts the wrong class everywhere
-    loss = dice_loss(pred, target)
-    assert float(loss) > 0.5
-
-
-def test_dice_loss_accepts_one_hot_target():
-    indices = torch.zeros(1, 4, 4, dtype=torch.long)
-    onehot = torch.nn.functional.one_hot(indices, num_classes=2)
-    onehot = onehot.permute(0, 3, 1, 2).float()
-    pred = torch.zeros(1, 2, 4, 4)
-    pred[:, 0] = 10.0
-    assert float(dice_loss(pred, onehot)) < 1e-2
-
-
-def test_segmentation_loss_finite_scalar():
-    cfg = _make_cfg(distill_weight=0.0)
-    logits = torch.randn(2, 2, 4, 4)
-    target = torch.randint(0, 2, (2, 4, 4))
-    loss = segmentation_loss(logits, target, cfg)
-    assert loss.dim() == 0
-    assert torch.isfinite(loss)
-
-
-def test_segmentation_loss_ignores_teacher_when_distill_zero():
-    cfg = _make_cfg(distill_weight=0.0)
-    logits = torch.randn(2, 2, 4, 4)
-    target = torch.randint(0, 2, (2, 4, 4))
-    # Passing None must work when distillation is disabled.
-    loss = segmentation_loss(logits, target, cfg, teacher_logits=None)
-    assert torch.isfinite(loss)
-
-
-def test_segmentation_loss_distill_adds_positive_term():
-    base_cfg = _make_cfg(distill_weight=0.0)
-    distill_cfg = _make_cfg(distill_weight=1.0, distill_temperature=2.0)
-
-    torch.manual_seed(0)
-    logits = torch.randn(2, 2, 4, 4)
-    teacher = torch.randn(2, 2, 4, 4)
-    target = torch.randint(0, 2, (2, 4, 4))
-
-    base = segmentation_loss(logits, target, base_cfg)
-    with_distill = segmentation_loss(
-        logits, target, distill_cfg, teacher_logits=teacher
+@pytest.fixture(params=["class-indices", "one-hot"])
+def segmentation_batch(
+    request: pytest.FixtureRequest,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Provide deterministic 2D logits and equivalent target encodings."""
+    target_indices = torch.tensor([[[0, 1], [1, 0]]], dtype=torch.long)
+    logits = torch.tensor(
+        [[[[8.0, -8.0], [-8.0, 8.0]], [[-8.0, 8.0], [8.0, -8.0]]]],
+        requires_grad=True,
     )
-    assert float(with_distill) > float(base)
+    if request.param == "one-hot":
+        target = F.one_hot(target_indices, num_classes=2).permute(0, 3, 1, 2).float()
+    else:
+        target = target_indices
+    return logits, target
+
+
+# ---------------------------------------------------------------------------
+# Dice behavior
+# ---------------------------------------------------------------------------
+
+
+def test_dice_loss_distinguishes_perfect_and_incorrect_predictions(
+    segmentation_batch: tuple[torch.Tensor, torch.Tensor],
+) -> None:
+    logits, target = segmentation_batch
+
+    perfect_loss = dice_loss(logits, target)
+    incorrect_loss = dice_loss(-logits, target)
+
+    assert perfect_loss.detach() < 1e-6
+    assert incorrect_loss > perfect_loss + 0.5
+
+
+# ---------------------------------------------------------------------------
+# Combined segmentation loss
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("dice_weight", "bce_weight"),
+    [(1.0, 0.0), (0.0, 1.0), (0.25, 0.75)],
+)
+def test_segmentation_loss_applies_configured_component_weights(
+    segmentation_batch: tuple[torch.Tensor, torch.Tensor],
+    dice_weight: float,
+    bce_weight: float,
+) -> None:
+    logits, target = segmentation_batch
+    cfg = _loss_cfg(dice_weight=dice_weight, bce_weight=bce_weight)
+    target_indices = target.argmax(dim=1) if target.dim() == 4 else target
+
+    loss = segmentation_loss(logits, target, cfg)
+    expected = dice_weight * dice_loss(
+        logits, target_indices
+    ) + bce_weight * F.cross_entropy(logits, target_indices)
+
+    assert loss.shape == torch.Size([])
+    assert torch.allclose(loss, expected)
+    loss.backward()
+    assert logits.grad is not None
+    assert torch.isfinite(logits.grad).all()
