@@ -1,110 +1,68 @@
-"""Contract test for models.register_model.model_builder — that it returns a usable model.
-
-Covers only the "local" (in-repo architecture, no network) path, built against the
-real Hydra conf/ tree the way tests/test_config_schema.py does. No mock stand-in for
-the returned model — calls the real model_builder and asserts on its real object.
-"""
+"""Verify the configured local model builds and processes batched 2D images."""
 
 from __future__ import annotations
 
+# third-party
 import pytest
 import torch
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
+from omegaconf import DictConfig
 from torch import nn
 
+# project
 from feral_vision.config.store import register_configs
-
-# The register_model module already exists; model_builder may still be renamed/moved.
-# Guard on the name import (ImportError == "cannot import name 'model_builder'") so
-# collection stays green either way.
-try:
-    from feral_vision.models.register_model import model_builder
-
-    _BUILDER_AVAILABLE = True
-except ImportError:
-    _BUILDER_AVAILABLE = False
-
-pytestmark = pytest.mark.skipif(
-    not _BUILDER_AVAILABLE,
-    reason="model_builder not implemented yet (TDD)",
-)
-
-# ---------------------------------------------------------------------------
-# STEP 1 — SUCCESS CRITERIA
-# ---------------------------------------------------------------------------
-# model_builder(cfg: DictConfig) -> nn.Module
-#
-#   C1. Returns an object that is an instance of torch.nn.Module.
-#   C2. Calling the returned module on a batched image tensor succeeds without
-#       raising and returns a tensor.
-#
-# Scope: only the "local" (in-repo architecture, no network) path — conf/model/
-# the baseline recipe's local model (architecture.source == "local",
-# architecture.id == "net").
-# Remote sources (hf_hub/torch_hub/ultralytics/...) are intentionally out of scope
-# for this file: none of this repo's deps ship a real mock-server fixture for them.
-# ---------------------------------------------------------------------------
+from feral_vision.models.register_model import model_builder
 
 
 # ---------------------------------------------------------------------------
 # Helpers / local fixtures
 # ---------------------------------------------------------------------------
 
-# The resolved "local" architecture is models/default.py's Net (the CIFAR-tutorial
-# CNN): fc1 = nn.Linear(16 * 5 * 5, 120) only matches a 5x5 feature map, which its
-# conv/pool stack only produces for exactly 32x32 input (32->28->14->10->5). Do not
-# change this without checking Net's architecture.
-_IMAGE_SIZE = 32
-
 
 @pytest.fixture(autouse=True)
-def _registered():
-    """Register Hydra structured configs before each test, as test_config_schema.py does."""
+def _registered_and_isolated_hydra() -> None:
+    """Register schemas and clear global Hydra state around recipe composition."""
     register_configs()
-
-
-@pytest.fixture(autouse=True)
-def _clear_hydra():
-    """Reset Hydra's global state around each test so repeated initialize() calls don't collide."""
     GlobalHydra.instance().clear()
     yield
     GlobalHydra.instance().clear()
 
 
-def _compose_model_cfg():
-    """Compose the baseline Run Recipe's local model config."""
+@pytest.fixture
+def local_model_cfg() -> DictConfig:
+    """Compose the smoke recipe's local in-repository model configuration."""
     with initialize(version_base=None, config_path="../conf"):
-        cfg = compose(config_name="runs/baseline")
-    return cfg.model
+        return compose(config_name="runs/smoke").model
 
 
-def _batched_image() -> torch.Tensor:
-    """One batched RGB image tensor of shape (1, 3, 32, 32) for a forward pass through Net."""
-    return torch.rand(1, 3, _IMAGE_SIZE, _IMAGE_SIZE)
+@pytest.fixture
+def built_local_model(local_model_cfg: DictConfig) -> nn.Module:
+    """Build the configured local model and release its gradient state afterward."""
+    model = model_builder(local_model_cfg)
+    yield model
+    model.zero_grad(set_to_none=True)
+    model.to("cpu")
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+@pytest.fixture(params=[1, 3, 10])
+def local_model_input(request: pytest.FixtureRequest) -> torch.Tensor:
+    """Provide supported 32x32 RGB batches across representative batch sizes."""
+    return torch.ones(request.param, 3, 32, 32)
 
 
 # ---------------------------------------------------------------------------
-# C1 — returns a usable nn.Module
+# Local model construction
 # ---------------------------------------------------------------------------
 
 
-def test_model_builder_returns_nn_module():
-    """C1: model_builder(cfg.model) returns a torch.nn.Module instance."""
-    model = model_builder(_compose_model_cfg())
+def test_model_builder_builds_local_model_with_batched_logits(
+    built_local_model: nn.Module, local_model_input: torch.Tensor
+) -> None:
+    output = built_local_model(local_model_input)
 
-    assert isinstance(model, nn.Module)
-
-
-# ---------------------------------------------------------------------------
-# C2 — the built model runs a forward pass and returns a tensor
-# ---------------------------------------------------------------------------
-
-
-def test_model_builder_forward_pass_returns_tensor():
-    """C2: calling the built module on a batched image tensor returns a tensor."""
-    model = model_builder(_compose_model_cfg())
-
-    output = model(_batched_image())
-
+    assert isinstance(built_local_model, nn.Module)
     assert isinstance(output, torch.Tensor)
+    assert output.shape == (local_model_input.shape[0], 10)

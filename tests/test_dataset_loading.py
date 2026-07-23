@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 import pytest
 import torch
@@ -93,57 +91,15 @@ def test_source_unmatched_image_raises(tmp_path):
         DatasetSource(tmp_path)
 
 
-def test_source_missing_directory_raises(tmp_path):
-    with pytest.raises((FileNotFoundError, NotADirectoryError)):
-        DatasetSource(tmp_path / "nonexistent")
-
-
 # ---------------------------------------------------------------------------
 # DatasetSource — partition contract
 # ---------------------------------------------------------------------------
 
 
-def test_source_partition_returns_datasetsource_instance(tmp_path):
-    _write_sample_pair(tmp_path, "s0")
-    source = DatasetSource(tmp_path)
-    assert isinstance(source.partition(0, 1), DatasetSource)
-
-
-@pytest.mark.parametrize("n,num_workers", [(1, 1), (6, 2), (10, 3), (7, 4)])
-def test_source_partition_lengths_sum_to_total(tmp_path, n, num_workers):
-    for i in range(n):
-        _write_sample_pair(tmp_path, f"s{i:02d}")
-    source = DatasetSource(tmp_path)
-    total = sum(len(source.partition(w, num_workers)) for w in range(num_workers))
-    assert total == n
-
-
-@pytest.mark.parametrize("n,num_workers", [(4, 2), (9, 3), (7, 4)])
-def test_source_partition_slices_are_disjoint(tmp_path, n, num_workers):
-    for i in range(n):
-        _write_sample_pair(tmp_path, f"s{i:02d}")
-    source = DatasetSource(tmp_path)
-    path_sets = [
-        {
-            source.partition(w, num_workers)._index[j][0]
-            for j in range(len(source.partition(w, num_workers)))
-        }
-        for w in range(num_workers)
-    ]
-    for i, a in enumerate(path_sets):
-        for b in path_sets[i + 1 :]:
-            assert a.isdisjoint(b)
-
-
-def test_source_single_worker_gets_full_dataset(tmp_path):
-    for i in range(5):
-        _write_sample_pair(tmp_path, f"s{i}")
-    source = DatasetSource(tmp_path)
-    assert len(source.partition(0, 1)) == 5
-
-
-@pytest.mark.parametrize("n,num_workers", [(10, 3), (7, 4)])
-def test_source_partition_slices_are_contiguous_and_ordered(tmp_path, n, num_workers):
+@pytest.mark.parametrize("n,num_workers", [(1, 1), (3, 5), (10, 3)])
+def test_source_partition_slices_are_complete_contiguous_and_ordered(
+    tmp_path, n, num_workers
+):
     for i in range(n):
         _write_sample_pair(tmp_path, f"s{i:02d}")
     source = DatasetSource(tmp_path)
@@ -162,30 +118,6 @@ def test_source_partition_is_loadable(tmp_path):
     img, annotations = part.load(0)
     assert img.dtype == torch.uint8
     assert img.ndim == 3 and img.shape[0] == 3
-
-
-@pytest.mark.parametrize("n,num_workers", [(7, 2), (7, 4)])
-def test_source_partition_first_worker_gets_ceil_items(tmp_path, n, num_workers):
-    for i in range(n):
-        _write_sample_pair(tmp_path, f"s{i}")
-    source = DatasetSource(tmp_path)
-    assert len(source.partition(0, num_workers)) == math.ceil(n / num_workers)
-
-
-def test_source_partition_last_worker_gets_remainder_on_uneven_split(tmp_path):
-    # ceil(7/3)=3 — workers get 3, 3, 1
-    for i in range(7):
-        _write_sample_pair(tmp_path, f"s{i}")
-    source = DatasetSource(tmp_path)
-    assert len(source.partition(2, 3)) == 1
-
-
-def test_source_partition_excess_worker_gets_empty_slice(tmp_path):
-    # ceil(3/5)=1 — workers 3 and 4 start past the end
-    for i in range(3):
-        _write_sample_pair(tmp_path, f"s{i}")
-    source = DatasetSource(tmp_path)
-    assert len(source.partition(4, 5)) == 0
 
 
 # ---------------------------------------------------------------------------

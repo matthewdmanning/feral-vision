@@ -1,23 +1,19 @@
-"""Tests for optimizer/scheduler/loss-fn builders.
+"""Verify training builders instantiate every selectable Hydra component."""
 
-Verify that build_optimizer / build_scheduler / build_loss_fn correctly delegate
-to hydra.utils.instantiate for each supported config variant in schema.py.
-"""
+from __future__ import annotations
 
+from pathlib import Path
+
+# third-party
 import pytest
 import torch
-import torch.nn as nn
-from omegaconf import OmegaConf
+from hydra import compose, initialize
+from hydra.core.global_hydra import GlobalHydra
+from hydra.utils import get_class
+from omegaconf import DictConfig
 
-from feral_vision.config.schema import (
-    AdamConfig,
-    AdamWConfig,
-    BCEWithLogitsConfig,
-    CosineAnnealingConfig,
-    CrossEntropyConfig,
-    SGDConfig,
-    StepLRConfig,
-)
+# project
+from feral_vision.config.store import register_configs
 from feral_vision.training.optim import (
     build_loss_fn,
     build_optimizer,
@@ -25,78 +21,99 @@ from feral_vision.training.optim import (
 )
 
 
-@pytest.fixture
-def module() -> nn.Module:
-    """Small 2D image model supplying parameters to optimizer builders."""
-    return nn.Conv2d(3, 2, kernel_size=1)
+# ---------------------------------------------------------------------------
+# Helpers / local fixtures
+# ---------------------------------------------------------------------------
+
+_CONF_ROOT = Path(__file__).resolve().parents[1] / "conf"
 
 
-# --- build_optimizer ---------------------------------------------------------
+def _variant_names(group: str) -> tuple[str, ...]:
+    """Return selectable YAML variant names for one training component group."""
+    return tuple(path.stem for path in sorted((_CONF_ROOT / group).glob("*.yaml")))
 
 
-def test_build_optimizer_adamw(module):
-    cfg = OmegaConf.structured(AdamWConfig(lr=1e-3))
-    opt = build_optimizer(module.parameters(), cfg)
-    assert isinstance(opt, torch.optim.AdamW)
-    assert opt.param_groups[0]["lr"] == pytest.approx(1e-3)
+def _compose_training_cfg(override: str) -> DictConfig:
+    """Compose the smoke Run Recipe with one real training-component override."""
+    with initialize(version_base=None, config_path="../conf"):
+        return compose(config_name="runs/smoke", overrides=[override])
 
 
-def test_build_optimizer_adam(module):
-    cfg = OmegaConf.structured(AdamConfig(lr=5e-4))
-    opt = build_optimizer(module.parameters(), cfg)
-    assert isinstance(opt, torch.optim.Adam)
-    assert opt.param_groups[0]["lr"] == pytest.approx(5e-4)
+@pytest.fixture(autouse=True)
+def _registered_and_isolated_hydra() -> None:
+    """Register schemas and clear global Hydra state around each composition."""
+    register_configs()
+    GlobalHydra.instance().clear()
+    yield
+    GlobalHydra.instance().clear()
 
 
-def test_build_optimizer_sgd_has_momentum(module):
-    cfg = OmegaConf.structured(SGDConfig(lr=1e-2, momentum=0.9))
-    opt = build_optimizer(module.parameters(), cfg)
-    assert isinstance(opt, torch.optim.SGD)
-    assert opt.param_groups[0]["lr"] == pytest.approx(1e-2)
-    assert opt.param_groups[0]["momentum"] == pytest.approx(0.9)
+@pytest.fixture(params=_variant_names("train/optim"))
+def optimizer_cfg(request: pytest.FixtureRequest) -> DictConfig:
+    """Provide each selectable optimizer configuration from the real config tree."""
+    return _compose_training_cfg(f"train/optim={request.param}").train.optim
 
 
-# --- build_scheduler ---------------------------------------------------------
+@pytest.fixture(params=_variant_names("train/scheduler"))
+def scheduler_cfg(request: pytest.FixtureRequest) -> DictConfig:
+    """Provide each selectable scheduler configuration from the real config tree."""
+    return _compose_training_cfg(f"train/scheduler={request.param}").train.scheduler
 
 
-def test_build_scheduler_none_returns_none(module):
-    opt = build_optimizer(module.parameters(), OmegaConf.structured(AdamWConfig()))
-    assert build_scheduler(opt, None) is None
+@pytest.fixture(params=_variant_names("train/loss_fn"))
+def loss_cfg(request: pytest.FixtureRequest) -> DictConfig:
+    """Provide each selectable loss configuration from the real config tree."""
+    return _compose_training_cfg(f"train/loss_fn={request.param}").train.loss_fn
 
 
-def test_build_scheduler_step(module):
-    opt = build_optimizer(module.parameters(), OmegaConf.structured(AdamWConfig()))
-    sched_cfg = OmegaConf.structured(StepLRConfig(step_size=5, gamma=0.5))
-    sched = build_scheduler(opt, sched_cfg)
-    assert isinstance(sched, torch.optim.lr_scheduler.StepLR)
-    assert sched.step_size == 5
-    assert sched.gamma == pytest.approx(0.5)
+# ---------------------------------------------------------------------------
+# Optimizers and schedulers
+# ---------------------------------------------------------------------------
 
 
-def test_build_scheduler_cosine(module):
-    opt = build_optimizer(module.parameters(), OmegaConf.structured(AdamWConfig()))
-    sched_cfg = OmegaConf.structured(CosineAnnealingConfig(T_max=10))
-    sched = build_scheduler(opt, sched_cfg)
-    assert isinstance(sched, torch.optim.lr_scheduler.CosineAnnealingLR)
-    assert sched.T_max == 10
+def test_build_optimizer_binds_real_variant_and_updates_image_model(
+    image_model: torch.nn.Module, optimizer_cfg: DictConfig
+) -> None:
+    optimizer = build_optimizer(image_model.parameters(), optimizer_cfg)
+    parameters_before = [
+        parameter.detach().clone() for parameter in image_model.parameters()
+    ]
 
+    image_model(torch.ones(1, 3, 8, 8)).square().mean().backward()
+    optimizer.step()
 
-# --- build_loss_fn -----------------------------------------------------------
-
-
-def test_build_loss_fn_cross_entropy():
-    loss_fn = build_loss_fn(OmegaConf.structured(CrossEntropyConfig()))
-    assert isinstance(loss_fn, torch.nn.CrossEntropyLoss)
-
-
-def test_build_loss_fn_bce_with_logits():
-    loss_fn = build_loss_fn(OmegaConf.structured(BCEWithLogitsConfig()))
-    assert isinstance(loss_fn, torch.nn.BCEWithLogitsLoss)
-
-
-def test_build_loss_fn_cross_entropy_label_smoothing():
-    loss_fn = build_loss_fn(
-        OmegaConf.structured(CrossEntropyConfig(label_smoothing=0.1))
+    assert isinstance(optimizer, get_class(optimizer_cfg._target_))
+    assert any(
+        not torch.equal(before, after)
+        for before, after in zip(parameters_before, image_model.parameters())
     )
-    assert isinstance(loss_fn, torch.nn.CrossEntropyLoss)
-    assert loss_fn.label_smoothing == pytest.approx(0.1)
+
+
+def test_build_scheduler_binds_every_real_variant(
+    image_model: torch.nn.Module, scheduler_cfg: DictConfig
+) -> None:
+    optimizer_cfg = _compose_training_cfg("train/optim=adam").train.optim
+    optimizer = build_optimizer(image_model.parameters(), optimizer_cfg)
+
+    scheduler = build_scheduler(optimizer, scheduler_cfg)
+
+    assert isinstance(scheduler, get_class(scheduler_cfg._target_))
+    assert scheduler.optimizer is optimizer
+
+
+def test_build_scheduler_none_disables_scheduling(image_model: torch.nn.Module) -> None:
+    optimizer_cfg = _compose_training_cfg("train/optim=adam").train.optim
+    optimizer = build_optimizer(image_model.parameters(), optimizer_cfg)
+
+    assert build_scheduler(optimizer, None) is None
+
+
+# ---------------------------------------------------------------------------
+# Loss functions
+# ---------------------------------------------------------------------------
+
+
+def test_build_loss_fn_instantiates_every_real_variant(loss_cfg: DictConfig) -> None:
+    loss_fn = build_loss_fn(loss_cfg)
+
+    assert isinstance(loss_fn, get_class(loss_cfg._target_))
