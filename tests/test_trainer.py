@@ -154,7 +154,7 @@ def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(tmp_pat
     )
     data_root = tmp_path / "data"
     data_root.mkdir()
-    data_tracker = data_root / "data.dvc"
+    data_tracker = data_root / "dvc.lock"
     data_tracker.write_text("outs:\n- md5: immutable-data-version\n")
     cfg = SimpleNamespace(
         train=SimpleNamespace(epochs=1),
@@ -184,8 +184,8 @@ def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(tmp_pat
     assert model_metadata["signature"] is not None
     assert model_metadata["saved_input_example_info"] is not None
     run = client.search_runs([experiment_id])[0]
-    assert run.data.params["dvc_data_version"].startswith("data.dvc@sha256:")
-    logged_trackers = list(artifact_root.rglob("data.dvc"))
+    assert run.data.params["dvc_data_version"].startswith("dvc.lock@sha256:")
+    logged_trackers = list(artifact_root.rglob("dvc.lock"))
     assert len(logged_trackers) == 1
     assert logged_trackers[0].read_text() == data_tracker.read_text()
     resolved_configs = list(artifact_root.rglob("resolved_config.json"))

@@ -42,6 +42,11 @@ The following are out of scope:
   not use service-account key files.
 - Before training, input data is synchronized from GCS to the attached SSD,
   mounted in the container at `/data`.
+- `scripts/data/` owns human-directed data acquisition, DVC processing, and
+  registration. It pushes DVC objects and publishes the prepared dataset plus
+  `dvc.lock` to GCS; local files are disposable staging only. Image and annotation
+  artifacts stay in GCS. GoogleSQL may hold durable relational data or metadata,
+  but is not an image-artifact store.
 - Bucket names, project IDs, and instance settings are supplied at runtime via
   environment variables or `gcloud`, never baked into the image.
 - MLflow is deployed as a shared Cloud Run service. Its backend store is a
