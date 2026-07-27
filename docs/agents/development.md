@@ -21,9 +21,10 @@ bash scripts/validate_ci.sh
 # Tests (use -m on Windows)
 uv run python -m pytest
 
-# DVC data pipeline
-dvc repro
-dvc pull
+# Cloud-backed DVC data workflow (local files are staging only)
+GCS_BUCKET=YOUR_BUCKET bash scripts/data/acquire.sh
+GCS_BUCKET=YOUR_BUCKET bash scripts/data/process.sh
+GCS_BUCKET=YOUR_BUCKET bash scripts/data/register.sh
 ```
 
 For the cloud-training contract and first-run readiness status, see

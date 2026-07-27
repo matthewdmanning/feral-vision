@@ -14,6 +14,11 @@ MCP servers respond, and any scripts needed for the task are available. Report
 each missing or broken prerequisite with a concise fix, then stop before work
 that depends on it.
 
+## Test work
+
+When writing, editing, or reviewing tests, invoke the `$write-python-test` skill
+before making or assessing test changes.
+
 ## Agent references
 
 - [Development workflow](development.md) — repository layout, commands, and
