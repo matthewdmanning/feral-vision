@@ -9,6 +9,7 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
     "albumentations>=2.0",
     "dvc",
+    "fiftyone>=1.0",
     "huggingface-hub>=1.20.1",
     "hydra-core",
     "mlflow",

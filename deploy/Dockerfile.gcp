@@ -1,4 +1,5 @@
-FROM feral-vision:latest
+ARG BASE_IMAGE=feral-vision:smoke
+FROM ${BASE_IMAGE}
 
 RUN apt-get update && apt-get install -y gnupg curl apt-transport-https ca-certificates && \
     curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
@@ -8,8 +9,4 @@ RUN apt-get update && apt-get install -y gnupg curl apt-transport-https ca-certi
     apt-get update && apt-get install -y google-cloud-cli && \
     rm -rf /var/lib/apt/lists/*
 
-RUN uv pip install "dvc[gs]"
-
-ENTRYPOINT ["bash", "-c", \
-  "gcloud auth activate-service-account --key-file=${GOOGLE_APPLICATION_CREDENTIALS} 2>/dev/null || true && \
-   dvc pull && dvc repro ${HYDRA_OVERRIDES:-}"]
+ENTRYPOINT ["bash", "scripts/cloud/container_train.sh"]

@@ -27,3 +27,21 @@ point, not a fixed set of options. Current sources:
 
 Additional sources are added by extending the dispatch in ``fetch.py``; each must
 resolve to the layout above.
+
+Sampled COCO zoo pull
+---------------------
+
+For a bounded COCO 2017 training subset, call the FiftyOne helper from Python::
+
+   from scripts.pull_coco_train2017 import pull_coco_train2017
+
+   dataset = pull_coco_train2017(
+       max_epochs=max_epochs,
+       batch_size=batch_size,
+   )
+
+It loads COCO's ``train`` split with detection annotations for bird, cat, dog,
+horse, sheep, cow, elephant, bear, zebra, and giraffe. The sample limit is
+``max_epochs * batch_size``; FiftyOne manages the downloaded images and
+annotations in its dataset-zoo storage. This is separate from the DVC ``coco``
+fetch stage above.

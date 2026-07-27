@@ -6,7 +6,7 @@ from importlib import import_module
 from pathlib import Path
 
 import pytest
-from hydra import compose, initialize
+from hydra import compose, initialize, initialize_config_dir
 from hydra.core.global_hydra import GlobalHydra
 from hydra.errors import ConfigCompositionException
 from omegaconf import DictConfig, OmegaConf
@@ -41,7 +41,7 @@ def _test_recipe_paths() -> tuple[Path, ...]:
     return tuple(
         path
         for path in _recipe_paths()
-        if path.parent.name == "testing" or path.stem == "smoke"
+        if path.parent.name == "testing"
     )
 
 
@@ -54,6 +54,12 @@ def _compose_recipe(path: Path, overrides: list[str] | None = None) -> DictConfi
     """Compose one complete recipe after registering the structured schemas."""
     with initialize(version_base=None, config_path="../conf"):
         return compose(config_name=_config_name(path), overrides=overrides or [])
+
+
+def _compose_deploy(overrides: list[str] | None = None) -> DictConfig:
+    """Compose the root-level cloud-smoke configuration and its schema."""
+    with initialize_config_dir(version_base=None, config_dir=str(_REPOSITORY_ROOT)):
+        return compose(config_name="deploy/cloudbuild", overrides=overrides or [])
 
 
 def _resolve_dotted_name(dotted_name: str) -> object:
@@ -111,6 +117,32 @@ def test_recipe_rejects_unknown_structured_override() -> None:
         ConfigCompositionException, match="Could not override 'train.nope'"
     ):
         _compose_recipe(_CONF_ROOT / "runs" / "baseline.yaml", ["train.nope=1"])
+
+
+# ---------------------------------------------------------------------------
+# Deployment inputs — typed, declarative configuration
+# ---------------------------------------------------------------------------
+
+
+def test_cloudbuild_config_composes_against_its_deploy_schema() -> None:
+    """Cloud-smoke inputs are declarative values, not an embedded workflow."""
+    cfg = _compose_deploy()
+
+    assert cfg.deploy.substitutions._REGION
+    assert cfg.deploy.substitutions._REPO
+    assert cfg.deploy.substitutions._GCP_PROJECT
+    assert cfg.deploy.substitutions._BASE_IMAGE_NAME
+    assert cfg.deploy.substitutions._IMAGE_NAME
+    assert cfg.deploy.substitutions._IMAGE_TAG
+
+
+def test_cloudbuild_config_rejects_unknown_structured_override() -> None:
+    """Deployment inputs reject fields that no cloud-smoke script consumes."""
+    with pytest.raises(
+        ConfigCompositionException,
+        match="Could not override 'deploy.substitutions._NOT_A_PARAMETER'",
+    ):
+        _compose_deploy(["deploy.substitutions._NOT_A_PARAMETER=1"])
 
 
 # ---------------------------------------------------------------------------

@@ -20,7 +20,7 @@ The following are out of scope:
 
 ## Data and configuration constraints
 
-- Data operations, including acquisition and augmentation, must be idempotent
+- DVC runs, including acquisition and augmentation, must be idempotent
   and re-runnable; fetching skips files already present.
 - A train/validation split must be static, use seed `42`, expose its ratio
   through Hydra, and be persisted to GCS before training begins.
@@ -41,29 +41,25 @@ The following are out of scope:
 - GCP access uses the instance service account through Workload Identity; do
   not use service-account key files.
 - Before training, input data is synchronized from GCS to the attached SSD,
-  mounted in the container at `/data`.
-- Bucket names, project IDs, and instance settings are supplied at runtime via
-  environment variables or `gcloud`, never baked into the image.
-- MLflow is deployed as a shared Cloud Run service. Its backend store is a
-  Cloud SQL PostgreSQL database and its artifact store is a GCS bucket. The
-  training container receives the Cloud Run tracking URI; it does not start a
-  local MLflow server or copy a SQLite database to GCS. Per the
-  [tooling boundary](../architecture/program-flow.md#7-tooling-boundaries), run-generated
-  model artifacts belong to MLflow. When artifact logging succeeds, only the
-  selected best model artifact is recorded in its configured GCS prefix; do not
-  upload intermediate checkpoints to a parallel GCS location directly.
+  mounted in the container at `/data`; the configured Hydra augmentation runs on
+  the GPU VM before the trainer starts.
+- Bucket names, project IDs, and instance settings are declared in the
+  cloud-smoke configuration and passed at runtime; they are never baked into
+  the image.
+- MLflow uses a database URI generated for each run. It is not a shared,
+  persistent hosted service, so do not provision Cloud Run or Cloud SQL for a
+  smoke test. Per the [tooling boundary](../architecture/program-flow.md#7-tooling-boundaries),
+  MLflow still owns any run-generated model artifacts; do not create a parallel
+  checkpoint-export path.
 
-This is a required deployment topology, not evidence that a first cloud run is
-ready. Before the first production run, the package must produce the readiness
-and preflight evidence in [issue #37](https://github.com/matthewdmanning/feral-vision/issues/37),
-the phase-aware recovery and final summary in [issue #38](https://github.com/matthewdmanning/feral-vision/issues/38),
-and the complete model-artifact and lineage behavior in
-[issue #20](https://github.com/matthewdmanning/feral-vision/issues/20). Until
-then, the Docker procedure is an implementation path, not a first-run
-acceptance runbook.
+The first cloud run is an empirical manual smoke. It is not gated on preflight,
+a reusable launcher, recovery infrastructure, or complete model-lineage work.
+Record the command, inputs, logs, result, and observed blockers in
+[issue #38](https://github.com/matthewdmanning/feral-vision/issues/38); decide
+what to automate only after that evidence exists.
 
 ## Non-functional constraints
 
-- Local development may continue when no MLflow server is active; metric logging
-  is a no-op in that case. First cloud-run acceptance requires durable MLflow
-  evidence as stated above.
+- Local development may continue when no MLflow run is active; metric logging is
+  a no-op in that case. Persistence beyond an individual run is a later decision,
+  not a smoke-test requirement.

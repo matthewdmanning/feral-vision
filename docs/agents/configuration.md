@@ -1,6 +1,6 @@
 # Configuration
 
-Use this guide when changing Hydra configuration or model definitions.
+Use this guide when changing Hydra configuration or model configuration.
 
 Do not modify an existing Hydra `default.yaml` in place. Create a semantic named
 replacement; the planned configuration cutover retires legacy defaults only
