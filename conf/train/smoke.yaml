@@ -6,7 +6,7 @@ defaults:
   - loss_fn: cross_entropy
   - _self_
 
-epochs: 50
-batch_size: 16
+epochs: 1
+batch_size: 2
 num_workers: 0
-device: gpu
+device: cpu

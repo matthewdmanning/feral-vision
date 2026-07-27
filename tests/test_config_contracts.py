@@ -38,11 +38,7 @@ def _recipe_paths() -> tuple[Path, ...]:
 
 def _test_recipe_paths() -> tuple[Path, ...]:
     """Return recipes that must be safe to compose and run on CPU-only CI."""
-    return tuple(
-        path
-        for path in _recipe_paths()
-        if path.parent.name == "testing"
-    )
+    return tuple(path for path in _recipe_paths() if path.parent.name == "testing")
 
 
 def _config_name(path: Path) -> str:

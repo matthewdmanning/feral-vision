@@ -45,7 +45,9 @@ def export_coco_train2017(
     import fiftyone as fo
 
     if export_dir.exists():
-        raise FileExistsError(f"Refusing to overwrite existing export directory: {export_dir}")
+        raise FileExistsError(
+            f"Refusing to overwrite existing export directory: {export_dir}"
+        )
     dataset = pull_coco_train2017(max_epochs=max_epochs, batch_size=batch_size)
     dataset.export(
         export_dir=str(export_dir),
