@@ -32,6 +32,12 @@ mlflow.db
 .claude/**
 .codex/config.toml
 .codex/hooks/github_auth.py
+
+# Terraform local working state and plan artifacts
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfplan
 CLAUDE.md
 bash.exe.stackdump
 .coverage

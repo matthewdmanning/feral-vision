@@ -44,10 +44,11 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
+      - run: uv sync --group dev
       - name: Lint
-        run: uvx ruff check . --output-format=github
+        run: uv run ruff check . --output-format=github
       - name: Format
-        run: uvx ruff format --check .
+        run: uv run ruff format --check .
 
   type-check:
     name: Type safety

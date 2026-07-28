@@ -1,0 +1,14 @@
+#!/bin/bash
+set -euo pipefail
+
+readonly coco_data_dir="${coco_data_dir}"
+readonly archive_uri="gs://${bucket_name}/${coco_archive_prefix}"
+readonly training_image="${training_image}"
+
+if [[ -d "$coco_data_dir/images" ]]; then
+  docker pull "$training_image"
+  docker run --rm \
+    -v /mnt/disks/ssd:/data:ro \
+    --entrypoint gcloud \
+    "$training_image" storage rsync --recursive "$coco_data_dir" "$archive_uri"
+fi

@@ -21,8 +21,13 @@ and are not retained in the artifact store.
 Cloud training
 --------------
 
-The former GCE launch script is deprecated. The required deployment topology
-and first-run readiness gate are defined in ``docs/planning/product-scope.md``.
+Stage a configured Ultralytics checkpoint before the GPU VM run::
+
+   GCS_BUCKET=feral-vision scripts/cloud/stage_model.sh conf/model/yolo11n_seg.yaml
+
+The GPU container mounts its SSD-backed input data at ``/data``, applies the
+selected Hydra augmentation, and then starts the canonical trainer. The broader
+deployment topology is defined in ``docs/planning/product-scope.md``.
 
 Data pipeline
 -------------
