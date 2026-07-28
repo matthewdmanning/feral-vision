@@ -22,8 +22,9 @@ When a change affects a user-visible workflow, update the relevant document in
 `docs/guide/` in the same change. If no guide changes are needed, record that
 the guide-impact check was completed in the handoff.
 
-Do not commit `docs/_build/`: GitHub Actions rebuilds Sphinx documentation on
-documentation changes and deploys the generated Pages artifact from `main`.
+Do not commit `docs/_build/` or run Sphinx as part of local validation:
+GitHub Actions rebuilds documentation on documentation changes and deploys the
+generated Pages artifact from `main`.
 
 ## CLI boundary
 
