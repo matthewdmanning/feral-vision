@@ -2,7 +2,8 @@
 
 This document is the canonical agent reference for how data becomes a trained
 model. For cloud-service configuration, identity, and lifecycle, use
-[MLOps boundaries](mlops.md); this document does not define those concerns.
+[Cloud Operations](cloudops.md); for DVC, Hydra, and MLflow ownership, use
+[Tracking and Data Ownership](tracking.md).
 
 ## Data path
 
