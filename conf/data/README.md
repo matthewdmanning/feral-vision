@@ -12,5 +12,5 @@ Choose a semantic dataset variant as part of a reproducible Run Recipe.
 ## Ownership
 
 Hydra owns configuration values and DVC owns data artifacts. The data-flow and
-tooling boundary are defined in [the program flow](../../docs/architecture/program-flow.md); the
+tooling boundary are defined in [the program flow](../../docs/agents/program-flow.md); the
 project vocabulary is in [the glossary](../../docs/domain/glossary.md).

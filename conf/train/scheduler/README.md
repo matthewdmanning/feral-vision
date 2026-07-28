@@ -13,4 +13,4 @@ Run Recipe.
 ## Ownership
 
 Training code owns scheduler construction. The canonical training path is
-defined in [the program flow](../../../docs/architecture/program-flow.md).
+defined in [the program flow](../../../docs/agents/program-flow.md).

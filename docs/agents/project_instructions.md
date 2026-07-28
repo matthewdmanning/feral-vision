@@ -7,22 +7,40 @@ Read only the sections and linked documents required for the task you were
 instructed to perform. Follow an explicitly required reference before acting;
 otherwise, do not load unrelated guidance merely because it is listed here.
 
-## Session prerequisites
+## Documentation integrity
 
-At the beginning of a session, check that `gh` is installed, `origin` is set,
-MCP servers respond, and any scripts needed for the task are available. Report
-each missing or broken prerequisite with a concise fix, then stop before work
-that depends on it.
+Functions longer than three lines and class definitions must have docstrings. All docstrings must be written using numpy style.
 
-## Test work
+The main agent must update the canonical project documentation in the same
+change whenever code changes a substantive project contract. This includes
+program flow, integrations or deployment paths, runtime/configuration behavior,
+data or MLflow ownership, public interfaces, and operator workflows. A purely
+internal refactor that preserves those contracts does not require documentation
+changes. Do not defer this check to a later session or reviewer.
 
-When writing, editing, or reviewing tests, invoke the `$write-python-test` skill
-before making or assessing test changes.
+When a change affects a user-visible workflow, update the relevant document in
+`docs/guide/` in the same change. If no guide changes are needed, record that
+the guide-impact check was completed in the handoff.
+
+Do not commit `docs/_build/`: GitHub Actions rebuilds Sphinx documentation on
+documentation changes and deploys the generated Pages artifact from `main`.
+
+## CLI boundary
+
+Never integrate a CLI into a function or Python script. Only shell scripts may
+provide command-line interfaces.
+
+## Code quality
+
+Before adding project code for a capability, check whether a library already in
+use provides it. Use that library directly unless a project-specific boundary is
+genuinely required.
 
 ## Agent references
 
 - [Development workflow](development.md) — repository layout, commands, and
   documentation lookup
+- [Test writing and review](testing.md) — required skill and availability gate
 - [Data and model tests](data.md) — dataset layout and image-shaped test inputs
 - [Configuration](configuration.md) — Hydra recipes and model reproducibility
 - [MLOps boundaries](mlops.md) — DVC, Hydra, MLflow, and model-registry scope

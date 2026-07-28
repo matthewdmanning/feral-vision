@@ -3,7 +3,7 @@
 Use this guide for repository orientation, local commands, and documentation
 lookup.
 
-Read [the program flow](../architecture/program-flow.md) before architecture or
+Read [the program flow](program-flow.md) before architecture or
 integration work. It is the single source of truth for the data-to-model program
 flow and tooling ownership; link to it instead of restating that flow elsewhere.
 
@@ -21,14 +21,12 @@ bash scripts/validate_ci.sh
 # Tests (use -m on Windows)
 uv run python -m pytest
 
-# Cloud-backed DVC data workflow (local files are staging only)
-GCS_BUCKET=YOUR_BUCKET bash scripts/data/acquire.sh
-GCS_BUCKET=YOUR_BUCKET bash scripts/data/process.sh
-GCS_BUCKET=YOUR_BUCKET bash scripts/data/register.sh
+# DVC data pipeline
+dvc repro
+dvc pull
 ```
 
-For the cloud-training contract and first-run readiness status, see
-[Product Scope](../planning/product-scope.md). The operational procedure is
-[Docker/GCE training](../../docker/USER_STEPS.md). The domain glossary is
-[Glossary](../domain/glossary.md). Find installed-version documentation first;
+Cloud-service configuration, identity, and lifecycle are defined in
+[MLOps boundaries](mlops.md). The domain glossary is [Glossary](../domain/glossary.md).
+Find installed-version documentation first;
 use Context7 only when local documentation is unavailable.

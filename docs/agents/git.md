@@ -10,6 +10,10 @@ At the beginning of a session involving repository or GitHub work, check that
 for the task are available. Report each missing or broken prerequisite with a
 concise fix, then stop before work that depends on it.
 
+Fetch `origin` before repository work. Fast-forward a clean local `main` from
+`origin/main` before branching; do not pull, merge, rebase, or otherwise update
+a dirty worktree or a feature branch without task-specific intent.
+
 ## GitHub access
 
 Follow the canonical [issue-tracker guidance](issue-tracker.md) for GitHub
@@ -28,6 +32,10 @@ requesting a replacement token.
 Never push directly to `main`; publish changes through a pull request. Create
 commits with `uv run cz commit`; the Dev workflow validates Conventional Commit
 messages on non-`main` branches.
+
+Before opening or updating a pull request, fetch `origin/main` and integrate it
+into the feature branch locally. Resolve any clashes locally and run the relevant
+verification before publishing; do not leave conflict resolution to GitHub.
 
 Before finishing work, remove worktrees and local branches created for the task
 when they are no longer needed. Never remove an active, dirty, or user-owned

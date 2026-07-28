@@ -21,8 +21,11 @@ and are not retained in the artifact store.
 Cloud training
 --------------
 
-The former GCE launch script is deprecated. The required deployment topology
-and first-run readiness gate are defined in ``docs/planning/product-scope.md``.
+Cloud training is provisioned through Terraform and its operational scripts;
+manual Docker launches are not a supported workflow. The provisioned GPU VM
+stages data on its SSD, mounts it at ``/data`` in the training container, runs
+the configured augmentation, and starts the canonical trainer. Cloud workflow
+changes are made through the Terraform and operational-script interfaces.
 
 Data pipeline
 -------------
