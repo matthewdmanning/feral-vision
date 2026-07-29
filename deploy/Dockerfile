@@ -1,11 +1,12 @@
-FROM pytorch/pytorch:2.8.0-cuda12.4-cudnn9-runtime
+ARG PYTORCH_IMAGE=pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime
+FROM ${PYTORCH_IMAGE}
 
 RUN apt-get update && apt-get install -y \
     git curl wget unzip ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -Ls https://astral.sh/uv/install.sh | sh && \
-    mv /root/.cargo/bin/uv /usr/local/bin/uv
+    mv /root/.local/bin/uv /usr/local/bin/uv
 
 WORKDIR /workspace
 COPY . /workspace

@@ -1,0 +1,62 @@
+#!/bin/bash
+set -euo pipefail
+
+readonly training_image="${training_image}"
+readonly coco_data_dir="${coco_data_dir}"
+readonly coco_max_epochs="${coco_max_epochs}"
+readonly coco_batch_size="${coco_batch_size}"
+readonly archive_uri="gs://${bucket_name}/${coco_archive_prefix}"
+
+archive_coco() {
+  if [[ -d "$coco_data_dir/images" ]]; then
+    docker run --rm \
+      -v /mnt/disks/ssd:/data:ro \
+      --entrypoint gcloud \
+      "$training_image" storage rsync --recursive "$coco_data_dir" "$archive_uri"
+  fi
+}
+
+on_exit() {
+  local status=$?
+  trap - EXIT
+  archive_coco || exit $status
+  exit $status
+}
+
+trap on_exit EXIT
+
+for attempt in $(seq 1 30); do
+  if nvidia-smi; then
+    break
+  fi
+  if [[ "$attempt" -eq 30 ]]; then
+    echo "NVIDIA driver did not become available after 5 minutes." >&2
+    exit 1
+  fi
+  sleep 10
+done
+
+docker pull "$training_image"
+
+if [[ ! -d "$coco_data_dir/images" ]]; then
+  docker run --rm \
+    -v /mnt/disks/ssd:/data \
+    -e COCO_MAX_EPOCHS="$coco_max_epochs" \
+    -e COCO_BATCH_SIZE="$coco_batch_size" \
+    -e COCO_EXPORT_DIR="$coco_data_dir" \
+    --entrypoint bash \
+    "$training_image" scripts/cloud/export_coco_to_vm.sh
+fi
+
+docker run --rm \
+  --gpus all \
+  --entrypoint python \
+  "$training_image" -c 'import torch; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))'
+
+docker run --rm \
+  --gpus all \
+  -v /mnt/disks/ssd:/data \
+  -e GCP_PROJECT="${project_id}" \
+  -e GCS_BUCKET="${bucket_name}" \
+  -e TRAIN_DATA="$coco_data_dir" \
+  "$training_image"

@@ -250,6 +250,36 @@ class AugmentationConfig:
     ops: list[str] = field(default_factory=list)
 
 
+# --- Deployment -------------------------------------------------------------
+@dataclass
+class DeploySubstitutionsConfig:
+    """Values passed from the cloud-smoke configuration to its scripts."""
+
+    _GCP_PROJECT: str = ""
+    _REGION: str = "us-central1"
+    _REPO: str = "feral-vision"
+    _BASE_IMAGE_NAME: str = "feral-vision"
+    _IMAGE_NAME: str = "feral-vision-gcp"
+    _IMAGE_TAG: str = "smoke"
+
+
+@dataclass
+class DeployOptionsConfig:
+    """Non-operational cloud-smoke configuration options."""
+
+    logging: str = "CLOUD_LOGGING_ONLY"
+
+
+@dataclass
+class DeployConfig:
+    """Inputs consumed by the manual cloud-smoke scripts."""
+
+    substitutions: DeploySubstitutionsConfig = field(
+        default_factory=DeploySubstitutionsConfig
+    )
+    options: DeployOptionsConfig = field(default_factory=DeployOptionsConfig)
+
+
 # --- Top-level (type-hint convenience; group schemas are what get registered) ---
 @dataclass
 class Config:

@@ -1,0 +1,18 @@
+services:
+  base:
+    image: ${BASE_IMAGE:-feral-vision-base:dev}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        PYTORCH_IMAGE: ${PYTORCH_IMAGE:-pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime}
+
+  training:
+    image: ${TRAINING_IMAGE:-feral-vision-gcp:dev}
+    build:
+      context: ..
+      dockerfile: Dockerfile.gcp
+      additional_contexts:
+        base: service:base
+      args:
+        BASE_IMAGE: base

@@ -1,0 +1,29 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-base
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        base_image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_BASE_IMAGE_NAME}:${_IMAGE_TAG}"
+        docker pull "$${base_image}" || true
+        docker build --cache-from "$${base_image}" --tag "$${base_image}" --file=deploy/Dockerfile .
+        docker push "$${base_image}"
+
+  - name: gcr.io/cloud-builders/docker
+    id: build-training-image
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        base_image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_BASE_IMAGE_NAME}:${_IMAGE_TAG}"
+        training_image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE_NAME}:${_IMAGE_TAG}"
+        docker pull "$${training_image}" || true
+        docker build --cache-from "$${training_image}" --build-arg="BASE_IMAGE=$${base_image}" --tag "$${training_image}" --file=deploy/Dockerfile.gcp .
+        docker push "$${training_image}"
+    waitFor:
+      - build-base
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_BASE_IMAGE_NAME}:${_IMAGE_TAG}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE_NAME}:${_IMAGE_TAG}
