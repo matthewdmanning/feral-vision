@@ -2,46 +2,25 @@
 
 Feral Vision trains and evaluates computer-vision models from reproducible datasets and run recipes. Its language separates data identity, run configuration, experiment evidence, and model lifecycle so that each trained result can be traced without conflating the systems that store those concerns.
 
-## Product scope
-
-**Feral-Cat Instance Segmentation**:
-The product capability that identifies each feral cat in a mobile-captured
-image and produces a separate pixel-level mask for that cat.
-_Avoid_: Generic animal detection, semantic segmentation
-
-**Instance Mask**:
-A pixel-level mask belonging to one detected feral-cat instance.
-_Avoid_: Bounding box, semantic mask
-
 ## Data lineage
 
-**Data Artifact**:
-A versioned collection of data at a specific lifecycle stage, such as raw, processed, or augmented data.
-_Avoid_: Model artifact, run artifact
+**Dataset Artifact**:
+A file that stores structured metadata for a Dataset's provenance, including its
+source Datasets and applicable operations, parameters, image order, and random
+seeds. It is Data Lineage.
+_Avoid_: Dataset, model artifact
 
 **Dataset**:
-A collection of raw, unaltered images obtained from an open source or uploaded by a user.
-_Avoid_: Dataset variant, augmented dataset
+A collection of images, with or without annotations. Its adjective specifies its contents and provenance.
+_Avoid_: Dataset Artifact, data path
 
 **Dataset Variant**:
 A collection derived from a Dataset by subsetting its images, augmenting them, or both.
-_Avoid_: Dataset, configuration variant
+_Avoid_: Configuration variant
 
-**Dataset Derivation Recipe**:
-The complete reproducible description of how a Dataset Variant was derived, including subset selection, augmentation operations and parameters, and any randomness or seed.
-_Avoid_: Data lineage link, run recipe
-
-**Data Version**:
-The immutable identity of the exact data artifact consumed by a run.
-_Avoid_: Dataset variant, data path
-
-**Data Lineage Link**:
-The recorded connection from a Dataset Variant to its parent Dataset and the Dataset Derivation Recipe applied to that parent.
-_Avoid_: Dataset derivation recipe, data path
-
-**Data Operation**:
-A standalone action that acquires, derives, versions, or retrieves a Data Artifact outside any training or inference loop.
-_Avoid_: Training step, inference step
+**Data Lineage**:
+The structured provenance connection recorded by a Dataset Artifact between a Dataset, its source Datasets, and any applicable operations.
+_Avoid_: Data path, run recipe
 
 ## Run configuration
 
@@ -50,36 +29,41 @@ A single named configuration file containing the key-value choices for one confi
 _Avoid_: Run recipe, configuration group
 
 **Run Recipe**:
-The complete, named, version-controlled declaration required to execute model
-training or inference: its Configuration Variants and the immutable Data
-Version it consumes. Its selected Model Definition may specify optional
-starting weights; when none are supplied, the run initializes randomly under
-its configured seed. A Run Recipe consumes a Data Version created by a prior
-human-directed Data Operation; it never fetches, augments, versions, or
-otherwise invokes DVC during training or inference.
-_Avoid_: Configuration variant, dataset derivation recipe, source defaults
+The complete, non-redundant collection of Configuration Variants required to run model training or inference, with no required concern missing.
+_Avoid_: Configuration variant, source defaults
+
+## Cloud deployment
+
+**Cloud Resource**:
+A provisioned cloud asset and its lifecycle configuration, including storage,
+container registry, compute, network, identity, and access policy. Terraform
+owns the configuration and lifecycle of every Cloud Resource used by the cloud
+smoke. Terraform is invoked separately; Hydra does not mirror, override, or
+invoke this configuration.
+_Avoid_: Training run, Dataset Artifact, Run Recipe
+
+**Terraform State**:
+The record Terraform uses to manage Cloud Resources. The first cloud smoke uses
+local state; a remote state backend is not part of that deployment.
+_Avoid_: Run record, data lineage link
 
 ## Experiment tracking
 
 **Experiment**:
-A named grouping of related runs used to compare attempts toward a shared objective.
-_Avoid_: Run, model
-
-**Run**:
-One execution of training or inference using a resolved run recipe and a specific data version.
-_Avoid_: Experiment, model version
+A named grouping of related training-script executions used to compare attempts toward a shared objective.
+_Avoid_: Training-script execution, model
 
 **Run Record**:
-The durable evidence about a run, including its resolved parameters, metrics, metadata, artifacts, and lineage.
+The durable evidence about a training-script execution, including its resolved parameters, metrics, metadata, artifacts, and lineage.
 _Avoid_: Run recipe, log file
 
 **Model Artifact**:
-A model architecture, its resolved configuration, and its learned weights treated as one tracked unit. Training produces it; experiment tracking records and stores it together with references to the Data Artifacts that establish its training-data lineage.
-_Avoid_: Data artifact, checkpoint
+A product of a training-script execution.
+_Avoid_: Dataset artifact, checkpoint
 
 **Checkpoint**:
-Model weights emitted by the training framework at a specific epoch during a training run, usually as a `.pt` file. It does not explicitly contain the model architecture or configuration.
-_Avoid_: Model artifact, model definition
+Model weights emitted by the training framework at a specific epoch during a training-script execution, usually as a `.pt` file. It does not explicitly contain the model architecture or configuration.
+_Avoid_: Model artifact, model configuration
 
 **Experiment Tracking**:
 The practice of recording and comparing run records.
@@ -87,26 +71,26 @@ _Avoid_: Model lifecycle management, model tracking
 
 ## Model identity and lifecycle
 
-**Model Definition**:
-A reusable description of a model's architecture, acquisition source, expected outputs, and optional starting weights, independent of any run.
-_Avoid_: Checkpoint, model version
-
 **MLflow Model Registry**:
-The MLflow service that owns Registered Models, their static Model Definition metadata, and their Model Versions, including the lifecycle relationship from a trained Model Artifact to its originating Run Record.
-_Avoid_: Model Catalog, experiment tracker, project registry
-
-**Offline Registration Journal**:
-A temporary local record of model-definition registrations made while the MLflow Model Registry is unreachable; it is replayed when the registry becomes reachable.
-_Avoid_: Model Catalog, durable registry
+The database containing Registered Models.
+_Avoid_: Experiment tracker, run record
 
 **Registered Model**:
-A named identity in the MLflow Model Registry that groups related Model Versions.
-_Avoid_: Model Definition, Model Artifact, training run
+A named identity in the MLflow Model Registry that groups its related Model Versions and their lineage.
+_Avoid_: Model artifact, training-script execution
 
 **Model Version**:
-A versioned MLflow Model Artifact under a Registered Model, linked to the Run Record that produced it. A change to learned weights creates a different Model Version.
-_Avoid_: Model Definition, checkpoint, run, registered model
+A distinct pairing of an architecture revision and a learned weight set under a Registered Model. A change to the architecture's shape or to its weights creates a different Model Version.
+_Avoid_: Checkpoint, training-script execution, registered model
+
+**Model Family**:
+A group of models containing the same types of operations with varying construction hyperparameters.
+_Avoid_: Model Zoo, Registered Model
+
+**Model Zoo**:
+An online collection of many different models, some with pre-trained weights.
+_Avoid_: Model Family, MLflow Model Registry
 
 **Model Lifecycle Management**:
-The practice of registering, evaluating, promoting, and retiring Model Versions in the MLflow Model Registry while preserving their Run Record and Data Artifact references.
+The practice of registering, evaluating, promoting, and retiring Model Versions while preserving registry provenance, the metadata needed to load and run them, and experiment-tracked references to the exact DVC Dataset Artifacts used for training.
 _Avoid_: Experiment tracking, model tracking

@@ -21,13 +21,11 @@ and are not retained in the artifact store.
 Cloud training
 --------------
 
-Stage a configured Ultralytics checkpoint before the GPU VM run::
-
-   GCS_BUCKET=feral-vision scripts/cloud/stage_model.sh conf/model/yolo11n_seg.yaml
-
-The GPU container mounts its SSD-backed input data at ``/data``, applies the
-selected Hydra augmentation, and then starts the canonical trainer. The broader
-deployment topology is defined in ``docs/planning/product-scope.md``.
+Cloud training is provisioned through Terraform and its operational scripts;
+manual Docker launches are not a supported workflow. The provisioned GPU VM
+stages data on its SSD, mounts it at ``/data`` in the training container, runs
+the configured augmentation, and starts the canonical trainer. Cloud workflow
+changes are made through the Terraform and operational-script interfaces.
 
 Data pipeline
 -------------

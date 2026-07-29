@@ -7,27 +7,15 @@ Read only the sections and linked documents required for the task you were
 instructed to perform. Follow an explicitly required reference before acting;
 otherwise, do not load unrelated guidance merely because it is listed here.
 
-## Session prerequisites
-
-At the beginning of a session, check that `gh` is installed, `origin` is set,
-MCP servers respond, and any scripts needed for the task are available. Report
-each missing or broken prerequisite with a concise fix, then stop before work
-that depends on it.
-
-## Test work
-
-When writing, editing, or reviewing tests, invoke the `$write-python-test` skill
-before making or assessing test changes.
-
 ## Agent references
 
-- [Development workflow](development.md) — repository layout, commands, and
-  documentation lookup
+- [Implementation](implementation.md) — code and authored-documentation changes
+- [Test writing and review](testing.md) — required skill and availability gate
 - [Data and model tests](data.md) — dataset layout and image-shaped test inputs
 - [Configuration](configuration.md) — Hydra recipes and model reproducibility
-- [MLOps boundaries](mlops.md) — DVC, Hydra, MLflow, and model-registry scope
-- [Git and GitHub workflow](git.md) — session checks, `gh` authentication, and
-  branch, commit, and pull-request hygiene
-- [Issue tracker](issue-tracker.md)
+- [Tracking and data ownership](tracking.md) — DVC, Hydra, MLflow, and registry scope
+- [Cloud operations](cloudops.md) — Terraform, cloud identity, and image builds
+- [Git and GitHub](github.md) — repository, issue, and pull-request workflow
+- [Wayfinding](wayfinding.md)
 - [Triage labels](triage-labels.md)
 - [Domain documentation](domain.md)

@@ -10,7 +10,6 @@ from googleapiclient.http import HttpMockSequence
 
 from scripts.cloud_preflight import get_compute_instance
 
-
 # ---------------------------------------------------------------------------
 # Helpers / local fixtures
 # ---------------------------------------------------------------------------

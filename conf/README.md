@@ -15,4 +15,8 @@ recipe and `runs/smoke` is CPU-safe for validation. There is no root
 
 Python schemas own field contracts, YAML files own semantic variant values, and
 Run Recipes own executable selection. The canonical program flow and tooling
-ownership are defined in [the program flow](../docs/architecture/program-flow.md).
+ownership are defined in [the program flow](../docs/agents/program-flow.md).
+
+The `deploy_schema` contract validates the root-level
+[`deploy/cloudbuild.yaml`](../deploy/cloudbuild.yaml) parameter file. That file
+is not a Run Recipe and does not define an operational workflow.

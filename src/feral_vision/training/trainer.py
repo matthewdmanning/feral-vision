@@ -10,11 +10,11 @@ units and is exercised by the canonical training entrypoint (:func:`main`).
 from __future__ import annotations
 
 import copy
-from contextlib import contextmanager
 import hashlib
 import math
-from pathlib import Path
 import subprocess
+from contextlib import contextmanager
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator
 
 if TYPE_CHECKING:

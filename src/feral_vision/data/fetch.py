@@ -17,12 +17,12 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig
 
+from feral_vision.config.store import register_configs
 from feral_vision.constants import (
     COCO_ANNOTATIONS_URL,
     COCO_IMAGE_URL_TEMPLATE,
     COCO_SUPERCATEGORY_FILTER,
 )
-from feral_vision.config.store import register_configs
 from feral_vision.utils import get_logger
 
 logger = get_logger(__name__)
