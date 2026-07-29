@@ -8,8 +8,8 @@ Trainer.fit's actual val_dataset contract end to end.
 
 from __future__ import annotations
 
-import math
 import json
+import math
 from pathlib import Path
 from types import SimpleNamespace
 

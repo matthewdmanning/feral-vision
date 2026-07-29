@@ -10,7 +10,6 @@ from omegaconf import DictConfig, OmegaConf
 # project
 from feral_vision.data.augmentations import compose_augmentations
 
-
 # ---------------------------------------------------------------------------
 # Helpers / local fixtures
 # ---------------------------------------------------------------------------

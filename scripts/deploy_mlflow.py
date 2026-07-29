@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import subprocess
+from pathlib import Path
 from typing import Any
 
 from omegaconf import DictConfig, OmegaConf
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = PROJECT_ROOT / "conf" / "deploy" / "mlflow.yaml"

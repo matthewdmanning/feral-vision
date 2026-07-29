@@ -14,7 +14,6 @@ from omegaconf import DictConfig, OmegaConf
 from feral_vision.config.store import register_configs
 from feral_vision.models.register_model import get_adapter
 
-
 # ---------------------------------------------------------------------------
 # Helpers / local fixtures
 # ---------------------------------------------------------------------------

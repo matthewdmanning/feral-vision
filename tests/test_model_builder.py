@@ -14,7 +14,6 @@ from torch import nn
 from feral_vision.config.store import register_configs
 from feral_vision.models.register_model import model_builder
 
-
 # ---------------------------------------------------------------------------
 # Helpers / local fixtures
 # ---------------------------------------------------------------------------

@@ -8,14 +8,14 @@ readiness evidence for a single immutable run identity.
 from __future__ import annotations
 
 import argparse
+import json
+import os
+import re
+import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-import json
-import os
 from pathlib import Path
-import re
-import subprocess
 from typing import Any
 from urllib.request import urlopen
 from uuid import uuid4
@@ -24,7 +24,6 @@ from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 
 from feral_vision.config.store import register_configs
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _DIGEST_IMAGE = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")

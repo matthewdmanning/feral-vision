@@ -10,7 +10,6 @@ from feral_vision.data.annotations import MaskAnnotation
 from feral_vision.data.dataset import AnnotationDataset, StreamingAnnotationDataset
 from feral_vision.io_utils import DatasetSource
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
