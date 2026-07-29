@@ -1,0 +1,9 @@
+name: Feral Vision CodeQL
+
+queries:
+  - uses: security-and-quality
+
+paths-ignore:
+  - .venv/**
+  - docs/_build/**
+  - "**/__pycache__/**"
