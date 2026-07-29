@@ -15,22 +15,8 @@ concurrency:
 
 permissions:
   contents: read
-  security-events: write
-  actions: read
 
 jobs:
-  codeql:
-    name: CodeQL
-    runs-on: ubuntu-latest
-    if: github.event.repository.visibility == 'public'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
-        with:
-          languages: python
-      - uses: github/codeql-action/autobuild@v3
-      - uses: github/codeql-action/analyze@v3
-
   dependency-audit:
     name: Dependency audit
     runs-on: ubuntu-latest
