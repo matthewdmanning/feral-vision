@@ -1,0 +1,24 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: relocate-embedded-source
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        cat > Dockerfile <<'EOF'
+        FROM ${_BASE_IMAGE}
+        RUN mkdir -p /opt/feral-vision && cp -a /workspace/. /opt/feral-vision/
+        ENTRYPOINT ["bash", "/opt/feral-vision/scripts/cloud/container_train.sh"]
+        EOF
+        docker build --tag "${_TRAINING_IMAGE}" .
+        docker push "${_TRAINING_IMAGE}"
+
+images:
+  - ${_TRAINING_IMAGE}
+
+substitutions:
+  _BASE_IMAGE: us-east4-docker.pkg.dev/feralspotter-f9e51/feral-docker/feral-vision-gcp@sha256:00ab0ba68c7434aa7d378e4fd13e89d12f663c1e7d24847706d7c38351d9fd99
+  _TRAINING_IMAGE: us-east4-docker.pkg.dev/feralspotter-f9e51/feral-docker/feral-vision-gcp:dvc-source-less
+
+options:
+  logging: CLOUD_LOGGING_ONLY

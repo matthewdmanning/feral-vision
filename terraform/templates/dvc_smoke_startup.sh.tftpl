@@ -1,0 +1,64 @@
+#!/bin/bash
+set -euo pipefail
+
+exec > >(tee /dev/console) 2>&1
+readonly status_prefix="[DVC_SMOKE]"
+
+readonly smoke_prefix="dvc-smoke/one-off"
+readonly fixture_uri="gs://${dataset_bucket}/$${smoke_prefix}/fixture.txt"
+fixture_generation=""
+
+cleanup() {
+  status="$?"
+
+  echo "$${status_prefix} cleanup status=$${status} generation=$${fixture_generation}"
+
+  if [[ -n "$${work_dir:-}" ]]; then
+    rm -rf "$${work_dir}"
+  fi
+
+  if [[ -n "$${fixture_generation}" ]]; then
+    FIXTURE_GENERATION="$${fixture_generation}" python3 - <<'PY'
+import os
+from google.cloud import storage
+
+client = storage.Client()
+blob = client.bucket("${dataset_bucket}").blob(
+    "dvc-smoke/one-off/fixture.txt", generation=int(os.environ["FIXTURE_GENERATION"])
+)
+blob.delete()
+PY
+  fi
+
+  echo "$${status_prefix} fixture generation removed=$${fixture_generation}"
+  shutdown -h now || true
+  exit "$${status}"
+}
+trap cleanup EXIT
+
+apt-get update
+apt-get install -y git python3-pip
+python3 -m pip install dvc-gs
+
+echo "$${status_prefix} dependencies installed"
+
+work_dir="$(mktemp -d)"
+cd "$${work_dir}"
+git init
+dvc init --no-scm
+printf 'feral-vision dvc smoke\n' > fixture.txt
+
+fixture_generation="$(FIXTURE_URI="$${fixture_uri}" python3 - <<'PY'
+import os
+from google.cloud import storage
+
+client = storage.Client()
+blob = client.bucket("${dataset_bucket}").blob("dvc-smoke/one-off/fixture.txt")
+blob.upload_from_filename("fixture.txt")
+print(blob.generation)
+PY
+)"
+echo "$${status_prefix} fixture uploaded generation=$${fixture_generation}"
+dvc import-url --version-aware "$${fixture_uri}" fixture.txt
+grep -q "version_id:" fixture.txt.dvc
+echo "$${status_prefix} SUCCESS version-aware tracker: $(tr '\n' ' ' < fixture.txt.dvc)"
