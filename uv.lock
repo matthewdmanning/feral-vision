@@ -1459,6 +1459,7 @@ dependencies = [
     { name = "albumentations" },
     { name = "dvc" },
     { name = "dvc-gs" },
+    { name = "fastapi" },
     { name = "fiftyone" },
     { name = "google-api-python-client" },
     { name = "huggingface-hub" },
@@ -1470,6 +1471,7 @@ dependencies = [
     { name = "pycocotools" },
     { name = "torch" },
     { name = "ultralytics" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -1498,6 +1500,7 @@ requires-dist = [
     { name = "albumentations", specifier = ">=2.0" },
     { name = "dvc" },
     { name = "dvc-gs", specifier = ">=3.1.0" },
+    { name = "fastapi" },
     { name = "fiftyone", specifier = ">=1.0" },
     { name = "google-api-python-client", specifier = ">=2.0" },
     { name = "huggingface-hub", specifier = ">=1.20.1" },
@@ -1509,6 +1512,7 @@ requires-dist = [
     { name = "pycocotools", specifier = ">=2.0" },
     { name = "torch", specifier = ">=2.12.1" },
     { name = "ultralytics", specifier = ">=8.3" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata.requires-dev]
