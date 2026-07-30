@@ -18,7 +18,7 @@ mlflow.db
 mlruns/
 mlflow.db
 
-*local
+*local*
 
 # DVC-tracked data and model artifacts
 /data/**
@@ -45,7 +45,11 @@ coverage.xml
 example_augment.txt
 yolo11n-seg.pt
 docs/_build
+docs/external_refs/mlflow_examples.md
 .vscode/tasks.json
 
 # Local Codex authentication
 .codex/hooks/github_auth.py
+
+# Local augmentation-preview renders
+aug_preview/

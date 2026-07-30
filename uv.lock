@@ -1458,6 +1458,7 @@ source = { editable = "." }
 dependencies = [
     { name = "albumentations" },
     { name = "dvc" },
+    { name = "fastapi" },
     { name = "fiftyone" },
     { name = "huggingface-hub" },
     { name = "hydra-core" },
@@ -1468,6 +1469,7 @@ dependencies = [
     { name = "pycocotools" },
     { name = "torch" },
     { name = "ultralytics" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -1495,6 +1497,7 @@ docs-sphinx = [
 requires-dist = [
     { name = "albumentations", specifier = ">=2.0" },
     { name = "dvc" },
+    { name = "fastapi" },
     { name = "fiftyone", specifier = ">=1.0" },
     { name = "huggingface-hub", specifier = ">=1.20.1" },
     { name = "hydra-core" },
@@ -1505,6 +1508,7 @@ requires-dist = [
     { name = "pycocotools", specifier = ">=2.0" },
     { name = "torch", specifier = ">=2.12.1" },
     { name = "ultralytics", specifier = ">=8.3" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata.requires-dev]
