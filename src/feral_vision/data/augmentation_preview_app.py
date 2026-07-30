@@ -165,7 +165,7 @@ def augmentation_catalog() -> list[dict[str, Any]]:
         if transform is A.BasicTransform or not issubclass(transform, A.BasicTransform):
             continue
         fields = []
-        for parameter in inspect.signature(transform.__init__).parameters.values():
+        for parameter in inspect.signature(transform).parameters.values():
             if parameter.name == "self" or parameter.kind in {
                 inspect.Parameter.VAR_KEYWORD,
                 inspect.Parameter.VAR_POSITIONAL,
@@ -183,7 +183,7 @@ def augmentation_catalog() -> list[dict[str, Any]]:
                     "choices": _enum_options(str(parameter.annotation)),
                 }
             )
-        fallback = {
+        fallback: dict[str, Any] = {
             "description": (
                 inspect.getdoc(transform) or "Albumentations transform."
             ).splitlines()[0],
@@ -191,7 +191,7 @@ def augmentation_catalog() -> list[dict[str, Any]]:
             "sweeps": _sweep_definitions(transform, fields),
         }
         reference = references.get(name, {})
-        documented_sweeps = reference.get("sweeps", [])
+        documented_sweeps: list[dict[str, Any]] = list(reference.get("sweeps", []))
         fallback["sweeps"] = documented_sweeps + [
             sweep
             for sweep in fallback["sweeps"]
