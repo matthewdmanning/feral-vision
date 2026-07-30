@@ -223,7 +223,10 @@ def test_write_augmentation_preview_html_creates_structured_grid_assets(
     assert 'class="slider-row"' in document
     assert "pointer-events: none" not in document
     assert 'className: "original-badge", textContent: "Original source"' in document
-    assert 'image.src = isOriginal ? page.sourceAsset : page.variants[row][column]' in document
+    assert (
+        "image.src = isOriginal ? page.sourceAsset : page.variants[row][column]"
+        in document
+    )
     assert "object-fit: contain" in document
     assert '"displayValues": ["off", "partial", "full"]' in document
     assert len(tuple(index.parent.glob("assets/page-1/*.png"))) == 10
