@@ -10,5 +10,5 @@ if [[ -d "$coco_data_dir/images" ]]; then
   docker run --rm \
     -v /mnt/disks/ssd:/data:ro \
     --entrypoint gcloud \
-    "$training_image" storage rsync --recursive "$coco_data_dir" "$archive_uri"
+    "$training_image" storage rsync --recursive --checksums-only "$coco_data_dir" "$archive_uri"
 fi
