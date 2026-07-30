@@ -36,3 +36,7 @@ evaluation:
 .. code-block:: bash
 
    dvc repro
+
+For cloud training, the selected Dataset Artifact is prepared and reviewed
+upstream in the dedicated DVC repository. The training container receives its
+staged data and does not invoke DVC or resolve a mutable Cloud Storage prefix.

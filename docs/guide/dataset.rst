@@ -45,3 +45,18 @@ horse, sheep, cow, elephant, bear, zebra, and giraffe. The sample limit is
 ``max_epochs * batch_size``; FiftyOne manages the downloaded images and
 annotations in its dataset-zoo storage. This is separate from the DVC ``coco``
 fetch stage above.
+
+Cloud Dataset Artifacts
+-----------------------
+
+Cloud preparation publishes the selected ``images/`` and ``annotations/``
+layout to a versioned Google Cloud Storage prefix. A dedicated DVC repository
+then tracks that prefix with ``dvc import-url --version-aware`` and commits the
+generated tracker with ``dataset-artifact.json``. The data repository stores
+only provenance files; Google Cloud Storage stores the dataset itself.
+
+Training is given a reviewed Dataset Artifact, not a mutable bucket prefix. Its
+tracker pins the Cloud Storage object generations used by the run. A later data
+version is adopted through a reviewed tracker update (optionally with
+``dvc update --rev`` for a selected object version), rather than by overwriting
+the training input in place.
