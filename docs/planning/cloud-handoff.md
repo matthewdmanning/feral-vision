@@ -38,15 +38,15 @@
   Build source workspace has no `.git`, and `dvc add` therefore exited with
   `ERROR: /workspace is not a git repository`. The archive rsync and `dvc push`
   steps did not run, so do not claim a published Dataset Artifact.
-- The adopted replacement design is a DVC-scoped repository: Cloud Build
-  publishes the dataset to a dedicated dataset-only, versioned GCS bucket.
-  General operational storage is not a Dataset Artifact source; Terraform state
-  should remain in its dedicated protected bucket. Data-repository automation
-  records dataset object generations with `dvc import-url --version-aware` and
-  commits the generated tracker with `dataset-artifact.json`. This is a design
-  decision only; the repository, dataset-bucket provisioning, credential path,
-  and build integration have not yet been implemented. Do not claim a published
-  Dataset Artifact.
+- The adopted replacement is a bucket-backed Dataset Artifact catalog. Cloud
+  Build publishes the dataset payload to the versioned
+  `mobile-optimized-images` bucket, then stores `dataset-artifact.json` and a
+  version-aware `dataset-artifact.dvc` tracker in the same artifact prefix.
+  The temporary no-SCM DVC workspace only generates that tracker; it is not a
+  training dependency. General operational storage is not a Dataset Artifact
+  source; Terraform state remains in its protected operations bucket. The
+  revised build integration is implemented but has not yet been executed, so do
+  not claim a published Dataset Artifact.
 - Terraform state and Cloud Build staging share the regional operations bucket
   `feral-vision-operations-us-east4`, separated by `terraform/` and
   `cloudbuild/` prefixes with prefix-scoped IAM. Dataset archives use the
@@ -168,15 +168,11 @@ dirty-worktree changes and stage only the files above when preparing a commit.
 
 ## Next commands
 
-1. Provision the dataset-only bucket with Object Versioning and dataset-specific
-   lifecycle and IAM policies; do not reuse the Terraform-state or general
-   artifact bucket. Configure the DVC-scoped repository and implement a
-   reviewed automation path that records the completed Cloud Build export with
-   `dvc import-url --version-aware`, commits the tracker and
-   `dataset-artifact.json`, and passes the data-repository revision and tracker
-   digest to training lineage. Only then submit the regional preparation build
-   and verify the objects and Dataset Artifact before allowing the VM to consume
-   them.
+1. Confirm Object Versioning and dataset-specific lifecycle and IAM policies on
+   `mobile-optimized-images`; do not reuse the Terraform-state or general
+   artifact bucket. Submit the revised regional preparation build, then verify
+   its `payload/`, `dataset-artifact.json`, and version-aware
+   `dataset-artifact.dvc` before allowing the VM to consume them.
 2. Keep the T4 request paused until capacity returns. On a future retry,
    generate and review a fresh Terraform plan; do not use the saved plans in
    `/tmp`, and apply only with explicit approval.

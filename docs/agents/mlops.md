@@ -49,10 +49,11 @@ normal shutdown archives it for later VM runs.
 Cloud Storage
 ├── dataset-only bucket                 # one bucket per environment
 │   └── datasets/<dataset>/<artifact>/
-│       ├── images/
-│       ├── annotations/
+│       ├── payload/
+│       │   ├── images/
+│       │   └── annotations/
 │       ├── dataset-artifact.json
-│       └── <dataset>.dvc
+│       └── dataset-artifact.dvc
 └── general storage
     ├── Terraform state + Cloud Build staging
     ├── MLflow artifacts
@@ -67,19 +68,17 @@ source for a Dataset Artifact. Keep Terraform state in a dedicated protected
 operations bucket with Cloud Build staging when their prefixes have separate,
 least-privilege IAM conditions; both remain separate from datasets.
 
-Cloud Build publishes prepared data to a versioned Cloud Storage prefix. A
-separate DVC-scoped Git repository owns Dataset Artifact pointers and manifests;
-it contains no dataset blobs and is independent of the application repository.
-After publication, its automation creates or updates a tracker with
-`dvc import-url --version-aware` against the GCS prefix and commits the tracker
-and `dataset-artifact.json` together through the data repository's review
-workflow. Object Versioning must be enabled on the source bucket before this
-workflow is used.
+Cloud Build publishes prepared data to a versioned Cloud Storage prefix. The
+dataset bucket is the Dataset Artifact catalog: each artifact prefix contains a
+`payload/` directory, `dataset-artifact.json`, and a version-aware
+`dataset-artifact.dvc` tracker. Cloud Build creates that tracker with
+`dvc import-url --no-download --version-aware` after publishing the payload.
+The temporary no-SCM DVC workspace exists only to generate the tracker; it does
+not store dataset blobs or become a training dependency. Object Versioning must
+be enabled on the source bucket before this workflow is used.
 
-The resulting tracker records the GCS object generations. Training consumes the
-selected tracker and staged data, and records the data-repository commit and
-tracker digest in its run manifest and MLflow lineage. A new cloud version is
-adopted only by updating that tracker (for a selected version, `dvc update --rev`
-may be used) and reviewing the corresponding data-repository change. Do not use
-`dvc add --no-scm` in the application build as a substitute for this provenance
-boundary, and do not run DVC in the training container.
+The tracker records the GCS object generations. Training consumes the selected
+tracker and staged data, and records the tracker digest in its run manifest and
+MLflow lineage. A new cloud version is adopted only by publishing a new artifact
+prefix or updating its tracker with `dvc update --rev`; do not overwrite a
+reviewed training input in place. Do not run DVC in the training container.

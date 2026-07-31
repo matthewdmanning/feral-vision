@@ -17,13 +17,12 @@ steps:
         uv run python - <<'PY'
         from __future__ import annotations
 
-        import hashlib
         import json
         import os
         from pathlib import Path
 
         export_dir = Path(os.environ["COCO_EXPORT_DIR"])
-        dvc_artifact = export_dir.with_suffix(".dvc")
+        manifest_path = export_dir.parent / "dataset-artifact.json"
         metadata = {
             "schema_version": 1,
             "kind": "Dataset Artifact",
@@ -40,28 +39,31 @@ steps:
                 * int(os.environ["COCO_BATCH_SIZE"]),
                 "random_seed": None,
             },
-            "dvc_artifact": {
-                "path": dvc_artifact.name,
-                "sha256": hashlib.sha256(dvc_artifact.read_bytes()).hexdigest(),
+            "payload": {
+                "path": "payload",
             },
+            "dvc_tracker": {"path": "dataset-artifact.dvc"},
         }
-        (export_dir / "dataset-artifact.json").write_text(
+        manifest_path.write_text(
             json.dumps(metadata, indent=2, sort_keys=True) + "\n"
         )
         PY
 
         archive_uri="gs://$${GCS_BUCKET}/datasets/coco/train2017"
-        gcloud storage rsync --recursive --checksums-only "$$COCO_EXPORT_DIR" "$$archive_uri"
+        payload_uri="$$archive_uri/payload"
+        gcloud storage rsync --recursive --checksums-only "$$COCO_EXPORT_DIR" "$$payload_uri"
+        gcloud storage cp data/prepared/dataset-artifact.json \
+          "$$archive_uri/dataset-artifact.json"
 
         tracker_dir="$$(mktemp -d)"
         trap 'rm -rf "$$tracker_dir"' EXIT
         cd "$$tracker_dir"
         uv run dvc init --no-scm
-        uv run dvc import-url --version-aware \
-          "$$archive_uri/dataset-artifact.json" dataset-artifact.json
-        grep -q "version_id:" dataset-artifact.json.dvc
-        gcloud storage cp dataset-artifact.json.dvc \
-          "$$archive_uri/dataset-artifact.json.dvc"
+        uv run dvc import-url --no-download --version-aware \
+          "$$payload_uri" coco_train2017
+        grep -q "version_id:" coco_train2017.dvc
+        gcloud storage cp coco_train2017.dvc \
+          "$$archive_uri/dataset-artifact.dvc"
 
 substitutions:
   _TRAINING_IMAGE: us-east4-docker.pkg.dev/feralspotter-f9e51/feral-docker/feral-vision-gcp@sha256:00ab0ba68c7434aa7d378e4fd13e89d12f663c1e7d24847706d7c38351d9fd99

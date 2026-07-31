@@ -10,7 +10,9 @@ model. For cloud-service configuration, identity, and lifecycle, use
 `data/fetch.py` selects a source that resolves to the canonical
 `<root>/images/`, `<root>/annotations/` layout. Raw data lives in cloud storage
 or is an always-available standard dataset. DVC owns Datasets and their Dataset
-Artifacts. Cloud training follows this path:
+Artifacts. For cloud-prepared data, the version-aware DVC tracker and
+`dataset-artifact.json` are stored beside the payload in the dataset bucket.
+Cloud training follows this path:
 
 `raw data -> GPU VM SSD -> Docker -> augmentation -> training`
 
