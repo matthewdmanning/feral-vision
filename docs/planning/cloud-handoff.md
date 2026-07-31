@@ -11,6 +11,9 @@
 - A future DVC smoke uses the existing Compute Engine execution identity named
   by `dvc_smoke_service_account_email`; Terraform must not create a new service
   account. Its temporary object-admin binding is constrained to `dvc-smoke/`.
+- Its CPU VM uses the pinned
+  `projects/debian-cloud/global/images/debian-13-trixie-v20260727` boot image;
+  do not substitute the GPU trainer image or a floating Debian family.
 - The startup script writes `[DVC_SMOKE]` stage and terminal markers to the
   serial console, including success only after the tracker contains
   `version_id:`. Do not accept VM termination alone as a passing result.
