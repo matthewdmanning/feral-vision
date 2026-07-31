@@ -1,5 +1,5 @@
 steps:
-  - name: ${_TRAINING_IMAGE}
+  - name: ${_DVC_IMAGE}
     id: prepare-bounded-coco
     entrypoint: bash
     args:
@@ -12,7 +12,18 @@ steps:
         export COCO_BATCH_SIZE="${_COCO_BATCH_SIZE}"
         export COCO_EXPORT_DIR="data/prepared/coco_train2017"
 
-        bash scripts/cloud/export_coco_to_vm.sh
+        python3 - <<'PY'
+        import os
+        from pathlib import Path
+
+        from scripts.pull_coco_train2017 import export_coco_train2017
+
+        export_coco_train2017(
+            max_epochs=int(os.environ["COCO_MAX_EPOCHS"]),
+            batch_size=int(os.environ["COCO_BATCH_SIZE"]),
+            export_dir=Path(os.environ["COCO_EXPORT_DIR"]),
+        )
+        PY
 
         uv run python - <<'PY'
         from __future__ import annotations
@@ -58,15 +69,14 @@ steps:
         tracker_dir="$$(mktemp -d)"
         trap 'rm -rf "$$tracker_dir"' EXIT
         cd "$$tracker_dir"
-        uv run dvc init --no-scm
-        uv run dvc import-url --no-download --version-aware \
+        dvc init --no-scm
+        dvc import-url --no-download --version-aware \
           "$$payload_uri" coco_train2017
         grep -q "version_id:" coco_train2017.dvc
         gcloud storage cp coco_train2017.dvc \
           "$$archive_uri/dataset-artifact.dvc"
 
 substitutions:
-  _TRAINING_IMAGE: us-east4-docker.pkg.dev/feralspotter-f9e51/feral-docker/feral-vision-gcp@sha256:00ab0ba68c7434aa7d378e4fd13e89d12f663c1e7d24847706d7c38351d9fd99
   _GCS_BUCKET: mobile-optimized-images
   _COCO_MAX_EPOCHS: "50"
   _COCO_BATCH_SIZE: "16"

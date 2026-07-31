@@ -53,15 +53,16 @@
   digest-pinned image, before a payload or tracker was published. Cloud Logging
   was unreachable from the operator environment, so the precise command error
   remains unobserved; do not retry that same image digest without first
-  rebuilding or otherwise inspecting its embedded source/runtime.
+  rebuilding or otherwise inspecting its embedded source/runtime. The replacement
+  is the independent DVC-only image described below.
 - Terraform state and Cloud Build staging share the regional operations bucket
   `feral-vision-operations-us-east4`, separated by `terraform/` and
   `cloudbuild/` prefixes with prefix-scoped IAM. Dataset archives use the
   separate `mobile-optimized-images` bucket.
 - The preparation configuration is
-  `deploy/cloudbuild.prepare.yaml`; it uses the immutable training image
-  `us-east4-docker.pkg.dev/feralspotter-f9e51/feral-docker/feral-vision-gcp@sha256:00ab0ba68c7434aa7d378e4fd13e89d12f663c1e7d24847706d7c38351d9fd99`.
-  Never replace that reference with `:smoke` for a preparation run.
+  `deploy/cloudbuild.prepare.yaml`; it requires an immutable CPU-only DVC image
+  digest. Build that image with `deploy/cloudbuild.dvc-image.yaml`; never use a
+  PyTorch/CUDA training image or a mutable tag for a preparation run.
 - The image was rebuilt to provide FiftyOne/OpenCV runtime libraries `libgl1`
   and `libglib2.0-0`. `scripts/pull_coco_train2017.py` now uses
   `export_media=True`, which is compatible with the installed FiftyOne

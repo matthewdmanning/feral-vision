@@ -37,6 +37,11 @@ publishes the base image to Artifact Registry for remote build caching and then
 publishes the final training image. [`stage_model.sh`](../../scripts/cloud/stage_model.sh)
 stages an eligible pretrained model to Cloud Storage.
 
+[`deploy/cloudbuild.dvc-image.yaml`](../../deploy/cloudbuild.dvc-image.yaml)
+builds the independent CPU-only DVC preparation image. It is the only image used
+by `deploy/cloudbuild.prepare.yaml`; do not use a PyTorch/CUDA training image
+for data publication.
+
 The Terraform startup restores a previously archived bounded COCO export from
 Cloud Storage to VM SSD before downloading. A first run downloads the subset;
 normal shutdown archives it for later VM runs.

@@ -32,6 +32,10 @@ It runs the CUDA-enabled training image with the staged data mounted at `/data`;
 it does not fetch data or run DVC. Terraform and operational scripts own the
 resulting cloud workload; manual Docker launches are not a supported flow.
 
+Cloud dataset preparation uses a separate CPU-only DVC image. It contains
+FiftyOne, DVC-GCS, OpenCV runtime libraries, the Cloud Storage CLI, and only the
+COCO export scripts. It must not inherit PyTorch/CUDA or the training image.
+
 ## Annotation and dataset loading
 
 `io_utils.DatasetSource._load_annotation` dispatches by extension to concrete
