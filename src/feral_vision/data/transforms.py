@@ -6,7 +6,6 @@ import cv2
 import numpy as np
 import torch
 
-
 # uint8 images span [0, 255]; divide by this to scale into [0, 1].
 _UINT8_MAX: float = 255.0
 

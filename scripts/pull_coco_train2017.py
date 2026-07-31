@@ -53,7 +53,7 @@ def export_coco_train2017(
         export_dir=str(export_dir),
         dataset_type=fo.types.COCODetectionDataset,
         label_field="ground_truth",
-        export_media=True,
+        export_media="copy",
     )
     (export_dir / "data").rename(export_dir / "images")
     annotations = export_dir / "annotations"

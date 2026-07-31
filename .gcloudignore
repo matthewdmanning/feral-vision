@@ -1,0 +1,11 @@
+#!include:.gitignore
+
+.git/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+docs/_build/
+.dvc/tmp/
+data/
+.vscode/

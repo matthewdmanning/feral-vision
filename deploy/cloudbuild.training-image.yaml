@@ -1,0 +1,15 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-training-image
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        docker build --build-arg="BASE_IMAGE=${_BASE_IMAGE}" --tag "${_TRAINING_IMAGE}" --file=deploy/Dockerfile.gcp .
+        docker push "${_TRAINING_IMAGE}"
+
+images:
+  - ${_TRAINING_IMAGE}
+
+options:
+  logging: CLOUD_LOGGING_ONLY

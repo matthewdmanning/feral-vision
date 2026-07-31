@@ -6,8 +6,5 @@
         "tests"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true,
-    "workbench.editor.autoLockGroups": {
-        "workbench.editor.browser": true
-    }
+    "python.testing.pytestEnabled": true
 }
