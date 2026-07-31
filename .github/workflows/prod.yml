@@ -27,9 +27,8 @@ jobs:
           enable-cache: true
       - name: Style check
         run: |
-          uv sync --group dev
-          uv run ruff check . --output-format=github
-          uv run ruff format --check .
+          uvx ruff check . --output-format=github
+          uvx ruff format --check .
       - name: Install deps
         run: uv sync --group dev
       - name: Static type analysis

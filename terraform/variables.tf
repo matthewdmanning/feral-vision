@@ -1,26 +1,18 @@
 variable "project_id" {
-  description = "GCP project that owns the GPU trainer resources."
+  description = "GCP project that owns the Cloud Storage bucket."
   type        = string
   nullable    = false
 }
 
 variable "bucket_name" {
-  description = "Existing dataset-only Cloud Storage bucket that holds the COCO archive."
+  description = "Globally unique name for the Cloud Storage bucket."
   type        = string
-  default     = "mobile-optimized-images"
   nullable    = false
 
   validation {
     condition     = can(regex("^[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]$", var.bucket_name))
     error_message = "bucket_name must be 3-222 lowercase characters and use only letters, digits, dots, underscores, or hyphens."
   }
-}
-
-variable "bucket_project_id" {
-  description = "GCP project that owns the existing dataset bucket."
-  type        = string
-  default     = "feralspotter-f9e51"
-  nullable    = false
 }
 
 variable "region" {
@@ -33,7 +25,14 @@ variable "region" {
 variable "zone" {
   description = "GCP zone for the GPU trainer."
   type        = string
-  default     = "us-east4-c"
+  default     = "us-east4-a"
+  nullable    = false
+}
+
+variable "location" {
+  description = "Cloud Storage location for the bucket."
+  type        = string
+  default     = "us-east4"
   nullable    = false
 }
 
@@ -61,7 +60,7 @@ variable "gpu_type" {
 variable "deep_learning_image_family" {
   description = "GPU-enabled PyTorch Deep Learning VM image family."
   type        = string
-  default     = "pytorch-2-9-cu129-ubuntu-2204-nvidia-580"
+  default     = "pytorch-latest-gpu"
   nullable    = false
 }
 
@@ -73,16 +72,8 @@ variable "deep_learning_image_project" {
 }
 
 variable "network_self_link" {
-  description = "Self-link of the VPC network for the GPU trainer."
+  description = "Self-link of the dedicated VPC network for the GPU trainer."
   type        = string
-  default     = "projects/feralspotter-f9e51/global/networks/default"
-  nullable    = false
-}
-
-variable "subnetwork_self_link" {
-  description = "Self-link of the subnet used by the private GPU trainer and Cloud NAT."
-  type        = string
-  default     = "projects/feralspotter-f9e51/regions/us-east4/subnetworks/default"
   nullable    = false
 }
 
@@ -90,13 +81,6 @@ variable "service_account_id" {
   description = "Account ID for the GPU trainer service account."
   type        = string
   default     = "feral-vision-trainer"
-  nullable    = false
-}
-
-variable "dvc_smoke_service_account_email" {
-  description = "Existing Compute Engine service account used by the disposable DVC smoke VM; Terraform never creates it."
-  type        = string
-  default     = "446310107443-compute@developer.gserviceaccount.com"
   nullable    = false
 }
 
@@ -167,7 +151,7 @@ variable "coco_archive_prefix" {
 }
 
 variable "labels" {
-  description = "Labels applied to cloud-smoke resources."
+  description = "Labels applied to the bucket."
   type        = map(string)
   default = {
     managed-by = "terraform"

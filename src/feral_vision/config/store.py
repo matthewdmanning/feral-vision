@@ -13,29 +13,29 @@ from __future__ import annotations
 from hydra.core.config_store import ConfigStore
 
 from feral_vision.config.schema import (
-    AdamConfig,
-    # Optim variants
-    AdamWConfig,
     AugmentationConfig,
-    BCEWithLogitsConfig,
-    # Scheduler variants
-    CosineAnnealingConfig,
-    CosineWarmRestartsConfig,
+    DataConfig,
+    InferenceConfig,
+    ModelConfig,
     # Loss variants
     CrossEntropyConfig,
-    DataConfig,
-    DeployConfig,
-    InferenceConfig,
-    L1LossConfig,
-    LinearLRConfig,
-    ModelConfig,
+    BCEWithLogitsConfig,
     MSELossConfig,
+    L1LossConfig,
     NLLLossConfig,
-    RAdamConfig,
-    ReduceLROnPlateauConfig,
-    RMSpropConfig,
+    # Optim variants
+    AdamWConfig,
+    AdamConfig,
     SGDConfig,
+    RMSpropConfig,
+    RAdamConfig,
+    # Scheduler variants
+    CosineAnnealingConfig,
+    LinearLRConfig,
     StepLRConfig,
+    ReduceLROnPlateauConfig,
+    CosineWarmRestartsConfig,
+    DeployConfig,
     TrackingConfig,
     TrainConfig,
 )

@@ -12,7 +12,7 @@ archive_coco() {
     docker run --rm \
       -v /mnt/disks/ssd:/data:ro \
       --entrypoint gcloud \
-      "$training_image" storage rsync --recursive --checksums-only "$coco_data_dir" "$archive_uri"
+      "$training_image" storage rsync --recursive "$coco_data_dir" "$archive_uri"
   fi
 }
 
@@ -37,13 +37,6 @@ for attempt in $(seq 1 30); do
 done
 
 docker pull "$training_image"
-
-if [[ ! -d "$coco_data_dir/images" ]]; then
-  docker run --rm \
-    -v /mnt/disks/ssd:/data \
-    --entrypoint gcloud \
-    "$training_image" storage rsync --recursive --checksums-only "$archive_uri" "$coco_data_dir" || true
-fi
 
 if [[ ! -d "$coco_data_dir/images" ]]; then
   docker run --rm \

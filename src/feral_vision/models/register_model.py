@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import importlib
 import json
-import tempfile
 from pathlib import Path
+import tempfile
 from typing import Any
 
 from omegaconf import DictConfig, OmegaConf
@@ -14,6 +14,7 @@ from torch import nn
 from feral_vision.models.ModelProperties import ModelProperties
 from feral_vision.tasks import CVTask
 from feral_vision.utils import get_logger
+
 
 logger = get_logger(__name__)
 _OFFLINE_REGISTRY_PATH = (

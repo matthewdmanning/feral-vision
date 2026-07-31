@@ -1,0 +1,73 @@
+steps:
+  - name: ${_TRAINING_IMAGE}
+    id: prepare-bounded-coco
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        cd /opt/feral-vision
+
+        export GCS_BUCKET="${_GCS_BUCKET}"
+        export COCO_MAX_EPOCHS="${_COCO_MAX_EPOCHS}"
+        export COCO_BATCH_SIZE="${_COCO_BATCH_SIZE}"
+        export COCO_EXPORT_DIR="data/prepared/coco_train2017"
+
+        bash scripts/cloud/export_coco_to_vm.sh
+
+        uv run python - <<'PY'
+        from __future__ import annotations
+
+        import hashlib
+        import json
+        import os
+        from pathlib import Path
+
+        export_dir = Path(os.environ["COCO_EXPORT_DIR"])
+        dvc_artifact = export_dir.with_suffix(".dvc")
+        metadata = {
+            "schema_version": 1,
+            "kind": "Dataset Artifact",
+            "dataset": "COCO 2017 train animal subset",
+            "source": "FiftyOne coco-2017 train detections",
+            "selection": {
+                "classes": [
+                    "bird", "cat", "dog", "horse", "sheep", "cow",
+                    "elephant", "bear", "zebra", "giraffe",
+                ],
+                "max_epochs": int(os.environ["COCO_MAX_EPOCHS"]),
+                "batch_size": int(os.environ["COCO_BATCH_SIZE"]),
+                "max_samples": int(os.environ["COCO_MAX_EPOCHS"])
+                * int(os.environ["COCO_BATCH_SIZE"]),
+                "random_seed": None,
+            },
+            "dvc_artifact": {
+                "path": dvc_artifact.name,
+                "sha256": hashlib.sha256(dvc_artifact.read_bytes()).hexdigest(),
+            },
+        }
+        (export_dir / "dataset-artifact.json").write_text(
+            json.dumps(metadata, indent=2, sort_keys=True) + "\n"
+        )
+        PY
+
+        archive_uri="gs://$${GCS_BUCKET}/datasets/coco/train2017"
+        gcloud storage rsync --recursive --checksums-only "$$COCO_EXPORT_DIR" "$$archive_uri"
+
+        tracker_dir="$$(mktemp -d)"
+        trap 'rm -rf "$$tracker_dir"' EXIT
+        cd "$$tracker_dir"
+        uv run dvc init --no-scm
+        uv run dvc import-url --version-aware \
+          "$$archive_uri/dataset-artifact.json" dataset-artifact.json
+        grep -q "version_id:" dataset-artifact.json.dvc
+        gcloud storage cp dataset-artifact.json.dvc \
+          "$$archive_uri/dataset-artifact.json.dvc"
+
+substitutions:
+  _TRAINING_IMAGE: us-east4-docker.pkg.dev/feralspotter-f9e51/feral-docker/feral-vision-gcp@sha256:00ab0ba68c7434aa7d378e4fd13e89d12f663c1e7d24847706d7c38351d9fd99
+  _GCS_BUCKET: mobile-optimized-images
+  _COCO_MAX_EPOCHS: "50"
+  _COCO_BATCH_SIZE: "16"
+
+options:
+  logging: CLOUD_LOGGING_ONLY

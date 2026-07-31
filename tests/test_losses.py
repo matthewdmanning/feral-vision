@@ -11,6 +11,7 @@ from omegaconf import DictConfig, OmegaConf
 # project
 from feral_vision.training.losses import dice_loss, segmentation_loss
 
+
 # ---------------------------------------------------------------------------
 # Helpers / local fixtures
 # ---------------------------------------------------------------------------
