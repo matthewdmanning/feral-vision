@@ -45,8 +45,15 @@
   The temporary no-SCM DVC workspace only generates that tracker; it is not a
   training dependency. General operational storage is not a Dataset Artifact
   source; Terraform state remains in its protected operations bucket. The
-  revised build integration is implemented but has not yet been executed, so do
-  not claim a published Dataset Artifact.
+  revised build integration is implemented but is not yet verified, so do not
+  claim a published Dataset Artifact.
+- The first execution of that revised build,
+  `e0219991-be90-45b0-96fa-9deac071d995`, reached terminal `FAILURE` at
+  `2026-07-31T17:19:47Z`. Its sole step exited immediately after pulling the
+  digest-pinned image, before a payload or tracker was published. Cloud Logging
+  was unreachable from the operator environment, so the precise command error
+  remains unobserved; do not retry that same image digest without first
+  rebuilding or otherwise inspecting its embedded source/runtime.
 - Terraform state and Cloud Build staging share the regional operations bucket
   `feral-vision-operations-us-east4`, separated by `terraform/` and
   `cloudbuild/` prefixes with prefix-scoped IAM. Dataset archives use the
