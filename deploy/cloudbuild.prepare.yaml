@@ -1,83 +1,21 @@
 steps:
+  - name: ${_ACQUISITION_IMAGE}
+    id: acquire-coco-into-workspace
+    env:
+      - COCO_MAX_EPOCHS=${_COCO_MAX_EPOCHS}
+      - COCO_BATCH_SIZE=${_COCO_BATCH_SIZE}
+      - DATASET_PAYLOAD_DIR=/workspace/payload
+      - DATASET_INPUT_PATH=/workspace/dataset-input.json
   - name: ${_DVC_IMAGE}
-    id: prepare-bounded-coco
-    entrypoint: bash
-    args:
-      - -ceu
-      - |
-        cd /opt/feral-vision
-
-        export GCS_BUCKET="${_GCS_BUCKET}"
-        export COCO_MAX_EPOCHS="${_COCO_MAX_EPOCHS}"
-        export COCO_BATCH_SIZE="${_COCO_BATCH_SIZE}"
-        export COCO_EXPORT_DIR="data/prepared/coco_train2017"
-
-        python3 - <<'PY'
-        import os
-        from pathlib import Path
-
-        from scripts.pull_coco_train2017 import export_coco_train2017
-
-        export_coco_train2017(
-            max_epochs=int(os.environ["COCO_MAX_EPOCHS"]),
-            batch_size=int(os.environ["COCO_BATCH_SIZE"]),
-            export_dir=Path(os.environ["COCO_EXPORT_DIR"]),
-        )
-        PY
-
-        uv run python - <<'PY'
-        from __future__ import annotations
-
-        import json
-        import os
-        from pathlib import Path
-
-        export_dir = Path(os.environ["COCO_EXPORT_DIR"])
-        manifest_path = export_dir.parent / "dataset-artifact.json"
-        metadata = {
-            "schema_version": 1,
-            "kind": "Dataset Artifact",
-            "dataset": "COCO 2017 train animal subset",
-            "source": "FiftyOne coco-2017 train detections",
-            "selection": {
-                "classes": [
-                    "bird", "cat", "dog", "horse", "sheep", "cow",
-                    "elephant", "bear", "zebra", "giraffe",
-                ],
-                "max_epochs": int(os.environ["COCO_MAX_EPOCHS"]),
-                "batch_size": int(os.environ["COCO_BATCH_SIZE"]),
-                "max_samples": int(os.environ["COCO_MAX_EPOCHS"])
-                * int(os.environ["COCO_BATCH_SIZE"]),
-                "random_seed": None,
-            },
-            "payload": {
-                "path": "payload",
-            },
-            "dvc_tracker": {"path": "dataset-artifact.dvc"},
-        }
-        manifest_path.write_text(
-            json.dumps(metadata, indent=2, sort_keys=True) + "\n"
-        )
-        PY
-
-        archive_uri="gs://$${GCS_BUCKET}/datasets/coco/train2017"
-        payload_uri="$$archive_uri/payload"
-        gcloud storage rsync --recursive --checksums-only "$$COCO_EXPORT_DIR" "$$payload_uri"
-        gcloud storage cp data/prepared/dataset-artifact.json \
-          "$$archive_uri/dataset-artifact.json"
-
-        tracker_dir="$$(mktemp -d)"
-        trap 'rm -rf "$$tracker_dir"' EXIT
-        cd "$$tracker_dir"
-        dvc init --no-scm
-        dvc import-url --no-download --version-aware \
-          "$$payload_uri" coco_train2017
-        grep -q "version_id:" coco_train2017.dvc
-        gcloud storage cp coco_train2017.dvc \
-          "$$archive_uri/dataset-artifact.dvc"
+    id: publish-dataset-artifact
+    env:
+      - GCS_BUCKET=${_GCS_BUCKET}
+      - DATASET_ARTIFACT_PREFIX=${_DATASET_ARTIFACT_PREFIX}
+      - DATASET_PAYLOAD_DIR=/workspace/payload
+      - DATASET_INPUT_PATH=/workspace/dataset-input.json
 
 substitutions:
-  _GCS_BUCKET: mobile-optimized-images
+  _GCS_BUCKET: mobile-training-images
   _COCO_MAX_EPOCHS: "50"
   _COCO_BATCH_SIZE: "16"
 

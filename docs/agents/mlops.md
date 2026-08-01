@@ -38,9 +38,13 @@ publishes the final training image. [`stage_model.sh`](../../scripts/cloud/stage
 stages an eligible pretrained model to Cloud Storage.
 
 [`deploy/cloudbuild.dvc-image.yaml`](../../deploy/cloudbuild.dvc-image.yaml)
-builds the independent CPU-only DVC preparation image. It is the only image used
-by `deploy/cloudbuild.prepare.yaml`; do not use a PyTorch/CUDA training image
-for data publication.
+builds the independent Python-only DVC publication image. It contains DVC-GCS
+and the Cloud Storage Python client, but not PyTorch/CUDA, FiftyOne, `uv`, or
+the Cloud Storage CLI. `deploy/cloudbuild.coco-acquire-image.yaml` builds the
+separate COCO/FiftyOne/MongoDB acquisition image. Source-specific acquisition and
+source-agnostic publication run as distinct steps in
+`deploy/cloudbuild.prepare.yaml`; do not use a PyTorch/CUDA training image for
+either responsibility.
 
 The Terraform startup restores a previously archived bounded COCO export from
 Cloud Storage to VM SSD before downloading. A first run downloads the subset;
@@ -87,3 +91,18 @@ tracker and staged data, and records the tracker digest in its run manifest and
 MLflow lineage. A new cloud version is adopted only by publishing a new artifact
 prefix or updating its tracker with `dvc update --rev`; do not overwrite a
 reviewed training input in place. Do not run DVC in the training container.
+
+### Acquisition-publication contract
+
+An acquisition image is source-specific. It writes a canonical
+`/workspace/payload/images/` and `/workspace/payload/annotations/` layout plus
+`/workspace/dataset-input.json`. The input metadata must name the dataset and
+source and include a provenance object. The DVC publication image validates this
+shared workspace, uploads the payload and manifest through the Cloud Storage
+Python client, then generates and uploads the version-aware tracker.
+
+Every publication supplies immutable acquisition and DVC image digests and a
+new, reviewed `DATASET_ARTIFACT_PREFIX`. The prefix is intentionally a required
+build substitution: a rerun must choose a new artifact prefix rather than
+overwrite a training input. New download sources implement this workspace
+contract without adding their download libraries to the DVC image.

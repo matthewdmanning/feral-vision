@@ -32,9 +32,13 @@ It runs the CUDA-enabled training image with the staged data mounted at `/data`;
 it does not fetch data or run DVC. Terraform and operational scripts own the
 resulting cloud workload; manual Docker launches are not a supported flow.
 
-Cloud dataset preparation uses a separate CPU-only DVC image. It contains
-FiftyOne, DVC-GCS, OpenCV runtime libraries, the Cloud Storage CLI, and only the
-COCO export scripts. It must not inherit PyTorch/CUDA or the training image.
+Cloud dataset preparation has two CPU-only images sharing the source-less Cloud
+Build workspace. A source-specific acquisition image writes `payload/images/`,
+`payload/annotations/`, and `dataset-input.json`; the minimal DVC publication
+image validates and publishes that contract. The DVC image contains only Python,
+DVC-GCS, and the Cloud Storage Python client. It must not inherit PyTorch/CUDA,
+FiftyOne, MongoDB, `uv`, or the Cloud Storage CLI from the training or acquisition
+images.
 
 ## Annotation and dataset loading
 

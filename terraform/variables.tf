@@ -7,7 +7,7 @@ variable "project_id" {
 variable "bucket_name" {
   description = "Existing dataset-only Cloud Storage bucket that holds the COCO archive."
   type        = string
-  default     = "mobile-optimized-images"
+  default     = "mobile-training-images"
   nullable    = false
 
   validation {
@@ -19,7 +19,7 @@ variable "bucket_name" {
 variable "bucket_project_id" {
   description = "GCP project that owns the existing dataset bucket."
   type        = string
-  default     = "feralspotter-f9e51"
+  default     = "cs-poc-kewg0kffb7uwobgq1rex2af"
   nullable    = false
 }
 
@@ -75,14 +75,14 @@ variable "deep_learning_image_project" {
 variable "network_self_link" {
   description = "Self-link of the VPC network for the GPU trainer."
   type        = string
-  default     = "projects/feralspotter-f9e51/global/networks/default"
+  default     = "projects/cs-poc-kewg0kffb7uwobgq1rex2af/global/networks/default"
   nullable    = false
 }
 
 variable "subnetwork_self_link" {
   description = "Self-link of the subnet used by the private GPU trainer and Cloud NAT."
   type        = string
-  default     = "projects/feralspotter-f9e51/regions/us-east4/subnetworks/default"
+  default     = "projects/cs-poc-kewg0kffb7uwobgq1rex2af/regions/us-east4/subnetworks/default"
   nullable    = false
 }
 
@@ -96,7 +96,7 @@ variable "service_account_id" {
 variable "dvc_smoke_service_account_email" {
   description = "Existing Compute Engine service account used by the disposable DVC smoke VM; Terraform never creates it."
   type        = string
-  default     = "446310107443-compute@developer.gserviceaccount.com"
+  default     = "feral-vision-ai@cs-poc-kewg0kffb7uwobgq1rex2af.iam.gserviceaccount.com"
   nullable    = false
 }
 

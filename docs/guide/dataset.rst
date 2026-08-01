@@ -56,6 +56,17 @@ It then writes ``dataset-artifact.json`` and a version-aware
 Dataset Artifact catalog; the tracker pins the object generations without
 copying the data into the application repository.
 
+Acquisition and publication are intentionally separate. Any source-specific
+acquisition image writes ``/workspace/payload/images/``,
+``/workspace/payload/annotations/``, and ``/workspace/dataset-input.json``.
+The input metadata identifies the dataset and source and carries a provenance
+object. A minimal source-agnostic DVC image validates that shared workspace,
+uploads the payload and manifest with the Cloud Storage Python client, and then
+creates the version-aware tracker. This lets a new download source reuse the
+publication boundary without adding its dependencies to the DVC image.
+The COCO acquisition image includes FiftyOne and its MongoDB runtime; those
+source-specific dependencies are not part of the publisher.
+
 Training is given a reviewed Dataset Artifact, not a mutable bucket prefix. Its
 tracker pins the Cloud Storage object generations used by the run. A later data
 version is adopted through a reviewed tracker update (optionally with
