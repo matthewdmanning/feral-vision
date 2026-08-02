@@ -1,0 +1,61 @@
+name: Quality checks
+
+on:
+  workflow_call:
+    inputs:
+      python-versions:
+        description: JSON list of Python versions to validate.
+        required: false
+        type: string
+        default: '["3.12"]'
+      coverage:
+        description: Upload a coverage report for the caller.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ${{ fromJSON(inputs.python-versions) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Install development dependencies
+        run: uv sync --group dev
+      - name: Lint and format changed Python files
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE_SHA" ]; then
+            BASE_SHA="$(git merge-base HEAD origin/main)"
+          fi
+          mapfile -t PYTHON_FILES < <(git diff --name-only "$BASE_SHA...HEAD" -- '*.py')
+          if [ "${#PYTHON_FILES[@]}" -eq 0 ]; then
+            echo "No changed Python files to lint or format-check."
+            exit 0
+          fi
+          uv run ruff check "${PYTHON_FILES[@]}" --output-format=github
+          uv run ruff format --check "${PYTHON_FILES[@]}"
+      - name: Static type analysis
+        run: uv run mypy src
+      - name: Tests
+        run: >-
+          uv run python -m pytest -m "not gpu and not slow" -q --tb=short
+          ${{ inputs.coverage && '--cov=src --cov-report=xml' || '' }}
+      - name: Upload coverage report
+        if: inputs.coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7
