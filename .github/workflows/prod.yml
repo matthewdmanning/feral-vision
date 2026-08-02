@@ -1,8 +1,7 @@
-name: Prod
+name: Prod (manual)
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: prod-main
@@ -13,32 +12,15 @@ permissions:
 
 jobs:
   quality:
-    name: Quality gate
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.13"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          enable-cache: true
-      - name: Style check
-        run: |
-          uv sync --group dev
-          uv run ruff check . --output-format=github
-          uv run ruff format --check .
-      - name: Install deps
-        run: uv sync --group dev
-      - name: Static type analysis
-        run: uv run mypy src
-      - name: Tests
-        run: uv run python -m pytest -m "not gpu and not slow" -q --tb=short
+    name: Quality checks
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/quality.yml
+    with:
+      python-versions: '["3.12", "3.13"]'
 
   build:
     name: Distribution build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: quality
     steps:
@@ -60,7 +42,7 @@ jobs:
     name: Version bump and release
     runs-on: ubuntu-latest
     needs: [quality, build]
-    if: false  # TODO: re-enable when ready to auto-release on merge to main
+    if: false  # TODO: re-enable when ready for manual production releases
     permissions:
       contents: write
     steps:
