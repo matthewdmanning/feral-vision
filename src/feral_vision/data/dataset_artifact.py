@@ -11,21 +11,25 @@ from typing import Any, Protocol
 class _Blob(Protocol):
     """Use this protocol to type the Cloud Storage blob publisher dependency."""
 
-    def upload_from_filename(self, filename: str, **kwargs: object) -> None: ...
+    def upload_from_filename(self, filename: str, **kwargs: object) -> None:
+        pass
 
-    def upload_from_string(self, data: str, **kwargs: object) -> None: ...
+    def upload_from_string(self, data: str, **kwargs: object) -> None:
+        pass
 
 
 class _Bucket(Protocol):
     """Use this protocol to type the Cloud Storage bucket publisher dependency."""
 
-    def blob(self, blob_name: str) -> _Blob: ...
+    def blob(self, blob_name: str) -> _Blob:
+        pass
 
 
 class StorageClient(Protocol):
     """Use this protocol to type the Cloud Storage client publisher dependency."""
 
-    def bucket(self, bucket_name: str) -> _Bucket: ...
+    def bucket(self, bucket_name: str) -> _Bucket:
+        pass
 
 
 def load_dataset_input(input_path: Path) -> dict[str, Any]:

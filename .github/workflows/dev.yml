@@ -22,3 +22,5 @@ jobs:
     uses: ./.github/workflows/quality.yml
     with:
       python-versions: '["3.12"]'
+      base-sha: ${{ github.event.before }}
+      head-sha: ${{ github.sha }}
