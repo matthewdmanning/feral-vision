@@ -1,7 +1,8 @@
-# Data and model tests
+# Data and ingestion
 
-Use this guide when changing data ingestion, datasets, model tests, or model
-examples.
+Use this guide when changing data ingestion, dataset contracts, or dataset
+publication. Data operation entrypoints live in
+[`scripts/data/`](../../scripts/data/).
 
 Every dataset root has `images/` and `annotations/` directories. Annotation
 files match image stems: masks use `.png` or `.jpg`, YOLO boxes use `.txt`, and
@@ -22,11 +23,11 @@ bucket whose object versions DVC pins. It has Object Versioning, dataset-specifi
 lifecycle rules, and least-privilege access for the Cloud Build publisher,
 DVC-repository automation, and training readers. General storage must not be a
 source for a Dataset Artifact. Keep Terraform state in a dedicated protected
-operations bucket with Cloud Build staging when their prefixes have separate,
-least-privilege IAM conditions; both remain separate from datasets.
+operations bucket or fine-grained permissions; a dedicated bucket is preferred
+for security but is not required.
 
 Cloud Build publishes prepared data to a versioned Cloud Storage prefix. The
-dataset bucket is the Dataset Artifact catalog: each artifact prefix contains a
+dataset bucket is the Dataset Artifact catalog: each dataset prefix contains a
 `payload/` directory, `dataset-artifact.json`, and a version-aware
 `dataset-artifact.dvc` tracker. Cloud Build creates that tracker with
 `dvc import-url --no-download --version-aware` after publishing the payload.
