@@ -188,6 +188,7 @@ class Trainer:
         loss_fn: LossFn,
         cfg: Any,
         scheduler: Any | None = None,
+        task_adapter: Any | None = None,
         device: torch.device | str | None = None,
         best_model_path: str | Path = DEFAULT_BEST_MODEL_PATH,
     ) -> None:
@@ -199,6 +200,7 @@ class Trainer:
         self.loss_fn = loss_fn
         self.cfg = cfg
         self.scheduler = scheduler
+        self.task_adapter = task_adapter
         self.best_model_path = Path(best_model_path)
         self.best_loss = INITIAL_BEST_LOSS
         self._input_example: torch.Tensor | None = None
@@ -210,15 +212,20 @@ class Trainer:
         self.model.train()
         running_loss = 0.0
         batch_count = 0
-        for inputs, targets in dataloader:
-            inputs = self._move(inputs)
-            targets = self._move(targets)
-            if self._input_example is None:
-                self._input_example = inputs.detach().cpu()
-
+        for batch in dataloader:
             self.optimizer.zero_grad()
-            outputs = self.model(inputs)
-            loss = self.loss_fn(outputs, targets)
+            if self.task_adapter is None:
+                inputs, targets = batch
+                inputs = self._move(inputs)
+                targets = self._move(targets)
+                if self._input_example is None:
+                    self._input_example = inputs.detach().cpu()
+                outputs = self.model(inputs)
+                loss = self.loss_fn(outputs, targets)
+            else:
+                loss, _ = self.task_adapter.loss(self.model, batch)
+                if self._input_example is None:
+                    self._input_example = batch.images.detach().cpu()
             loss.backward()
             self.optimizer.step()
 
@@ -401,6 +408,7 @@ def build_trainer(cfg: Any) -> Trainer:
     optimizer = build_optimizer(model.parameters(), cfg.train.optim)
     scheduler = build_scheduler(optimizer, cfg.train.scheduler)
     loss_fn = build_loss_fn(cfg.train.loss_fn)
+    task_adapter = build_task_adapter(cfg)
 
     return Trainer(
         model=model,
@@ -408,8 +416,21 @@ def build_trainer(cfg: Any) -> Trainer:
         loss_fn=loss_fn,
         cfg=cfg,
         scheduler=scheduler,
+        task_adapter=task_adapter,
         device=cfg.train.device,
     )
+
+
+def build_task_adapter(cfg: Any) -> Any | None:
+    """Use this function when a Run Recipe selects task-specific trainer behavior."""
+    task = getattr(cfg.train, "task", "generic")
+    if task == "generic":
+        return None
+    if task == "detection":
+        from feral_vision.training.task_adapters import DetectionTaskAdapter
+
+        return DetectionTaskAdapter(num_classes=int(cfg.train.num_classes))
+    raise ValueError(f"unsupported training task {task!r}")
 
 
 def main() -> None:
@@ -433,13 +454,19 @@ def main() -> None:
         train_dataset = AnnotationDataset(
             DatasetSource(to_absolute_path(cfg.data.root))
         )
+        trainer = build_trainer(cfg)
         train_loader = DataLoader(
             train_dataset,
             batch_size=cfg.train.batch_size,
             shuffle=True,
             num_workers=cfg.train.num_workers,
+            collate_fn=(
+                trainer.task_adapter.collate
+                if trainer.task_adapter is not None
+                else None
+            ),
         )
-        build_trainer(cfg).fit(train_loader)
+        trainer.fit(train_loader)
 
     _run()
 

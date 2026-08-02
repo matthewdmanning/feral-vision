@@ -11,6 +11,7 @@ from feral_vision.data.augmentations import (
     AugmentationSweep,
     _instantiate_transform,
     build_augmentation_previews,
+    materialize_detection_variant,
     write_augmentation_preview_html,
 )
 
@@ -232,3 +233,38 @@ def test_write_augmentation_preview_html_creates_structured_grid_assets(
     assert len(tuple(index.parent.glob("assets/page-1/*.png"))) == 10
     rendered_source = cv2.imread(str(index.parent / "assets/page-1/source.png"))
     np.testing.assert_array_equal(rendered_source, source_image)
+
+
+# ---------------------------------------------------------------------------
+# Materialized detection variants
+# ---------------------------------------------------------------------------
+
+
+def test_materialize_detection_variant_cotransforms_yolo_boxes_without_duplication(
+    tmp_path,
+) -> None:
+    """One source image produces one flipped image with its class-labelled box transformed."""
+    import cv2
+
+    source = tmp_path / "raw"
+    (source / "images").mkdir(parents=True)
+    (source / "annotations").mkdir()
+    image = np.zeros((8, 10, 3), dtype=np.uint8)
+    assert cv2.imwrite(str(source / "images" / "animal.jpg"), image)
+    (source / "annotations" / "animal.txt").write_text("3 0.25 0.5 0.2 0.4\n")
+
+    destination = materialize_detection_variant(
+        source,
+        tmp_path / "augmented",
+        [{"name": "HorizontalFlip", "p": 1.0}],
+        seed=7,
+    )
+
+    assert sorted(path.name for path in (destination / "images").iterdir()) == [
+        "animal.jpg"
+    ]
+    class_id, *box = (destination / "annotations" / "animal.txt").read_text().split()
+    assert class_id == "3"
+    np.testing.assert_allclose(
+        [float(value) for value in box], [0.75, 0.5, 0.2, 0.4], rtol=1e-5
+    )

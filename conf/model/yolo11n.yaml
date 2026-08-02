@@ -1,0 +1,11 @@
+# Downloaded through the Ultralytics source adapter; used as a PyTorch nn.Module.
+defaults:
+  - model_schema
+  - _self_
+
+architecture:
+  source: ultralytics
+  id: yolo11n.pt
+  location: ultralytics.YOLO
+
+weights: null

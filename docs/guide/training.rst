@@ -18,6 +18,8 @@ logged to MLflow when a run is active. When artifact logging succeeds, only the
 selected best model artifact is recorded; intermediate checkpoints remain local
 and are not retained in the artifact store.
 
+Recipe-specific operating contracts are maintained in ``docs/runs/``.
+
 Cloud training
 --------------
 

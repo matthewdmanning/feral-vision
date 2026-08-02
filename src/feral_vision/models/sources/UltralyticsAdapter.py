@@ -12,6 +12,8 @@ Task strings returned by model.task and their CVTask mapping:
 
 from __future__ import annotations
 
+from typing import Any
+
 from omegaconf import DictConfig
 from torch import nn
 
@@ -36,7 +38,15 @@ class UltralyticsAdapter(SourceAdapter):
         from ultralytics import YOLO
 
         log.info("loading ultralytics model %s", cfg.architecture.id)
-        model = YOLO(cfg.architecture.id).model
+        loaded_model: Any = YOLO(cfg.architecture.id).model
+        num_classes = getattr(cfg.architecture, "num_classes", None)
+        if num_classes is not None and loaded_model.model[-1].nc != num_classes:
+            from ultralytics.nn.tasks import DetectionModel
+
+            model = DetectionModel(loaded_model.yaml, nc=num_classes, verbose=False)
+            model.load(loaded_model, verbose=False)
+        else:
+            model = loaded_model
         assert isinstance(model, nn.Module), f"expected nn.Module, got {type(model)}"
         return model
 

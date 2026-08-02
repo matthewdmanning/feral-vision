@@ -12,7 +12,7 @@ a constant from :mod:`feral_vision.constants` (no magic numbers).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from omegaconf import MISSING
 
@@ -37,6 +37,7 @@ class SourceConfig:
     source: str = MISSING  # discriminator: hf_hub | torch_hub | ultralytics | ...
     id: str = MISSING  # hub repo ID, model name, dotted class path, or URL
     location: str = MISSING  # stable source location or dotted local class path
+    num_classes: Optional[int] = None  # task head size when the source supports it
 
 
 @dataclass
@@ -220,6 +221,8 @@ class TrainConfig:
     batch_size: int = 32
     num_workers: int = 0
     device: str = "cuda"
+    task: str = "generic"
+    num_classes: int = 0
     optim: OptimConfig = MISSING
     loss_fn: LossFnConfig = MISSING
     scheduler: SchedulerConfig = MISSING
@@ -245,9 +248,10 @@ class TrackingConfig:
 @dataclass
 class AugmentationConfig:
     name: str = MISSING
-    # Ordered list of registered augmentation op names; the chain builder maps
-    # each name to a concrete Augmentation (params sourced from constants).
-    ops: list[str] = field(default_factory=list)
+    seed: int = 0
+    # Ordered Albumentations operation mappings. Each mapping declares its
+    # class name and operation-specific parameters, including probability.
+    ops: list[dict[str, Any]] = field(default_factory=list)
 
 
 # --- Deployment -------------------------------------------------------------
