@@ -1,0 +1,13 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file=deploy/Dockerfile.coco-acquire
+      - --tag=${_COCO_ACQUISITION_IMAGE}
+      - .
+
+images:
+  - ${_COCO_ACQUISITION_IMAGE}
+
+substitutions:
+  _COCO_ACQUISITION_IMAGE: us-east4-docker.pkg.dev/cs-poc-kewg0kffb7uwobgq1rex2af/feral-docker/feral-vision-coco-acquire

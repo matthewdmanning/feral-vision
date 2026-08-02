@@ -37,6 +37,15 @@ publishes the base image to Artifact Registry for remote build caching and then
 publishes the final training image. [`stage_model.sh`](../../scripts/cloud/stage_model.sh)
 stages an eligible pretrained model to Cloud Storage.
 
+[`deploy/cloudbuild.dvc-image.yaml`](../../deploy/cloudbuild.dvc-image.yaml)
+builds the independent Python-only DVC publication image. It contains DVC-GCS
+and the Cloud Storage Python client, but not PyTorch/CUDA, FiftyOne, `uv`, or
+the Cloud Storage CLI. `deploy/cloudbuild.coco-acquire-image.yaml` builds the
+separate COCO/FiftyOne/MongoDB acquisition image. Source-specific acquisition and
+source-agnostic publication run as distinct steps in
+`deploy/cloudbuild.prepare.yaml`; do not use a PyTorch/CUDA training image for
+either responsibility.
+
 The Terraform startup restores a previously archived bounded COCO export from
 Cloud Storage to VM SSD before downloading. A first run downloads the subset;
 normal shutdown archives it for later VM runs.
@@ -49,10 +58,11 @@ normal shutdown archives it for later VM runs.
 Cloud Storage
 ├── dataset-only bucket                 # one bucket per environment
 │   └── datasets/<dataset>/<artifact>/
-│       ├── images/
-│       ├── annotations/
+│       ├── payload/
+│       │   ├── images/
+│       │   └── annotations/
 │       ├── dataset-artifact.json
-│       └── <dataset>.dvc
+│       └── dataset-artifact.dvc
 └── general storage
     ├── Terraform state + Cloud Build staging
     ├── MLflow artifacts
@@ -67,19 +77,32 @@ source for a Dataset Artifact. Keep Terraform state in a dedicated protected
 operations bucket with Cloud Build staging when their prefixes have separate,
 least-privilege IAM conditions; both remain separate from datasets.
 
-Cloud Build publishes prepared data to a versioned Cloud Storage prefix. A
-separate DVC-scoped Git repository owns Dataset Artifact pointers and manifests;
-it contains no dataset blobs and is independent of the application repository.
-After publication, its automation creates or updates a tracker with
-`dvc import-url --version-aware` against the GCS prefix and commits the tracker
-and `dataset-artifact.json` together through the data repository's review
-workflow. Object Versioning must be enabled on the source bucket before this
-workflow is used.
+Cloud Build publishes prepared data to a versioned Cloud Storage prefix. The
+dataset bucket is the Dataset Artifact catalog: each artifact prefix contains a
+`payload/` directory, `dataset-artifact.json`, and a version-aware
+`dataset-artifact.dvc` tracker. Cloud Build creates that tracker with
+`dvc import-url --no-download --version-aware` after publishing the payload.
+The temporary no-SCM DVC workspace exists only to generate the tracker; it does
+not store dataset blobs or become a training dependency. Object Versioning must
+be enabled on the source bucket before this workflow is used.
 
-The resulting tracker records the GCS object generations. Training consumes the
-selected tracker and staged data, and records the data-repository commit and
-tracker digest in its run manifest and MLflow lineage. A new cloud version is
-adopted only by updating that tracker (for a selected version, `dvc update --rev`
-may be used) and reviewing the corresponding data-repository change. Do not use
-`dvc add --no-scm` in the application build as a substitute for this provenance
-boundary, and do not run DVC in the training container.
+The tracker records the GCS object generations. Training consumes the selected
+tracker and staged data, and records the tracker digest in its run manifest and
+MLflow lineage. A new cloud version is adopted only by publishing a new artifact
+prefix or updating its tracker with `dvc update --rev`; do not overwrite a
+reviewed training input in place. Do not run DVC in the training container.
+
+### Acquisition-publication contract
+
+An acquisition image is source-specific. It writes a canonical
+`/workspace/payload/images/` and `/workspace/payload/annotations/` layout plus
+`/workspace/dataset-input.json`. The input metadata must name the dataset and
+source and include a provenance object. The DVC publication image validates this
+shared workspace, uploads the payload and manifest through the Cloud Storage
+Python client, then generates and uploads the version-aware tracker.
+
+Every publication supplies immutable acquisition and DVC image digests and a
+new, reviewed `DATASET_ARTIFACT_PREFIX`. The prefix is intentionally a required
+build substitution: a rerun must choose a new artifact prefix rather than
+overwrite a training input. New download sources implement this workspace
+contract without adding their download libraries to the DVC image.

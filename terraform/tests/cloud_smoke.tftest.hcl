@@ -53,6 +53,11 @@ run "bucket_configuration" {
   }
 
   assert {
+    condition     = google_compute_instance.dvc_smoke.boot_disk[0].initialize_params[0].image == "projects/debian-cloud/global/images/debian-13-trixie-v20260727"
+    error_message = "The CPU DVC smoke VM must use the pinned Debian 13 Trixie image."
+  }
+
+  assert {
     condition     = strcontains(google_compute_instance.gpu_trainer.metadata_startup_script, "export_coco_to_vm.sh")
     error_message = "Terraform must stage COCO through the VM startup script."
   }

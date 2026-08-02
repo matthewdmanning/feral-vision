@@ -37,6 +37,10 @@ generated Pages artifact from `main`.
 Never integrate a CLI into a function or Python script. Only shell scripts may
 provide command-line interfaces.
 
+When an operator must make a change, provide the exact complete CLI command in
+a standalone `bash` code block. Commands must be directly copy/paste compatible
+and include every required flag and value.
+
 ## Code quality
 
 Before adding project code for a capability, check whether a library already in

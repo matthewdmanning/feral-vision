@@ -1,0 +1,19 @@
+FROM python:3.12-slim-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg && \
+    curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc \
+      | gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" \
+      > /etc/apt/sources.list.d/mongodb-org-8.0.list && \
+    apt-get update && apt-get install -y --no-install-recommends mongodb-org-server && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --no-cache-dir "fiftyone>=1.0"
+
+WORKDIR /opt/feral-vision
+COPY scripts/pull_coco_train2017.py scripts/pull_coco_train2017.py
+COPY scripts/cloud/acquire_coco_subset.sh /usr/local/bin/acquire-coco-subset
+
+RUN chmod 0755 /usr/local/bin/acquire-coco-subset
+
+ENTRYPOINT ["/usr/local/bin/acquire-coco-subset"]

@@ -1,0 +1,15 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-dvc-image
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        docker build --tag "${_DVC_IMAGE}" --file=deploy/Dockerfile.dvc .
+        docker push "${_DVC_IMAGE}"
+
+images:
+  - ${_DVC_IMAGE}
+
+options:
+  logging: CLOUD_LOGGING_ONLY

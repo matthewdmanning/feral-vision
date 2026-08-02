@@ -5,7 +5,7 @@ defaults:
   - _self_
 
 substitutions:
-  _GCP_PROJECT: feralspotter-f9e51
+  _GCP_PROJECT: cs-poc-kewg0kffb7uwobgq1rex2af
   _REGION: us-east4
   _REPO: feral-docker
   _BASE_IMAGE_NAME: feral-vision

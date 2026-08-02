@@ -27,3 +27,7 @@ steps:
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_BASE_IMAGE_NAME}:${_IMAGE_TAG}
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE_NAME}:${_IMAGE_TAG}
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET

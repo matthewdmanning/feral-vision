@@ -148,7 +148,7 @@ resource "google_compute_instance" "dvc_smoke" {
 
   boot_disk {
     initialize_params {
-      image = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
+      image = "projects/debian-cloud/global/images/debian-13-trixie-v20260727"
       size  = 20
       type  = "pd-standard"
     }

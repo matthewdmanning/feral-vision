@@ -10,7 +10,9 @@ model. For cloud-service configuration, identity, and lifecycle, use
 `data/fetch.py` selects a source that resolves to the canonical
 `<root>/images/`, `<root>/annotations/` layout. Raw data lives in cloud storage
 or is an always-available standard dataset. DVC owns Datasets and their Dataset
-Artifacts. Cloud training follows this path:
+Artifacts. For cloud-prepared data, the version-aware DVC tracker and
+`dataset-artifact.json` are stored beside the payload in the dataset bucket.
+Cloud training follows this path:
 
 `raw data -> GPU VM SSD -> Docker -> augmentation -> training`
 
@@ -29,6 +31,14 @@ Docker is the workload boundary between VM SSD staging and augmentation/training
 It runs the CUDA-enabled training image with the staged data mounted at `/data`;
 it does not fetch data or run DVC. Terraform and operational scripts own the
 resulting cloud workload; manual Docker launches are not a supported flow.
+
+Cloud dataset preparation has two CPU-only images sharing the source-less Cloud
+Build workspace. A source-specific acquisition image writes `payload/images/`,
+`payload/annotations/`, and `dataset-input.json`; the minimal DVC publication
+image validates and publishes that contract. The DVC image contains only Python,
+DVC-GCS, and the Cloud Storage Python client. It must not inherit PyTorch/CUDA,
+FiftyOne, MongoDB, `uv`, or the Cloud Storage CLI from the training or acquisition
+images.
 
 ## Annotation and dataset loading
 
