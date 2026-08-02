@@ -18,6 +18,18 @@ _Avoid_: Dataset Artifact, data path
 A collection derived from a Dataset by subsetting its images, augmenting them, or both.
 _Avoid_: Configuration variant
 
+**Bounding-box Detection**:
+A computer-vision task in which each annotated object is represented by a
+class-labelled rectangular bounding box. The selected model architecture and
+training data annotations must both support this task.
+_Avoid_: Instance segmentation, image classification
+
+**Annotation-aware Augmentation**:
+The derivation of a Dataset Variant that applies each geometric image transform
+to its corresponding annotations, preserving their alignment with the output
+image.
+_Avoid_: Image-only augmentation, unchanged bounding boxes
+
 **Data Lineage**:
 The structured provenance connection recorded by a Dataset Artifact between a Dataset, its source Datasets, and any applicable operations.
 _Avoid_: Data path, run recipe
@@ -31,6 +43,24 @@ _Avoid_: Run recipe, configuration group
 **Run Recipe**:
 The complete, non-redundant collection of Configuration Variants required to run model training or inference, with no required concern missing.
 _Avoid_: Configuration variant, source defaults
+
+**Task Adapter**:
+A training-layer boundary that translates a task's Dataset annotations and model
+outputs into batches, target assignment, and loss values while leaving the
+generic training loop responsible for optimization, tracking, and checkpoints.
+_Avoid_: Model Source Adapter, augmentation pipeline
+
+**Native Target Assignment**:
+The prediction-to-ground-truth matching policy supplied by a downloaded
+detector. A Task Adapter preserves this policy when applying a project-selected
+loss, unless a Run Recipe explicitly selects a different matching contract.
+_Avoid_: Loss function, annotation-aware augmentation
+
+**Fine-tuning Baseline**:
+The first training-script execution for a scope that starts from downloaded
+pretrained weights, uses a selected Dataset Variant, and establishes the
+reference Run Record and Model Artifact for later comparison.
+_Avoid_: From-scratch baseline, downloaded model
 
 ## Cloud deployment
 
@@ -90,6 +120,12 @@ _Avoid_: Model Zoo, Registered Model
 **Model Zoo**:
 An online collection of many different models, some with pre-trained weights.
 _Avoid_: Model Family, MLflow Model Registry
+
+**Model Source Adapter**:
+The boundary that obtains an external model definition and exposes it as a
+PyTorch ``nn.Module`` to Feral Vision. The source is distinct from the model's
+training task and from the resulting Model Artifact.
+_Avoid_: Model architecture, Model Artifact
 
 **Model Lifecycle Management**:
 The practice of registering, evaluating, promoting, and retiring Model Versions while preserving registry provenance, the metadata needed to load and run them, and experiment-tracked references to the exact DVC Dataset Artifacts used for training.
