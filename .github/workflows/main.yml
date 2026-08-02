@@ -1,12 +1,11 @@
-name: Dev (feature push)
+name: Main PR
 
 on:
-  # Validate direct pushes to development branches.
-  push:
-    branches-ignore: [main]
+  pull_request:
+    branches: [main]
 
 concurrency:
-  group: dev-${{ github.event.pull_request.number || github.ref }}
+  group: main-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
@@ -22,3 +21,12 @@ jobs:
     uses: ./.github/workflows/quality.yml
     with:
       python-versions: '["3.12"]'
+      coverage: true
+
+  security:
+    name: Security checks
+    uses: ./.github/workflows/security.yml
+
+  training-smoke:
+    name: Training smoke
+    uses: ./.github/workflows/train.yml
