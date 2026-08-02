@@ -13,6 +13,7 @@ import yaml
 # Local imports
 from feral_vision.data.dataset_artifact import (
     publish_dataset_artifact,
+    publish_dataset_variant_artifact,
     publish_dataset_tracker,
 )
 
@@ -120,7 +121,9 @@ def test_publish_dataset_artifact_uploads_payload_and_manifest(
         "datasets/example/v1/payload/annotations/instances.json",
         "datasets/example/v1/dataset-artifact.json",
     }
-    manifest = json.loads(bucket.blobs["datasets/example/v1/dataset-artifact.json"].text)
+    manifest = json.loads(
+        bucket.blobs["datasets/example/v1/dataset-artifact.json"].text
+    )
     assert manifest == {
         "schema_version": 1,
         "kind": "Dataset Artifact",
@@ -130,7 +133,9 @@ def test_publish_dataset_artifact_uploads_payload_and_manifest(
         "payload": {"path": "payload", "file_count": 2},
         "dvc_tracker": {"path": "dataset-artifact.dvc"},
     }
-    assert all(blob.options["if_generation_match"] == 0 for blob in bucket.blobs.values())
+    assert all(
+        blob.options["if_generation_match"] == 0 for blob in bucket.blobs.values()
+    )
 
 
 def test_publish_dataset_artifact_rejects_missing_provenance(
@@ -183,6 +188,34 @@ def test_publish_dataset_tracker_uploads_generated_dvc_file(tmp_path: Path) -> N
     assert client.bucket("dataset-bucket").blobs[
         "datasets/example/v1/dataset-artifact.dvc"
     ].filename == str(tracker_path)
+
+
+def test_publish_dataset_variant_records_immutable_source_artifact_lineage(
+    payload_root: Path, input_path: Path
+) -> None:
+    """Use this test to preserve raw-to-augmented Artifact lineage in the published manifest."""
+    client = _MemoryStorageClient()
+
+    publish_dataset_variant_artifact(
+        client,
+        bucket_name="dataset-bucket",
+        artifact_prefix="datasets/example/augmented-v1",
+        payload_root=payload_root,
+        input_path=input_path,
+        source_artifact_uri="gs://dataset-bucket/datasets/example/raw-v1",
+        augmentation_recipe={"seed": 7, "ops": [{"name": "HorizontalFlip", "p": 0.5}]},
+    )
+
+    manifest = json.loads(
+        client.bucket("dataset-bucket")
+        .blobs["datasets/example/augmented-v1/dataset-artifact.json"]
+        .text
+    )
+    assert manifest["kind"] == "Dataset Variant Artifact"
+    assert manifest["provenance"]["source_dataset_artifact"] == (
+        "gs://dataset-bucket/datasets/example/raw-v1"
+    )
+    assert manifest["provenance"]["operation"] == "annotation-aware augmentation"
 
 
 def test_preparation_config_requires_separate_immutable_images() -> None:

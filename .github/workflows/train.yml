@@ -1,21 +1,8 @@
 name: Training smoke
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "conf/**"
-      - "src/feral_vision/training/**"
-      - "src/feral_vision/models/**"
-      - "tests/test_trainer.py"
-      - "pyproject.toml"
-      - "uv.lock"
-      - ".github/workflows/train.yml"
+  workflow_call:
   workflow_dispatch:
-
-concurrency:
-  group: training-smoke-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 
 permissions:
   contents: read

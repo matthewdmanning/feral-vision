@@ -9,11 +9,12 @@
 # the `language` matrix defined below to confirm you have the correct set of
 # supported CodeQL languages.
 #
-name: "CodeQL Advanced"
+name: "CodeQL (feature push / main PR)"
 
 on:
+  # Scan direct pushes to development branches and proposed changes targeting main.
   push:
-    branches: [ "main" ]
+    branches-ignore: [ "main" ]
   pull_request:
     branches: [ "main" ]
   schedule:
