@@ -7,5 +7,5 @@ replacement; the planned configuration cutover retires legacy defaults only
 after the replacement recipes are validated. A required architecture `location`
 must always be non-null so a model remains reproducible.
 
-All tunables belong in `conf/`. Consult the co-located configuration README for
-the concern's purpose and use a complete named Run Recipe for reproducible work.
+Consult the co-located configuration README for the concern's purpose and use a
+complete named Run Recipe for reproducible work.
