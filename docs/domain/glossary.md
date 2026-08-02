@@ -5,9 +5,10 @@ Feral Vision trains and evaluates computer-vision models from reproducible datas
 ## Data lineage
 
 **Dataset Artifact**:
-A file that stores structured metadata for a Dataset's provenance, including its
-source Datasets and applicable operations, parameters, image order, and random
-seeds. It is Data Lineage.
+A file for which structured metadata about a Dataset's provenance can be stored
+in DVC pipeline files such as `dvc.yaml`, including source Datasets and
+applicable operations, parameters, image order, and random seeds. It is Data
+Lineage.
 _Avoid_: Dataset, model artifact
 
 **Dataset**:
@@ -15,7 +16,8 @@ A collection of images, with or without annotations. Its adjective specifies its
 _Avoid_: Dataset Artifact, data path
 
 **Dataset Variant**:
-A collection derived from a Dataset by subsetting its images, augmenting them, or both.
+A modification of a Dataset through subsetting, combination, and/or
+augmentation. A Dataset Variant is itself a Dataset.
 _Avoid_: Configuration variant
 
 **Bounding-box Detection**:

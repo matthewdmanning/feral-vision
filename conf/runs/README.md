@@ -7,8 +7,8 @@ Run Recipes are the only complete Hydra entrypoints.
 ## Selection
 
 Use `baseline` for canonical local training and `smoke` for CPU-safe validation.
-Select a different concern with a Hydra override, for example
-`model=yolo11n_seg`.
+Recipe-specific operating contracts live in `docs/runs/`. Select a different
+concern with a Hydra override, for example `model=yolo11n_seg`.
 
 ## Ownership
 

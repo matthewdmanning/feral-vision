@@ -1,0 +1,12 @@
+# Immutable annotation-aware Dataset Variant Artifact staged for training.
+defaults:
+  - data_schema
+  - _self_
+
+source: coco
+root: data/augmented/coco-animals-v1
+image_size: 640
+val_split: 0.2
+class_similarity:
+  - 1.0
+  - 0.8

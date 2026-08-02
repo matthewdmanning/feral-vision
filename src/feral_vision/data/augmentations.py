@@ -557,6 +557,71 @@ def run_augment_stage(cfg: DictConfig) -> None:
         log.info("wrote %s", dest)
 
 
+def materialize_detection_variant(
+    source_root: str | Path,
+    destination_root: str | Path,
+    operations: Sequence[Mapping[str, Any]],
+    *,
+    seed: int,
+) -> Path:
+    """Use this function to materialize one annotation-aware YOLO variant per source image."""
+    import cv2
+
+    source_root = Path(source_root)
+    destination_root = Path(destination_root)
+    source_images = source_root / "images"
+    source_annotations = source_root / "annotations"
+    if not source_images.is_dir() or not source_annotations.is_dir():
+        raise ValueError("detection source must contain images/ and annotations/")
+
+    output_images = destination_root / "images"
+    output_annotations = destination_root / "annotations"
+    output_images.mkdir(parents=True, exist_ok=True)
+    output_annotations.mkdir(parents=True, exist_ok=True)
+    pipeline = A.Compose(
+        [_instantiate_transform(operation) for operation in operations],
+        bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"]),
+    )
+
+    for index, image_path in enumerate(_image_paths(source_images)):
+        annotation_path = source_annotations / f"{image_path.stem}.txt"
+        if not annotation_path.is_file():
+            raise FileNotFoundError(
+                f"no annotation matching image stem {image_path.stem!r}"
+            )
+        image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if image is None:
+            raise FileNotFoundError(f"could not read image {image_path}")
+        rows = [
+            line.split() for line in annotation_path.read_text().splitlines() if line
+        ]
+        class_labels = [int(row[0]) for row in rows]
+        boxes = [[float(value) for value in row[1:5]] for row in rows]
+        pipeline.set_random_seed(seed + index)
+        augmented = pipeline(image=image, bboxes=boxes, class_labels=class_labels)
+
+        relative_image = image_path.relative_to(source_images)
+        destination_image = output_images / relative_image
+        destination_image.parent.mkdir(parents=True, exist_ok=True)
+        if not cv2.imwrite(str(destination_image), augmented["image"]):
+            raise OSError(f"could not write augmented image {destination_image}")
+        destination_annotation = output_annotations / relative_image.with_suffix(".txt")
+        destination_annotation.parent.mkdir(parents=True, exist_ok=True)
+        destination_annotation.write_text(
+            "".join(
+                f"{int(class_id)} {' '.join(f'{coordinate:.6f}' for coordinate in box)}\n"
+                for class_id, box in zip(
+                    augmented["class_labels"], augmented["bboxes"], strict=True
+                )
+            )
+        )
+
+    names_path = source_annotations / "names.yaml"
+    if names_path.is_file():
+        (output_annotations / "names.yaml").write_bytes(names_path.read_bytes())
+    return destination_root
+
+
 @hydra.main(version_base=None, config_path="../../../conf", config_name="runs/baseline")
 def main(cfg: DictConfig) -> None:
     register_configs()

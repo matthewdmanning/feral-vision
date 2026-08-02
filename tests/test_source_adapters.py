@@ -32,11 +32,17 @@ def _make_cfg(
     model_id: str,
     *,
     weights: dict | None = None,
+    num_classes: int | None = None,
 ):
     """Build a ModelConfig-shaped adapter input without composing the full recipe."""
     return OmegaConf.create(
         {
-            "architecture": {"source": source, "id": model_id, "location": "hub"},
+            "architecture": {
+                "source": source,
+                "id": model_id,
+                "location": "hub",
+                "num_classes": num_classes,
+            },
             "weights": weights,
         }
     )
@@ -180,6 +186,50 @@ def test_ultralytics_adapter_returns_module_and_preserves_task_metadata(monkeypa
 
     assert properties.model_outputs == [CVTask.SEG_INSTANCE]
     assert metadata == {"task": "segment", "nc": 2, "names": {0: "cat", 1: "dog"}}
+
+
+def test_ultralytics_adapter_rebuilds_detection_head_for_configured_taxonomy(
+    monkeypatch,
+):
+    pretrained = SimpleNamespace(
+        model=[SimpleNamespace(nc=80)],
+        yaml={"nc": 80},
+    )
+    fine_tuning_model = nn.Identity()
+    loaded_weights: list[object] = []
+    fine_tuning_model.load = lambda weights, verbose: loaded_weights.append(weights)  # type: ignore[attr-defined]
+
+    class _YOLO:
+        """Minimal offline facade returning an eighty-class pretrained detector."""
+
+        def __init__(self, model_id: str) -> None:
+            self.model = pretrained
+
+    def _detection_model(yaml, *, nc: int, verbose: bool) -> nn.Module:
+        """Use this function to capture construction of the configured fine-tuning head."""
+        assert yaml == {"nc": 80}
+        assert nc == 10
+        assert verbose is False
+        return fine_tuning_model
+
+    ultralytics = ModuleType("ultralytics")
+    ultralytics.__path__ = []  # type: ignore[attr-defined]
+    ultralytics.YOLO = _YOLO  # type: ignore[attr-defined]
+    ultralytics_nn = ModuleType("ultralytics.nn")
+    ultralytics_nn.__path__ = []  # type: ignore[attr-defined]
+    ultralytics_tasks = ModuleType("ultralytics.nn.tasks")
+    ultralytics_tasks.DetectionModel = _detection_model  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "ultralytics", ultralytics)
+    monkeypatch.setitem(sys.modules, "ultralytics.nn", ultralytics_nn)
+    monkeypatch.setitem(sys.modules, "ultralytics.nn.tasks", ultralytics_tasks)
+
+    assert (
+        UltralyticsAdapter().fetch(
+            _make_cfg("ultralytics", "yolo11n.pt", num_classes=10)
+        )
+        is fine_tuning_model
+    )
+    assert loaded_weights == [pretrained]
 
 
 # ---------------------------------------------------------------------------
