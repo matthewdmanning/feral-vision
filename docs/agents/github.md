@@ -71,16 +71,7 @@ worktree or branch without explicit approval.
 - Prefer structured connector operations in Codex; use `gh` when connector
   coverage is insufficient.
 
-## Wayfinding operations
+## Wayfinding and triage
 
-- A map is an issue labeled `wayfinder:map`.
-- Child tickets use GitHub sub-issues where available, falling back to a task
-  list and `Part of #<map>`.
-- Child labels use `wayfinder:<type>`: `research`, `prototype`, `grilling`, or
-  `task`.
-- Use native issue dependencies where available; otherwise add
-  `Blocked by: #<number>` to the child body.
-- The frontier is the first unassigned open child without open blockers.
-- Claim a ticket by assigning it to the driving developer.
-- Resolve it by commenting with the answer, closing it, and adding a short
-  linked decision to the map.
+Use [Wayfinding](wayfinding.md) for maps and child tickets. Use
+[Triage Labels](triage-labels.md) for issue workflow labels and their meanings.
