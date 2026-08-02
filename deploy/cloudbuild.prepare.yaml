@@ -1,0 +1,23 @@
+steps:
+  - name: ${_ACQUISITION_IMAGE}
+    id: acquire-coco-into-workspace
+    env:
+      - COCO_MAX_EPOCHS=${_COCO_MAX_EPOCHS}
+      - COCO_BATCH_SIZE=${_COCO_BATCH_SIZE}
+      - DATASET_PAYLOAD_DIR=/workspace/payload
+      - DATASET_INPUT_PATH=/workspace/dataset-input.json
+  - name: ${_DVC_IMAGE}
+    id: publish-dataset-artifact
+    env:
+      - GCS_BUCKET=${_GCS_BUCKET}
+      - DATASET_ARTIFACT_PREFIX=${_DATASET_ARTIFACT_PREFIX}
+      - DATASET_PAYLOAD_DIR=/workspace/payload
+      - DATASET_INPUT_PATH=/workspace/dataset-input.json
+
+substitutions:
+  _GCS_BUCKET: mobile-training-images
+  _COCO_MAX_EPOCHS: "50"
+  _COCO_BATCH_SIZE: "16"
+
+options:
+  logging: CLOUD_LOGGING_ONLY

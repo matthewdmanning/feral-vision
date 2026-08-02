@@ -13,6 +13,16 @@ on:
         required: false
         type: boolean
         default: false
+      base-sha:
+        description: Base commit used to find changed Python files.
+        required: false
+        type: string
+        default: ""
+      head-sha:
+        description: Head commit used to find changed Python files.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -35,11 +45,13 @@ jobs:
         run: uv sync --group dev
       - name: Lint and format changed Python files
         run: |
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          if [ -z "$BASE_SHA" ]; then
-            BASE_SHA="$(git merge-base HEAD origin/main)"
+          BASE_SHA="${{ inputs.base-sha }}"
+          HEAD_SHA="${{ inputs.head-sha }}"
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            BASE_SHA="HEAD^"
+            HEAD_SHA="HEAD"
           fi
-          mapfile -t PYTHON_FILES < <(git diff --name-only "$BASE_SHA...HEAD" -- '*.py')
+          mapfile -t PYTHON_FILES < <(git diff --name-only "$BASE_SHA...$HEAD_SHA" -- '*.py')
           if [ "${#PYTHON_FILES[@]}" -eq 0 ]; then
             echo "No changed Python files to lint or format-check."
             exit 0
