@@ -14,8 +14,8 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           python-version: "3.12"
           enable-cache: true
@@ -37,7 +37,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Detect builder
         id: detect
         run: |
@@ -48,7 +48,7 @@ jobs:
           else
             echo "builder=none" >> "$GITHUB_OUTPUT"
           fi
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         if: steps.detect.outputs.builder != 'none'
         with:
           python-version: "3.12"
@@ -78,13 +78,13 @@ jobs:
           fi
       - name: Upload pages artifact
         if: steps.detect.outputs.builder != 'none'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: ${{ steps.docs-path.outputs.path }}
       - name: Deploy to GitHub Pages
         if: steps.detect.outputs.builder != 'none'
         id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
 
   sbom:
     name: Software bill of materials
@@ -92,9 +92,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           format: spdx-json
           output-file: sbom.spdx.json
