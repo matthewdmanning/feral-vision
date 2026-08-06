@@ -34,6 +34,11 @@ output, not an operator input: the training container uses host networking to
 reach it, and startup exports the completed Run Record to the configured
 MLflow artifact prefix before the disposable VM is removed.
 
+The complete run-specific topology, ownership boundaries, and evidence
+requirements are recorded in [ADR 0002](../adr/0002-first-augmented-detection-cloud-run.md).
+The MLflow artifact prefix is dedicated operational storage; it must not be a
+dataset prefix in `gs://mobile-training-images/`.
+
 ## Cloud verification status
 
 You must NOT declare that a workflow status of "has not been validated" as a

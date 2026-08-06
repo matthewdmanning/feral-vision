@@ -38,10 +38,16 @@ shared cloud-smoke configuration.
 
 Before planning, supply a digest-pinned image built with
 `deploy/runs/detection_first_run_augmented/cloudbuild.training-image.yaml`, the immutable Dataset
-Variant Artifact prefix, the existing VM service-account email, and an HTTPS
-MLflow artifact prefix. The run startup creates a local MLflow server on the
+Variant Artifact prefix, the existing VM service-account email, and a writable
+non-dataset GCS MLflow artifact prefix. The run startup creates a local MLflow server on the
 VM loopback interface, stages the payload, manifest, and tracker to SSD, then
 starts `runs/detection_first_run_augmented`; it never runs augmentation or DVC.
+
+The MLflow tracking URI is not an input: startup creates
+`http://127.0.0.1:5000` on the disposable VM and the training container reaches
+it through host networking. The artifact prefix is dedicated non-dataset GCS
+storage. See [ADR 0002](../adr/0002-first-augmented-detection-cloud-run.md) for
+the complete topology and ownership boundaries.
 
 `scripts/cloud/prepare_detection_first_run_augmented.sh` creates an immutable
 run manifest and a fresh plan, but never applies it. After review,
