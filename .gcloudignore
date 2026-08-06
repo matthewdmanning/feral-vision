@@ -9,3 +9,8 @@ docs/_build/
 .dvc/tmp/
 data/
 .vscode/
+
+!src/
+!src/feral_vision/
+!src/feral_vision/data/
+!src/feral_vision/data/dataset_artifact.py

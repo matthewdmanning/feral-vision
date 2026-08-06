@@ -26,16 +26,16 @@ variable "region" {
 }
 
 variable "zone" {
-  description = "Compute Engine zone for this detection run."
+  description = "Compute Engine zone for this first augmented detection run."
   type        = string
   default     = "us-east4-c"
   nullable    = false
 }
 
 variable "vm_name" {
-  description = "Unique Compute Engine instance name for the detection run."
+  description = "Unique Compute Engine instance name for the first augmented detection run."
   type        = string
-  default     = "feral-vision-detection-trainer"
+  default     = "feral-vision-detection-first-run-augmented-trainer"
   nullable    = false
 }
 
@@ -81,7 +81,7 @@ variable "service_account_email" {
 }
 
 variable "training_image" {
-  description = "Digest-pinned detection training image built from deploy/runs/detection."
+  description = "Digest-pinned first augmented detection image built from deploy/runs/detection_first_run_augmented."
   type        = string
   nullable    = false
 
@@ -125,7 +125,7 @@ variable "labels" {
   type        = map(string)
   default = {
     managed-by = "terraform"
-    purpose    = "detection-training"
+    purpose    = "detection-first-run-augmented-training"
   }
   nullable = false
 }

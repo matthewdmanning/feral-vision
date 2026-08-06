@@ -11,4 +11,4 @@ RUN apt-get update && apt-get install -y gnupg curl apt-transport-https ca-certi
     apt-get update && apt-get install -y google-cloud-cli && \
     rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["bash", "/opt/feral-vision/scripts/runs/detection_container_train.sh"]
+ENTRYPOINT ["bash", "/opt/feral-vision/scripts/runs/detection_first_run_augmented_container_train.sh"]

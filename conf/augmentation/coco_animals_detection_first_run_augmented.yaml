@@ -1,0 +1,18 @@
+# Annotation-aware augmentation for the first two-class COCO-animal baseline.
+defaults:
+  - augmentation_schema
+  - _self_
+
+name: coco_animals_detection_first_run_augmented
+seed: 42
+ops:
+  - name: Downscale
+    scale_range: [0.25, 0.5]
+    p: 0.4
+  - name: RandomBrightnessContrast
+    brightness_limit: [-0.35, -0.1]
+    contrast_limit: [-0.3, 0]
+    p: 0.7
+  - name: GaussianBlur
+    blur_limit: [3, 7]
+    p: 0.4

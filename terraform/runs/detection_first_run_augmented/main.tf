@@ -9,7 +9,7 @@ data "google_storage_bucket" "dataset" {
   project = var.bucket_project_id
 }
 
-resource "google_compute_instance" "detection_trainer" {
+resource "google_compute_instance" "detection_first_run_augmented_trainer" {
   name         = var.vm_name
   machine_type = var.machine_type
   zone         = var.zone

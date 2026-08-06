@@ -10,6 +10,6 @@ test -f "${TRAIN_DATA}/dataset-artifact.json"
 test -f "${TRAIN_DATA}/dataset-artifact.dvc"
 
 exec uv run --no-sync python -m feral_vision.training.trainer \
-  --config-name runs/detection \
+  --config-name runs/detection_first_run_augmented \
   "data.root=${TRAIN_DATA}" \
   "tracking.tracking_uri=${MLFLOW_TRACKING_URI}"

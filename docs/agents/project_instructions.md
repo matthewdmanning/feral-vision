@@ -15,6 +15,23 @@ otherwise, do not load unrelated guidance merely because it is listed here.
 > `google-cloud-recipe-auth` skills. Remove this note once the required
 > capabilities are available in the standard agent environment.
 
+## Cloud identity selection
+
+Cloud identity is part of the workflow contract. Before inspecting IAM,
+granting a role, or submitting a cloud workflow, read the canonical cloud
+handoff and the workflow configuration to identify its intended execution
+service account. Confirm that the submitted configuration explicitly selects
+that account. A default account observed in a failed build is diagnostic
+evidence, not permission to substitute it for the documented identity or grant
+it roles. Do not select a service account from partial IAM bindings; verify the
+complete workflow contract first, then inspect or grant roles only for the
+selected identity.
+
+For the regional Dataset Artifact publisher, the selected identity is
+`feral-vision-ai@cs-poc-kewg0kffb7uwobgq1rex2af.iam.gserviceaccount.com`.
+Its Artifact Registry role is `roles/artifactregistry.createOnPushWriter`,
+which supplies both repository creation-on-push and artifact upload.
+
 ## Tool ownership
 
 - **DVC** owns raw, processed, and augmented Datasets and Dataset Artifacts. It

@@ -39,7 +39,23 @@ The tracker records the GCS object generations. Training consumes the selected
 tracker and staged data, and records the tracker digest in its run manifest and
 MLflow lineage. A new cloud version is adopted only by publishing a new artifact
 prefix or updating its tracker with `dvc update --rev`; do not overwrite a
-reviewed training input in place. Do not run DVC in the training container.
+reviewed training input in place. DVC publication may run in the training
+container when that workflow needs it.
+
+## Hydra-selected data workflow
+
+Use this single conditional workflow for the Hydra-specified data inputs:
+
+1. Download the Hydra-specified source files only after checking that they do
+   not already exist on the server.
+2. Publish and version the raw Dataset Artifact only after checking that it
+   does not already exist.
+3. If augmentation is specified, create and publish the Dataset Variant only
+   after checking that it has not already been created.
+4. Train from the Hydra-specified training files: either the raw source files
+   or the augmented files.
+
+Completed steps are inputs to later steps and must not be repeated.
 
 ## Acquisition-publication contract
 

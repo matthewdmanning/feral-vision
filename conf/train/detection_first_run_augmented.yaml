@@ -1,4 +1,4 @@
-# Detection-specific trainer parameters for the first COCO-animal baseline.
+# Detection-specific trainer parameters for the first augmented COCO-animal run.
 defaults:
   - train_schema
   - optim: adam
