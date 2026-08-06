@@ -5,37 +5,83 @@ set -euo pipefail
 readonly training_image="${training_image}"
 readonly dataset_uri="gs://${bucket_name}/${dataset_artifact_prefix}"
 readonly dataset_mount_dir="${dataset_mount_dir}"
-readonly mlflow_tracking_uri="${mlflow_tracking_uri}"
+readonly data_reference="${data_reference}"
+readonly mlflow_artifact_prefix="${mlflow_artifact_prefix}"
+readonly mlflow_tracking_uri="http://127.0.0.1:5000"
+readonly run_id="${run_id}"
 
-mkdir -p "$dataset_mount_dir"
+readonly host_dataset_mount_dir="/mnt/disks/ssd$${dataset_mount_dir#/data}"
+readonly host_run_manifest="/mnt/disks/ssd/run-manifest.json"
+mkdir -p "$host_dataset_mount_dir"
 docker pull "$training_image"
 
 docker run --rm \
   -v /mnt/disks/ssd:/data \
   --entrypoint gcloud \
-  "$training_image" storage rsync --recursive --checksums-only \
+  "$training_image" storage rsync --recursive --checksums-only --quiet \
   "$dataset_uri/payload" "$dataset_mount_dir"
 
 for metadata_file in dataset-artifact.json dataset-artifact.dvc; do
   docker run --rm \
     -v /mnt/disks/ssd:/data \
     --entrypoint gcloud \
-    "$training_image" storage cp "$dataset_uri/$metadata_file" "$dataset_mount_dir/$metadata_file"
+    "$training_image" storage cp "$dataset_uri/$metadata_file" "$dataset_mount_dir/$metadata_file" --quiet
 done
 
-test -d "$dataset_mount_dir/images"
-test -d "$dataset_mount_dir/annotations"
-test -f "$dataset_mount_dir/dataset-artifact.json"
-test -f "$dataset_mount_dir/dataset-artifact.dvc"
+cat > "$host_run_manifest" <<EOF
+{"image":"$training_image","data_reference":"$data_reference","run_recipe":"detection_first_run_augmented","runtime_overrides":["data.root=$dataset_mount_dir"],"mlflow_tracking_uri":"$mlflow_tracking_uri","mlflow_artifact_prefix":"$mlflow_artifact_prefix","gcp_project":"${project_id}","gce_zone":"${zone}","gce_instance":"${vm_name}","data_root":"$dataset_mount_dir","expected_python":"3.12","expected_cuda":"12"}
+EOF
+
+docker run --rm \
+  -v /mnt/disks/ssd:/data \
+  --entrypoint bash \
+  "$training_image" -ceu "test -d '$dataset_mount_dir/images'; test -d '$dataset_mount_dir/annotations'; test -f '$dataset_mount_dir/dataset-artifact.json'; test -f '$dataset_mount_dir/dataset-artifact.dvc'"
 
 docker run --rm \
   --gpus all \
   --entrypoint python \
   "$training_image" -c 'import torch; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))'
 
+docker run --detach --name feral-vision-mlflow --network host \
+  -v /mnt/disks/ssd:/data \
+  "$training_image" bash -ceu "exec uv run --no-sync mlflow server --host 127.0.0.1 --port 5000 --backend-store-uri sqlite:////data/mlflow.db --default-artifact-root '$mlflow_artifact_prefix'"
+
+until docker run --rm --network host --entrypoint python "$training_image" -c "from urllib.request import urlopen; assert urlopen('$mlflow_tracking_uri/health', timeout=5).status == 200"; do
+  sleep 2
+done
+
+set +e
+docker run --rm \
+  -v /mnt/disks/ssd:/data \
+  --entrypoint python \
+  "$training_image" /opt/feral-vision/scripts/cloud_preflight.py \
+  --manifest /data/run-manifest.json \
+  --output /data/cloud-preflight.json
+preflight_status=$?
+set -e
+
+docker run --rm \
+  -v /mnt/disks/ssd:/data \
+  --entrypoint gcloud \
+  "$training_image" storage cp /data/cloud-preflight.json "$mlflow_artifact_prefix/detection_first_run_augmented/$run_id/cloud-preflight.json" --quiet
+
+if [ "$preflight_status" -ne 0 ]; then
+  exit "$preflight_status"
+fi
+
 docker run --rm \
   --gpus all \
+  --network host \
   -v /mnt/disks/ssd:/data \
   -e TRAIN_DATA="$dataset_mount_dir" \
+  -e FERAL_VISION_RUN_ID="$run_id" \
   -e MLFLOW_TRACKING_URI="$mlflow_tracking_uri" \
   "$training_image"
+
+docker run --rm --network host \
+  -v /mnt/disks/ssd:/data \
+  -e FERAL_VISION_RUN_ID="$run_id" \
+  --entrypoint python \
+  "$training_image" -c 'import json, os; from pathlib import Path; from mlflow import MlflowClient; client = MlflowClient(tracking_uri="http://127.0.0.1:5000"); experiment = client.get_experiment_by_name("feral-vision"); runs = client.search_runs([experiment.experiment_id], filter_string=f"tags.feral_vision_run_id = '\''{os.environ[\"FERAL_VISION_RUN_ID\"]}'\''", order_by=["attributes.start_time DESC"], max_results=1); run = runs[0]; Path("/data/training-evidence.json").write_text(json.dumps({"mlflow_run_id": run.info.run_id, "status": run.info.status, "artifact_uri": run.info.artifact_uri, "metrics": run.data.metrics, "params": run.data.params, "tags": run.data.tags}, indent=2, sort_keys=True) + "\n")'
+
+docker run --rm -v /mnt/disks/ssd:/data --entrypoint gcloud "$training_image" storage cp /data/training-evidence.json "$mlflow_artifact_prefix/detection_first_run_augmented/$run_id/training-evidence.json" --quiet

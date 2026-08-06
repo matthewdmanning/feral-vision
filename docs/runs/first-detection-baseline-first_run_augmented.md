@@ -23,6 +23,12 @@ The Variant Artifact manifest records the raw Artifact URI plus the exact
 augmentation seed and operations. Training must use the Variant Artifact only;
 it must never fall back to the raw Artifact.
 
+For this baseline, COCO annotations are converted upstream in the Variant
+materialization build to YOLO detection boxes. The binary class contract is
+stable: `cat` is class `0`; every other selected COCO animal is class `1`
+(`not-cat`). Invalid or fully out-of-frame COCO boxes are excluded. The raw
+Dataset Artifact remains unchanged.
+
 ## Cloud run configuration
 
 The isolated cloud configuration is under `terraform/runs/detection_first_run_augmented/`. It
@@ -33,8 +39,14 @@ shared cloud-smoke configuration.
 Before planning, supply a digest-pinned image built with
 `deploy/runs/detection_first_run_augmented/cloudbuild.training-image.yaml`, the immutable Dataset
 Variant Artifact prefix, the existing VM service-account email, and an HTTPS
-MLflow tracking endpoint. The run startup stages the payload, manifest, and
-tracker to SSD, then starts `runs/detection_first_run_augmented`; it never runs augmentation or DVC.
+MLflow artifact prefix. The run startup creates a local MLflow server on the
+VM loopback interface, stages the payload, manifest, and tracker to SSD, then
+starts `runs/detection_first_run_augmented`; it never runs augmentation or DVC.
+
+`scripts/cloud/prepare_detection_first_run_augmented.sh` creates an immutable
+run manifest and a fresh plan, but never applies it. After review,
+`scripts/runs/detection_first_run_augmented.sh` applies precisely that plan and
+collects the startup, preflight, and MLflow Run Record evidence.
 
 ## Validation status
 

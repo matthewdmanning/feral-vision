@@ -52,7 +52,12 @@ resource "google_compute_instance" "detection_first_run_augmented_trainer" {
     bucket_name             = data.google_storage_bucket.dataset.name
     dataset_artifact_prefix = var.dataset_artifact_prefix
     dataset_mount_dir       = var.dataset_mount_dir
-    mlflow_tracking_uri     = var.mlflow_tracking_uri
+    data_reference          = var.data_reference
+    mlflow_artifact_prefix  = var.mlflow_artifact_prefix
+    project_id              = var.project_id
+    run_id                  = var.run_id
     training_image          = var.training_image
+    vm_name                 = var.vm_name
+    zone                    = var.zone
   })
 }

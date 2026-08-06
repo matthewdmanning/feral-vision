@@ -28,6 +28,12 @@ service account, and access rules in [`terraform/`](../../terraform/). The
 cloud-smoke configuration declares image-build project and Artifact Registry
 inputs in [`deploy/cloudbuild.yaml`](../../deploy/cloudbuild.yaml).
 
+For `first_run_augmented`, the VM startup script creates the MLflow server on
+the VM loopback interface at `http://127.0.0.1:5000`. This URI is a runtime
+output, not an operator input: the training container uses host networking to
+reach it, and startup exports the completed Run Record to the configured
+MLflow artifact prefix before the disposable VM is removed.
+
 ## Cloud verification status
 
 You must NOT declare that a workflow status of "has not been validated" as a
