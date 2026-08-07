@@ -1,34 +1,31 @@
 # Program Flow
 
-## Data flow
+## Cloud Flows
 
-`Dataset -> optional modification -> Dataset Variant -> DVC Registry`
+### Data Sets
 
-[Data and ingestion](data.md)
+`Data Source Adapter -> request -> optional transform or format -> Dataset`
 
-## Model sourcing
+`Dataset -> modification -> Dataset Variant`
 
-`Model source -> Model Source Adapter -> model (+ optional weights)`
+`Dataset or Dataset Variant -> Publish -> DVC Registry`
 
-[Model API](../api/models.rst) · [Coding standards](coding-standards.md)
+A Dataset Variant is a subclass of Dataset.
 
-## Cloud runs (training)
+### Models
 
-`Terraform -> provisioned Cloud Resources`
+`Model Source Adapter -> model (+ optional weights)`
 
-`immutable Dataset Variant + digest-pinned model image + Run Recipe + Cloud Resources -> Cloud Training Run -> Run Record + Model Artifact`
+### Cloud Builds
 
-DVC owns Dataset Artifacts and their lineage. Hydra owns Run Recipe selection.
+`Run Recipe (model + data) -> Cloud Run -> MLflow metrics and SQLite entries + best-performing model weights (Model Artifact) in Google Storage`
+
+The data and model flows are independent and may be composed in the same Cloud
+Run.
+Cloud Operations provides the execution environment; it does not change the
+pipeline's meaning.
+
+DVC owns Dataset Artifacts and their lineage. Hydra owns Run Recipes.
 Terraform owns Cloud Resource lifecycle. MLflow owns training evidence; it does
 not receive raw dataset directories. [Cloud Operations](cloudops.md) ·
-[Configuration](configuration.md) · [Training guide](../guide/training.rst) ·
-[Tracking and Data Integration](tracking.md)
-
-## First augmented detection baseline
-
-The concrete `first_run_augmented` topology is a Cloud Build materialization
-followed by a planned private GPU VM run. The VM hosts the run-local MLflow
-endpoint, exports durable evidence to a non-dataset artifact prefix, and is
-disposable. The detailed decision, identity boundary, and acceptance evidence
-are in [ADR 0002](../adr/0002-first-augmented-detection-cloud-run.md); the
-operator inputs and commands are in the [run contract](../runs/first-detection-baseline-first_run_augmented.md).
+[Configuration](configuration.md) · [Training guide](../guide/training.rst)

@@ -2,6 +2,11 @@
 
 Feral Vision trains and evaluates computer-vision models from reproducible datasets and run recipes. Its language separates data identity, run configuration, experiment evidence, and model lifecycle so that each trained result can be traced without conflating the systems that store those concerns.
 
+Terms may be described with other language. When an agent assumes two terms are
+interchangeable, it must state that assumption. A high-confidence mapping does
+not block a non-critical change; a low-confidence terminology change requires
+user confirmation.
+
 ## Data lineage
 
 **Dataset Artifact**:
@@ -15,10 +20,19 @@ _Avoid_: Dataset, model artifact
 A collection of images, with or without annotations. Its adjective specifies its contents and provenance.
 _Avoid_: Dataset Artifact, data path
 
+**Data Source Adapter**:
+The boundary that turns a request for a data source into a Dataset, applying
+any required transformation or format conversion.
+_Avoid_: Model Source Adapter, Dataset Variant
+
 **Dataset Variant**:
 A modification of a Dataset through subsetting, combination, and/or
 augmentation. A Dataset Variant is itself a Dataset.
 _Avoid_: Configuration variant
+
+**Publish**:
+Make a Dataset or Dataset Variant available through the DVC Registry.
+_Avoid_: Assuming that acquisition and publishing are interchangeable
 
 **Bounding-box Detection**:
 A computer-vision task in which each annotated object is represented by a
@@ -43,7 +57,10 @@ A single named configuration file containing the key-value choices for one confi
 _Avoid_: Run recipe, configuration group
 
 **Run Recipe**:
-The complete, non-redundant collection of Configuration Variants required to run model training or inference, with no required concern missing.
+One file that names the model and data that will be used for training,
+including the complete, non-redundant Configuration Variants required to run.
+When either is absent from its Google Storage bucket, its specific workflow
+will acquire it.
 _Avoid_: Configuration variant, source defaults
 
 **Task Adapter**:
@@ -90,8 +107,12 @@ The durable evidence about a training-script execution, including its resolved p
 _Avoid_: Run recipe, log file
 
 **Model Artifact**:
-A product of a training-script execution.
-_Avoid_: Dataset artifact, checkpoint
+An internal implementation term for a product of a training-script execution.
+Agents may use this phrase to search source and documentation. In human-facing
+communication, name the concrete output first, such as MLflow metrics, SQLite
+entries, or best-performing model weights saved to the designated Google
+Storage bucket.
+_Avoid_: Dataset Artifact, checkpoint, human-facing status language
 
 **Checkpoint**:
 Model weights emitted by the training framework at a specific epoch during a training-script execution, usually as a `.pt` file. It does not explicitly contain the model architecture or configuration.
