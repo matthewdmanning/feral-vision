@@ -1,21 +1,31 @@
 # Program Flow
 
-## Data Flow
+## Cloud Flows
 
-`Dataset -> optional modification -> DVC Registry`
+### Data Sets
 
-[Data and ingestion](data.md)
+`Data Source Adapter -> request -> optional transform or format -> Dataset`
 
-## Model Sourcing
+`Dataset -> modification -> Dataset Variant`
 
-`Model source -> Model Source Adapter -> model (+ optional weights)`
+`Dataset or Dataset Variant -> Publish -> DVC Registry`
 
-[Model API](../api/models.rst) · [Coding standards](coding-standards.md)
+A Dataset Variant is a subclass of Dataset.
 
-## Cloud Runs (Training)
+### Models
 
-`Terraform -> provisioned Cloud Resources`
+`Model Source Adapter -> model (+ optional weights)`
 
-`Data + Model + Run Recipe + provisioned Cloud Resources -> Cloud Training Run -> Run Record + Model Artifact`
+### Cloud Builds
 
-[Cloud Operations](cloudops.md) · [Configuration](configuration.md) · [Training guide](../guide/training.rst) · [Tracking and Data Integration](tracking.md)
+`Run Recipe (model + data) -> Cloud Run -> MLflow metrics and SQLite entries + best-performing model weights (Model Artifact) in Google Storage`
+
+The data and model flows are independent and may be composed in the same Cloud
+Run.
+Cloud Operations provides the execution environment; it does not change the
+pipeline's meaning.
+
+DVC owns Dataset Artifacts and their lineage. Hydra owns Run Recipes.
+Terraform owns Cloud Resource lifecycle. MLflow owns training evidence; it does
+not receive raw dataset directories. [Cloud Operations](cloudops.md) ·
+[Configuration](configuration.md) · [Training guide](../guide/training.rst)

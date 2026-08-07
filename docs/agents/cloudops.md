@@ -22,7 +22,8 @@ Terraform owns the configuration and lifecycle of cloud services: storage,
 registries, compute, network, identity, and access policy. Terraform files can
 declare or reference buckets and other cloud resources; the Terraform program
 creates or requisitions the resources described by those files. Operational
-scripts use provisioned services without recreating or redefining them.
+scripts use durable provisioned services without recreating or redefining them,
+and invoke the Terraform-configured VM lifecycle for each Cloud Run.
 
 Keep Terraform state in a dedicated protected operations bucket or under
 fine-grained permissions; a dedicated bucket is preferred for security but is
@@ -34,11 +35,41 @@ operations require authenticated Application Default Credentials or an
 equivalent `gcloud` identity with the required IAM roles; `GCP_API_KEY` is not
 an identity credential for Terraform or Compute Engine.
 
-The current GCP example declares storage, the private GPU VM, Cloud NAT egress,
-service account, and access rules in [`terraform/`](../../terraform/). The
-cloud-smoke configuration declares image-build project and Artifact Registry
-inputs in [`deploy/cloudbuild.yaml`](../../deploy/cloudbuild.yaml).
+## Cloud runs
 
+Data and model flows are independent and may be composed in the same Cloud Run.
+The script uses the local Run Recipe to resolve their configured folder and
+model names.
+
+A Run Recipe names the model and data that will be used for training. When
+either is absent from its Google Storage bucket, the script will acquire it
+through its specific workflow.
+
+Before creating or publishing a Dataset, the script will check the remote
+folder named by the configured Dataset for `dataset-artifact.json`. A missing
+local discovery result or explicit local path is not evidence that the resource
+is absent and will not block the Cloud Run.
+
+Before creating a Model Source Adapter, the script will check for the model
+named by the Run Recipe.
+
+For every Cloud Run, the script will create a new VM, execute the assigned
+Cloud Run, save its outputs while the VM is active, and remove the VM once no
+Cloud Run is running. VM creation is not completion, and no idle VM is
+retained.
+
+MLflow creates its SQLite database at runtime on the VM. At the end of the
+Cloud Run, the startup script uploads that database, the other MLflow outputs,
+and best-performing model weights (Model Artifact) to the operational Google
+Storage bucket, not the data-specific bucket, before the VM is removed.
+
+## Cloud verification status
+
+You must NOT declare that a workflow status of "has not been validated" as a
+blocker. It is a self blocking action. The correct action is to suggest or
+initiate verification first by referencing the documentation, then by running
+the workflow on the appropriate service. After referencing the documentation,
+change the state to "Ready for Cloud Verification".
 ## Image builds and operations
 
 [`scripts/cloud/run.py`](../../scripts/cloud/run.py) dispatches image `build`

@@ -16,6 +16,13 @@ Read only the sections and linked documents required for the task you were
 instructed to perform. Follow an explicitly required reference before acting;
 otherwise, do not load unrelated guidance merely because it is listed here.
 
+## Dated documents
+
+When a folder contains documents named `YYYY-MM-DD-{activity_name}`, read only
+the document with the most recent date. Naming determines recency; all earlier
+dated documents in that folder are stale unless the user explicitly asks for
+one.
+
 ## Tool ownership
 
 - **DVC** owns raw, processed, and augmented Datasets and Dataset Artifacts. It
@@ -40,7 +47,6 @@ otherwise, do not load unrelated guidance merely because it is listed here.
 | data ingestion, dataset contracts, or publication | [Data and ingestion](data.md) | Dataset layout, publication, lineage, and acquisition contracts. Tool ownership: **DVC**. |
 | Hydra or model configuration | [Configuration](configuration.md) | Recipe and reproducibility requirements. Tool ownership: **Hydra**. |
 | locating a Hydra configuration concern | [Hydra configuration index](hydra.md) | Configuration README index by concern. Tool ownership: **Hydra**. |
-| DVC, Hydra, MLflow, or model-registry integration | [Tracking and data integration](tracking.md) | Raw-data logging boundary for tracking integrations. Tool ownership: **DVC**, **Hydra**, **MLflow**, **MLflow Model Registry**, and **Scripts and source code**. |
 | Terraform, cloud identity, image builds, VMs, or cloud training | [Cloud Operations](cloudops.md) | Cloud-service ownership, credentials, and operational entrypoints. Tool ownership: **Scripts and source code**. |
 | Git, GitHub Issues, pull requests, or publishing | [GitHub workflow](github.md) | Session checks, authentication, issue tracking, and branch/PR hygiene. |
 | domain terminology or an architectural decision | [Domain Docs](domain.md) | Glossary and ADR discovery. |
