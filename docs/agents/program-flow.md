@@ -10,7 +10,7 @@
 
 `Model source -> Model Source Adapter -> model (+ optional weights)`
 
-[Model API](../api/models.rst) · [Implementation workflow](implementation.md)
+[Model API](../api/models.rst) · [Coding standards](coding-standards.md)
 
 ## Cloud Runs (Training)
 

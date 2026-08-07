@@ -9,6 +9,13 @@ boundaries and publication layout. Cloud operation entrypoints live in
 [`scripts/cloud/`](../../scripts/cloud/). Scripts for kicking off cloud runs live
 in [`scripts/runs/`](../../scripts/runs/).
 
+## Required capabilities
+
+Before resuming Google Cloud delivery work, install or load the official Google
+Cloud capability set: the `google-cloud-storage` Codex plugin plus the `gcloud`
+and `google-cloud-recipe-auth` skills. Remove this note once the required
+capabilities are available in the standard agent environment.
+
 ## Cloud resources
 
 Terraform owns the configuration and lifecycle of cloud services: storage,
@@ -16,6 +23,10 @@ registries, compute, network, identity, and access policy. Terraform files can
 declare or reference buckets and other cloud resources; the Terraform program
 creates or requisitions the resources described by those files. Operational
 scripts use provisioned services without recreating or redefining them.
+
+Keep Terraform state in a dedicated protected operations bucket or under
+fine-grained permissions; a dedicated bucket is preferred for security but is
+not required.
 
 Load `.env.local` only into the invoking process. Do not print, commit, or copy
 its values into Terraform variables, plans, logs, or documentation. Cloud

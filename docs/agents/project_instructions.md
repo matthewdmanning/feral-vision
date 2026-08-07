@@ -16,12 +16,6 @@ Read only the sections and linked documents required for the task you were
 instructed to perform. Follow an explicitly required reference before acting;
 otherwise, do not load unrelated guidance merely because it is listed here.
 
-> **Temporary cloud startup note.** Before resuming Google Cloud delivery work,
-> install or load the official Google Cloud capability set: the
-> `google-cloud-storage` Codex plugin plus the `gcloud` and
-> `google-cloud-recipe-auth` skills. Remove this note once the required
-> capabilities are available in the standard agent environment.
-
 ## Tool ownership
 
 - **DVC** owns raw, processed, and augmented Datasets and Dataset Artifacts. It
@@ -37,14 +31,18 @@ otherwise, do not load unrelated guidance merely because it is listed here.
 
 ## Agent references
 
-- [Program flow](program-flow.md) - architecture and integration
-- [Implementation workflow](implementation.md) — code and authored-documentation
-  changes
-- [Test writing and review](testing.md) — required skill and availability gate
-- [Data and ingestion](data.md) — dataset layout and publication
-- [Configuration](configuration.md) — Hydra recipes and model reproducibility
-- [Hydra configuration index](hydra.md) — configuration README files by concern
-- [Tracking and data integration](tracking.md) — tracking-specific operational
-  guidance
-- [GitHub workflow](github.md) — repository session checks, GitHub
-  authentication, issue tracking, and branch, commit, and pull-request hygiene
+| If your task involves… | Reference | File contents |
+| --- | --- | --- |
+| project architecture or system integration | [Program flow](program-flow.md) | Data, model-sourcing, and cloud-training flows. Tool ownership: **DVC**. |
+| project code or authored documentation | [Coding standards](coding-standards.md) | Documentation and code-quality requirements. |
+| user-facing chat, summaries, or an operator command | [User interactions](user-interactions.md) | User-facing collaboration preferences, CLI ownership, and copy-pasteable command requirements. Tool ownership: **Scripts and source code**. |
+| Python tests, fixtures, or model examples | [Test writing and review](testing.md) | Required testing skill and test-data rules. |
+| data ingestion, dataset contracts, or publication | [Data and ingestion](data.md) | Dataset layout, publication, lineage, and acquisition contracts. Tool ownership: **DVC**. |
+| Hydra or model configuration | [Configuration](configuration.md) | Recipe and reproducibility requirements. Tool ownership: **Hydra**. |
+| locating a Hydra configuration concern | [Hydra configuration index](hydra.md) | Configuration README index by concern. Tool ownership: **Hydra**. |
+| DVC, Hydra, MLflow, or model-registry integration | [Tracking and data integration](tracking.md) | Raw-data logging boundary for tracking integrations. Tool ownership: **DVC**, **Hydra**, **MLflow**, **MLflow Model Registry**, and **Scripts and source code**. |
+| Terraform, cloud identity, image builds, VMs, or cloud training | [Cloud Operations](cloudops.md) | Cloud-service ownership, credentials, and operational entrypoints. Tool ownership: **Scripts and source code**. |
+| Git, GitHub Issues, pull requests, or publishing | [GitHub workflow](github.md) | Session checks, authentication, issue tracking, and branch/PR hygiene. |
+| domain terminology or an architectural decision | [Domain Docs](domain.md) | Glossary and ADR discovery. |
+| a Wayfinder map or child ticket | [Wayfinding](wayfinding.md) | Map, child-ticket, dependency, and frontier conventions. |
+| GitHub issue workflow labels | [Triage Labels](triage-labels.md) | Canonical labels and their meanings. |

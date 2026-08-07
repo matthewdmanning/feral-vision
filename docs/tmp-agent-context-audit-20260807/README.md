@@ -113,7 +113,7 @@ artifact type.
 | Task | Minimal first read | Follow only when needed |
 | --- | --- | --- |
 | Any task using project terms | Relevant glossary section | Relevant ADR |
-| Code or authored docs | `implementation.md` | Domain, data, cloud, config guides affected |
+| Code or authored docs | `coding-standards.md` | Domain, data, cloud, config guides affected |
 | Python tests | `testing.md` | `data.md` only for dataset fixtures |
 | Data ingestion/publication | `data.md` | `cloudops.md`, selected ADR/run contract |
 | Hydra/model configuration | `configuration.md` | `hydra.md` concern index |
