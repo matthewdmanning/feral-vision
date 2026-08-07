@@ -22,9 +22,7 @@ The dataset-only bucket is the source for Dataset Artifacts and is the only
 bucket whose object versions DVC pins. It has Object Versioning, dataset-specific
 lifecycle rules, and least-privilege access for the Cloud Build publisher,
 DVC-repository automation, and training readers. General storage must not be a
-source for a Dataset Artifact. Keep Terraform state in a dedicated protected
-operations bucket or fine-grained permissions; a dedicated bucket is preferred
-for security but is not required.
+source for a Dataset Artifact.
 
 Cloud Build publishes prepared data to a versioned Cloud Storage prefix. The
 dataset bucket is the Dataset Artifact catalog: each dataset prefix contains a
