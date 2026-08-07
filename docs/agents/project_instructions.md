@@ -3,7 +3,14 @@
 This is the canonical shared guidance for agents working in Feral Vision.
 Platform entrypoints link here instead of maintaining copies.
 
-All agents must read the [glossary](../domain/glossary.md) for project-specific vocabulary and [triage labels](triage-labels.md) for workflow definitions.
+## File Format
+
+Project format: YYYY-MM-DD-{activity_name}
+The activity_name is the name of the sprint, if one is active. If the activity name is not known, ask the user.
+
+## Routing
+
+All agents must read the [glossary](../domain/glossary.md) for project-specific vocabulary.
 
 Read only the sections and linked documents required for the task you were
 instructed to perform. Follow an explicitly required reference before acting;
