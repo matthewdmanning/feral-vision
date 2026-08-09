@@ -5,47 +5,44 @@ set -eu
 : "${DATASET_ARTIFACT_PREFIX:?DATASET_ARTIFACT_PREFIX must be set}"
 
 payload_dir="${DATASET_PAYLOAD_DIR:-/workspace/payload}"
-input_path="${DATASET_INPUT_PATH:-/workspace/dataset-input.json}"
+workspace_dir="${DVC_WORKSPACE_DIR:-/workspace}"
 
-payload_uri="$(python3 - "$payload_dir" "$input_path" <<'PY'
-import os
+case "$payload_dir" in
+  "$workspace_dir"/*) ;;
+  *)
+    echo "DATASET_PAYLOAD_DIR must be inside DVC_WORKSPACE_DIR" >&2
+    exit 1
+    ;;
+esac
+
+cd "$workspace_dir"
+dvc init --no-scm
+dvc remote add --default dataset "gs://${GCS_BUCKET}/${DATASET_ARTIFACT_PREFIX}"
+
+lock_path="$(python3 - "$payload_dir" "$workspace_dir" <<'PY'
 import sys
 from pathlib import Path
 
-from google.cloud import storage
-from feral_vision.data.dataset_artifact import publish_dataset_artifact
+from feral_vision.data.dataset_artifact import version_dataset
 
-print(
-    publish_dataset_artifact(
-        storage.Client(),
-        bucket_name=os.environ["GCS_BUCKET"],
-        artifact_prefix=os.environ["DATASET_ARTIFACT_PREFIX"],
-        payload_root=Path(sys.argv[1]),
-        input_path=Path(sys.argv[2]),
-    )
-)
+print(version_dataset(Path(sys.argv[1]), workspace=Path(sys.argv[2])))
 PY
 )"
 
-tracker_dir="$(mktemp -d)"
-trap 'rm -rf "$tracker_dir"' EXIT
-cd "$tracker_dir"
-dvc init --no-scm
-dvc import-url --no-download --version-aware "$payload_uri" dataset-artifact
-grep -q "version_id:" dataset-artifact.dvc
+dvc push
 
-python3 - "$(pwd)/dataset-artifact.dvc" <<'PY'
+python3 - "$lock_path" <<'PY'
 import os
 import sys
 from pathlib import Path
 
 from google.cloud import storage
-from feral_vision.data.dataset_artifact import publish_dataset_tracker
+from feral_vision.data.dataset_artifact import publish_dataset_lock
 
-publish_dataset_tracker(
+print(publish_dataset_lock(
     storage.Client(),
     bucket_name=os.environ["GCS_BUCKET"],
     artifact_prefix=os.environ["DATASET_ARTIFACT_PREFIX"],
-    tracker_path=Path(sys.argv[1]),
-)
+    lock_path=Path(sys.argv[1]),
+))
 PY
