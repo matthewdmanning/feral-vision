@@ -5,8 +5,22 @@ Platform entrypoints link here instead of maintaining copies.
 
 ## File Format
 
-Project format: YYYY-MM-DD-{activity_name}
-The activity_name is the name of the sprint, if one is active. If the activity name is not known, ask the user.
+Dated project documents use `YYYY-MM-DD-{activity_name}`. The `activity_name`
+is the name of the sprint, if one is active. If the activity name is not known,
+ask the user.
+
+Code files and agent instruction files, including files under `docs/agents/`,
+do not use this naming convention.
+
+## Code location
+
+Place code that is agnostic to a particular model, data source, bucket, or
+server in `src/feral_vision/`. Place code specific to a configuration, model,
+augmentation composition, data source, bucket, or server in an appropriate
+subfolder of `scripts/`.
+
+Code under `src/` must **never** import from a project file or subfolder outside
+`src/`.
 
 ## Routing
 
@@ -47,7 +61,8 @@ one.
 | data ingestion, dataset contracts, or publication | [Data and ingestion](data.md) | Dataset layout, publication, lineage, and acquisition contracts. Tool ownership: **DVC**. |
 | Hydra or model configuration | [Configuration](configuration.md) | Recipe and reproducibility requirements. Tool ownership: **Hydra**. |
 | locating a Hydra configuration concern | [Hydra configuration index](hydra.md) | Configuration README index by concern. Tool ownership: **Hydra**. |
-| Terraform, cloud identity, image builds, VMs, or cloud training | [Cloud Operations](cloudops.md) | Cloud-service ownership, credentials, and operational entrypoints. Tool ownership: **Scripts and source code**. |
+| Terraform modules, state, plans, or Cloud Resource lifecycle | [Terraform](terraform.md) | Terraform ownership, file map, state, and plan safety. Tool ownership: **Terraform**. |
+| cloud identity, image builds, VMs, or cloud training | [Cloud Operations](cloudops.md) | Cloud-service credentials and operational entrypoints. Tool ownership: **Scripts and source code**. |
 | Git, GitHub Issues, pull requests, or publishing | [GitHub workflow](github.md) | Session checks, authentication, issue tracking, and branch/PR hygiene. |
 | domain terminology or an architectural decision | [Domain Docs](domain.md) | Glossary and ADR discovery. |
 | a Wayfinder map or child ticket | [Wayfinding](wayfinding.md) | Map, child-ticket, dependency, and frontier conventions. |

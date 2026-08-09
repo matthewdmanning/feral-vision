@@ -182,8 +182,8 @@ land in the local developer workspace.
 
 ## Local changes to preserve
 
-- `scripts/cloud/build.sh` submits Cloud Build with
-  `--region=${REGISTRY_REGION}`; this keeps future builds in `us-east4`.
+- `scripts/cloud/image_operations.sh` submits Cloud Build with the configured
+  region; this keeps future builds in `us-east4`.
 - `.gcloudignore` keeps Cloud Build source submissions small and honors
   `.gitignore`; do not remove its include directive or send local caches/data.
 - `deploy/cloudbuild.prepare.yaml` is the remote-only bounded COCO publication
