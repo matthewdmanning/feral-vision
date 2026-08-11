@@ -50,6 +50,14 @@ one.
   a retry buffer.
 - **Scripts and source code** own workflow control.
 
+## Cloud change discipline
+
+Before any cloud resource attempt, use the applicable repository documentation,
+existing configurations, workspace context, and available non-cloud tools to
+establish the intended contract and prerequisites. Do not use live cloud calls
+as discovery; proceed decisively only after that local investigation supports
+the action.
+
 ## Agent references
 
 | If your task involves… | Reference | File contents |
