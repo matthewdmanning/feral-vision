@@ -9,6 +9,23 @@ data "google_storage_bucket" "dataset" {
   project = var.bucket_project_id
 }
 
+import {
+  to = google_compute_subnetwork.training_default
+  id = "projects/${var.project_id}/regions/${var.region}/subnetworks/default"
+}
+
+resource "google_compute_subnetwork" "training_default" {
+  name                     = "default"
+  network                  = var.network_self_link
+  region                   = var.region
+  ip_cidr_range            = var.subnetwork_ip_cidr_range
+  private_ip_google_access = true
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 resource "google_compute_instance" "detection_trainer" {
   name         = var.vm_name
   machine_type = var.machine_type
@@ -17,8 +34,14 @@ resource "google_compute_instance" "detection_trainer" {
   labels       = var.labels
 
   scheduling {
-    on_host_maintenance = "TERMINATE"
-    automatic_restart   = false
+    on_host_maintenance         = "TERMINATE"
+    automatic_restart           = false
+    provisioning_model          = "FLEX_START"
+    instance_termination_action = "DELETE"
+
+    max_run_duration {
+      seconds = var.flex_start_max_run_duration_seconds
+    }
   }
 
   guest_accelerator {
@@ -32,6 +55,10 @@ resource "google_compute_instance" "detection_trainer" {
       size  = 100
       type  = "pd-ssd"
     }
+  }
+
+  scratch_disk {
+    interface = "NVME"
   }
 
   network_interface {
@@ -49,10 +76,13 @@ resource "google_compute_instance" "detection_trainer" {
   }
 
   metadata_startup_script = templatefile("${path.module}/templates/trainer_startup.sh.tftpl", {
-    bucket_name             = data.google_storage_bucket.dataset.name
-    dataset_artifact_prefix = var.dataset_artifact_prefix
-    dataset_mount_dir       = var.dataset_mount_dir
-    mlflow_tracking_uri     = var.mlflow_tracking_uri
-    training_image          = var.training_image
+    bucket_name                  = data.google_storage_bucket.dataset.name
+    dataset_artifact_prefix      = var.dataset_artifact_prefix
+    source_annotation_generation = var.source_annotation_generation
+    dataset_host_mount_dir       = var.dataset_host_mount_dir
+    dataset_container_mount_dir  = var.dataset_container_mount_dir
+    mlflow_tracking_uri          = var.mlflow_tracking_uri
+    run_config_name              = var.run_config_name
+    training_image               = var.training_image
   })
 }
