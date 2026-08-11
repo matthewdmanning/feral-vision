@@ -24,6 +24,8 @@ datasets/<dataset>/<artifact>/
 ├── payload/
 │   ├── images/
 │   └── annotations/
+├── dataset-artifact.json
+├── dataset-artifact.dvc
 └── dvc.lock
 ~~~
 
@@ -40,10 +42,19 @@ defines the Dataset folder as a stage dependency, runs `dvc repro`, and pushes
 the DVC-managed Dataset. Object Versioning must be enabled on the source bucket
 before this workflow is used.
 
-`dvc.lock` records the selected Dataset folder. Training consumes staged data
-with the selected lockfile and records its digest in MLflow lineage. A new cloud
-version is adopted only by publishing a new artifact prefix; do not overwrite a
-reviewed training input in place. Do not run DVC in the training container.
+`dvc.lock` records the selected Dataset folder. The training VM stages its
+selected data on the local SSD, runs DVC there before model training, and
+records the resulting lock digest in MLflow lineage. Do not write that local
+run evidence back over a reviewed training input in place.
+
+### Uncommitted tracker recovery
+
+`dataset-artifact.dvc` without `dvc.lock` is uncommitted source metadata, not
+training lineage. The training VM creates its own local DVC workspace after
+staging the canonical payload. If that workspace already has `.dvc` without
+`dvc.lock`, it runs `dvc commit`, reproduces the Dataset stage with `dvc repro`,
+and verifies the local lock before training. Do not infer a lockfile from a
+`.dvc` tracker or overwrite the source artifact with run-local metadata.
 
 ## Acquisition-publication contract
 
