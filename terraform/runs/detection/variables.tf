@@ -82,17 +82,24 @@ variable "deep_learning_image_project" {
   nullable    = false
 }
 
-variable "subnetwork_self_link" {
-  description = "Existing private subnet with reviewed NAT access."
-  type        = string
-  default     = "projects/cs-poc-kewg0kffb7uwobgq1rex2af/regions/us-east4/subnetworks/default"
-  nullable    = false
-}
-
 variable "network_self_link" {
   description = "Existing VPC network that owns the training subnet."
   type        = string
   default     = "projects/cs-poc-kewg0kffb7uwobgq1rex2af/global/networks/default"
+  nullable    = false
+}
+
+variable "nat_router_name" {
+  description = "Cloud Router name dedicated to the training VM's Cloud NAT."
+  type        = string
+  default     = "feral-vision-detection-router"
+  nullable    = false
+}
+
+variable "nat_name" {
+  description = "Cloud NAT name dedicated to the training VM subnet."
+  type        = string
+  default     = "feral-vision-detection-nat"
   nullable    = false
 }
 
@@ -106,6 +113,96 @@ variable "subnetwork_ip_cidr_range" {
     condition     = can(cidrhost(var.subnetwork_ip_cidr_range, 0))
     error_message = "subnetwork_ip_cidr_range must be a valid IPv4 CIDR range."
   }
+}
+
+variable "subnetwork_name" {
+  description = "Name of the existing training subnetwork."
+  type        = string
+  default     = "default"
+  nullable    = false
+}
+
+variable "instance_tags" {
+  description = "Network tags applied to the detection VM."
+  type        = list(string)
+  default     = ["cloud-detection-gpu"]
+  nullable    = false
+}
+
+variable "on_host_maintenance" {
+  description = "Compute Engine host-maintenance action for the detection VM."
+  type        = string
+  default     = "TERMINATE"
+  nullable    = false
+}
+
+variable "automatic_restart" {
+  description = "Whether Compute Engine automatically restarts the detection VM."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "provisioning_model" {
+  description = "Compute Engine provisioning model for the detection VM."
+  type        = string
+  default     = "FLEX_START"
+  nullable    = false
+}
+
+variable "instance_termination_action" {
+  description = "Action when the detection VM reaches its maximum Flex-start duration."
+  type        = string
+  default     = "DELETE"
+  nullable    = false
+}
+
+variable "accelerator_count" {
+  description = "Number of GPU accelerator cards attached to the detection VM."
+  type        = number
+  default     = 1
+  nullable    = false
+
+  validation {
+    condition     = var.accelerator_count > 0
+    error_message = "accelerator_count must be positive."
+  }
+}
+
+variable "boot_disk_size_gb" {
+  description = "Detection VM boot disk size in gigabytes."
+  type        = number
+  default     = 100
+  nullable    = false
+
+  validation {
+    condition     = var.boot_disk_size_gb > 0
+    error_message = "boot_disk_size_gb must be positive."
+  }
+}
+
+variable "boot_disk_type" {
+  description = "Detection VM boot disk type."
+  type        = string
+  default     = "pd-ssd"
+  nullable    = false
+}
+
+variable "scratch_disk_interface" {
+  description = "Local SSD interface attached to the detection VM."
+  type        = string
+  default     = "NVME"
+  nullable    = false
+}
+
+variable "instance_metadata" {
+  description = "Metadata values applied to the detection VM."
+  type        = map(string)
+  default = {
+    enable-oslogin        = "TRUE"
+    install-nvidia-driver = "True"
+  }
+  nullable = false
 }
 
 variable "service_account_email" {

@@ -1,6 +1,6 @@
 output "dvc_publisher_instance_name" {
   description = "Name of the disposable DVC publication instance."
-  value       = google_compute_instance.dvc_publisher.name
+  value       = module.publisher.instance_name
 }
 
 output "target_dataset_artifact_uri" {

@@ -33,9 +33,9 @@ def _variant_names(group: str) -> tuple[str, ...]:
 
 
 def _compose_training_cfg(override: str) -> DictConfig:
-    """Compose the smoke Run Recipe with one real training-component override."""
+    """Compose the canonical Run Recipe with one training-component override."""
     with initialize(version_base=None, config_path="../conf"):
-        return compose(config_name="runs/smoke", overrides=[override])
+        return compose(config_name="runs/baseline", overrides=[override])
 
 
 @pytest.fixture(autouse=True)

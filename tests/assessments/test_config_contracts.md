@@ -46,7 +46,7 @@ Occurrence probability: 2
 
 ### test_cloudbuild_config_composes_against_its_deploy_schema
 
-Purpose: Verify cloud-smoke substitutions compose as typed declarative deployment inputs.
+Purpose: Verify deployment substitutions compose as typed declarative inputs.
 
 Load-bearing: True
 
@@ -56,7 +56,7 @@ Occurrence probability: 2
 
 ### test_cloudbuild_config_rejects_unknown_structured_override
 
-Purpose: Verify cloud deployment inputs reject fields that the cloud-smoke workflow does not consume.
+Purpose: Verify cloud deployment inputs reject fields that the deployment workflow does not consume.
 
 Load-bearing: True
 

@@ -158,7 +158,7 @@ Load-bearing: False
 
 Occurrence probability: 2
 
-Rationale: This is a repository-fixture smoke check, not an independent
+Rationale: This is a repository-fixture check, not an independent
 production data contract.
 
 #### fixture_dataset

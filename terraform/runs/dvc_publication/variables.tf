@@ -53,6 +53,62 @@ variable "machine_type" {
   nullable    = false
 }
 
+variable "instance_tags" {
+  description = "Network tags applied to the DVC publication VM."
+  type        = list(string)
+  default     = ["dvc-publication"]
+  nullable    = false
+}
+
+variable "on_host_maintenance" {
+  description = "Compute Engine host-maintenance action for the DVC publication VM."
+  type        = string
+  default     = "MIGRATE"
+  nullable    = false
+}
+
+variable "automatic_restart" {
+  description = "Whether Compute Engine automatically restarts the DVC publication VM."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "boot_image" {
+  description = "Boot image used by the DVC publication VM."
+  type        = string
+  default     = "projects/debian-cloud/global/images/family/debian-13"
+  nullable    = false
+}
+
+variable "boot_disk_size_gb" {
+  description = "DVC publication VM boot disk size in gigabytes."
+  type        = number
+  default     = 50
+  nullable    = false
+
+  validation {
+    condition     = var.boot_disk_size_gb > 0
+    error_message = "boot_disk_size_gb must be positive."
+  }
+}
+
+variable "boot_disk_type" {
+  description = "DVC publication VM boot disk type."
+  type        = string
+  default     = "pd-ssd"
+  nullable    = false
+}
+
+variable "instance_metadata" {
+  description = "Metadata values applied to the DVC publication VM."
+  type        = map(string)
+  default = {
+    enable-oslogin = "TRUE"
+  }
+  nullable = false
+}
+
 variable "subnetwork_self_link" {
   description = "Existing private subnet to serve with the dedicated Cloud NAT."
   type        = string

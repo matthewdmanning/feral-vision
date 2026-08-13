@@ -52,7 +52,7 @@ def _compose_recipe(path: Path, overrides: list[str] | None = None) -> DictConfi
 
 
 def _compose_deploy(overrides: list[str] | None = None) -> DictConfig:
-    """Compose the root-level cloud-smoke configuration and its schema."""
+    """Compose the root-level deployment configuration and its schema."""
     with initialize_config_dir(version_base=None, config_dir=str(_REPOSITORY_ROOT)):
         return compose(config_name="deploy/cloudbuild", overrides=overrides or [])
 
@@ -120,7 +120,7 @@ def test_recipe_rejects_unknown_structured_override() -> None:
 
 
 def test_cloudbuild_config_composes_against_its_deploy_schema() -> None:
-    """Cloud-smoke inputs are declarative values, not an embedded workflow."""
+    """Deployment inputs are declarative values, not an embedded workflow."""
     cfg = _compose_deploy()
 
     assert cfg.deploy.substitutions._REGION
@@ -132,7 +132,7 @@ def test_cloudbuild_config_composes_against_its_deploy_schema() -> None:
 
 
 def test_cloudbuild_config_rejects_unknown_structured_override() -> None:
-    """Deployment inputs reject fields that no cloud-smoke script consumes."""
+    """Deployment inputs reject fields that no deployment script consumes."""
     with pytest.raises(
         ConfigCompositionException,
         match="Could not override 'deploy.substitutions._NOT_A_PARAMETER'",
