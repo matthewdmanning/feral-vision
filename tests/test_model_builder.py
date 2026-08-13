@@ -30,9 +30,9 @@ def _registered_and_isolated_hydra() -> None:
 
 @pytest.fixture
 def local_model_cfg() -> DictConfig:
-    """Compose the smoke recipe's local in-repository model configuration."""
+    """Compose the canonical recipe with the local in-repository model."""
     with initialize(version_base=None, config_path="../conf"):
-        return compose(config_name="runs/smoke").model
+        return compose(config_name="runs/baseline", overrides=["model=net"]).model
 
 
 @pytest.fixture

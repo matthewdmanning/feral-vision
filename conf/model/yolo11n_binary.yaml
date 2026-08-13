@@ -1,0 +1,12 @@
+# Pretrained YOLO11n with binary detector head.
+defaults:
+  - model_schema
+  - _self_
+
+architecture:
+  source: ultralytics
+  id: yolo11n.pt
+  location: ultralytics.YOLO
+  num_classes: 2
+
+weights: null

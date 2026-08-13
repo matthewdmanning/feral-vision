@@ -257,26 +257,26 @@ class AugmentationConfig:
 # --- Deployment -------------------------------------------------------------
 @dataclass
 class DeploySubstitutionsConfig:
-    """Values passed from the cloud-smoke configuration to its scripts."""
+    """Values passed from deployment configuration to its scripts."""
 
     _GCP_PROJECT: str = ""
     _REGION: str = "us-central1"
     _REPO: str = "feral-vision"
     _BASE_IMAGE_NAME: str = "feral-vision"
     _IMAGE_NAME: str = "feral-vision-gcp"
-    _IMAGE_TAG: str = "smoke"
+    _IMAGE_TAG: str = "default"
 
 
 @dataclass
 class DeployOptionsConfig:
-    """Non-operational cloud-smoke configuration options."""
+    """Non-operational deployment configuration options."""
 
     logging: str = "CLOUD_LOGGING_ONLY"
 
 
 @dataclass
 class DeployConfig:
-    """Inputs consumed by the manual cloud-smoke scripts."""
+    """Inputs consumed by the manual deployment scripts."""
 
     substitutions: DeploySubstitutionsConfig = field(
         default_factory=DeploySubstitutionsConfig

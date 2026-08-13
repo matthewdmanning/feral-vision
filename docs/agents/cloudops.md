@@ -48,15 +48,63 @@ is absent and will not block the Cloud Job.
 Before creating a Model Source Adapter, the script will check for the model
 named by the Run Recipe.
 
+## Canonical dataset directory
+
+Cloud data operations and Terraform training modules must use one dataset
+prefix and derive every required object from it; they must not search for image
+files across bucket prefixes. The dataset-only bucket layout is:
+
+~~~folder
+gs://<dataset-bucket>/datasets/<source>/<split>/<artifact>/
+├── payload/
+│   ├── images/
+│   └── annotations/
+├── dataset-artifact.json
+├── dataset-artifact.dvc
+└── dvc.lock
+~~~
+
+`dataset_artifact_prefix` is the path below the bucket (for example,
+`datasets/coco/train2017/<artifact>`). A training VM startup script derives
+`<prefix>/payload` as the source to stage directly on its attached and mounted
+local SSD, placing `images/` and `annotations/` below the mounted dataset
+directory. It then runs DVC on that VM to create `dataset-artifact.dvc` and
+`dvc.lock` beside the staged data, and passes that directory as `TRAIN_DATA`.
+
+Before staging, the training operation must verify `payload/images/` and
+`dataset-artifact.json`. When a required annotation only exists as a retained
+object generation, the run configuration must name that generation and copy
+it directly to the local SSD. If a local DVC workspace has `.dvc` but no lock,
+it must run `dvc commit`, reproduce the Dataset stage with `dvc repro`, and
+verify the resulting local lock before model training. A `.dvc` tracker alone
+never authorizes model training.
+
+`terraform/runs/detection/` owns this recovery for a training run: it does not
+create a duplicate Dataset Artifact prefix. The DVC tracker and lock are local
+training evidence and are logged with the MLflow run.
+
+## Reuse sibling cloud configurations first
+
+Before creating or changing a Cloud Job configuration, inspect the other
+configurations in the same folder for an existing VM instance template,
+launcher, variables, and backend. Reuse that configuration rather than
+authoring a direct VM resource or guessing a new execution path. A sibling
+configuration is project evidence of the intended infrastructure contract;
+only create a new configuration after confirming no reusable one exists.
+
 For every Cloud Job, the script will create a new VM, execute the assigned
 Cloud Job, save its outputs while the VM is active, and remove the VM once no
 Cloud Job is running. VM creation is not completion, and no idle VM is
 retained.
 
-MLflow creates its SQLite database at runtime on the VM. At the end of the
-Cloud Job, the startup script uploads that database, the other MLflow outputs,
-and best-performing model weights (Model Artifact) to the operational Google
-Storage bucket, not the data-specific bucket, before the VM is removed.
+When no tracking URI is configured, MLflow resolves its own local default URI
+to `sqlite:///mlflow.db`; it creates that SQLite database when the Cloud Job
+uses MLflow. This is not a managed HTTPS endpoint and must not be discovered as
+one. A Run Recipe may explicitly override the URI for a remote tracking
+service. At the end of the Cloud Job, the startup script uploads the local
+database, other MLflow outputs, and best-performing model weights (Model
+Artifact) to the operational Google Storage bucket, not the data-specific
+bucket, before the VM is removed.
 
 ## Cloud verification status
 

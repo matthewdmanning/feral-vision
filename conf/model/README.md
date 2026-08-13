@@ -5,9 +5,11 @@
 Model configuration selects a reproducible model definition: architecture
 source, identifier, location, and optional starting weights.
 
-## Selection
+## Weights
 
-Choose a semantic model variant as part of a complete Run Recipe.
+A value of `null` for weights means the selected source supplies its default
+weights; check the source documentation for their location. If the source
+provides no weights, the model initializes random weights.
 
 ## Ownership
 

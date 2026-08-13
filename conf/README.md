@@ -7,8 +7,8 @@ define program flow or tooling boundaries.
 
 ## Selection
 
-Choose a complete named Run Recipe: `runs/baseline` is the canonical local
-recipe and `runs/smoke` is CPU-safe for validation. There is no root
+Choose the complete named Run Recipe `runs/baseline`, which is the canonical
+local recipe. There is no root
 `config.yaml` selection layer.
 
 ## Ownership

@@ -51,7 +51,7 @@ Load-bearing: True
 
 Occurrence probability: 2
 
-Rationale: This is a configuration smoke test; it does not execute the built
+Rationale: This is a configuration check; it does not execute the built
 images or prove the remote publication boundary.
 
 #### default

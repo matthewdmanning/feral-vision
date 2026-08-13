@@ -27,8 +27,9 @@ it must never fall back to the raw Artifact.
 
 The isolated cloud configuration is under `terraform/runs/detection/`. It
 creates only the run-specific VM and consumes existing networking, image-pull,
-and dataset-read access. Its separate state prefix prevents overlap with the
-shared cloud-smoke configuration.
+and dataset-read access. It imports the existing training subnet and provisions
+Cloud NAT scoped to that subnet for private VM egress. Its separate state prefix
+isolates this run's resources.
 
 Before planning, supply a digest-pinned image built with
 `deploy/runs/detection/cloudbuild.training-image.yaml`, the immutable Dataset

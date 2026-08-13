@@ -35,6 +35,7 @@ mlflow.db
 
 # Terraform local working state and plan artifacts
 terraform/.terraform/
+**/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/*.tfplan
