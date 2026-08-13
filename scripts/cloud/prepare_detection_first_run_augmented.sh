@@ -55,16 +55,21 @@ if [ -z "$tracker_generation" ]; then
   echo "Dataset Variant tracker must resolve to an object generation" >&2
   exit 1
 fi
-readonly data_reference="${variant_uri}/dataset-artifact.dvc#${tracker_generation}"
+gcloud storage objects describe "${variant_uri}/payload/annotations/instances.json" --project="$project_id" --format='value(generation)' --quiet >"$artifact_dir/annotation-generation.txt"
+readonly source_annotation_generation="$(tr -d '[:space:]' <"$artifact_dir/annotation-generation.txt")"
+if [ -z "$source_annotation_generation" ]; then
+  echo "Dataset Variant annotations must resolve to an object generation" >&2
+  exit 1
+fi
 
 RUN_ID="$run_id" \
 TRAINING_IMAGE="$training_image" \
 RAW_URI="$raw_uri" \
 VARIANT_PREFIX="$variant_prefix" \
-DATA_REFERENCE="$data_reference" \
 MLFLOW_ARTIFACT_PREFIX="$MLFLOW_ARTIFACT_PREFIX" \
 VM_SERVICE_ACCOUNT_EMAIL="$VM_SERVICE_ACCOUNT_EMAIL" \
 VM_NAME="$vm_name" \
+SOURCE_ANNOTATION_GENERATION="$source_annotation_generation" \
 TERRAFORM_PLAN="$plan_path" \
 python3 - "$manifest_path" <<'PY'
 import json
@@ -79,8 +84,8 @@ Path(sys.argv[1]).write_text(
             "training_image": os.environ["TRAINING_IMAGE"],
             "raw_dataset_artifact_uri": os.environ["RAW_URI"],
             "dataset_artifact_prefix": os.environ["VARIANT_PREFIX"],
-            "data_reference": os.environ["DATA_REFERENCE"],
-            "mlflow_tracking_uri": "http://127.0.0.1:5000",
+            "source_annotation_generation": os.environ["SOURCE_ANNOTATION_GENERATION"],
+            "run_config_name": "runs/detection_first_run_augmented",
             "mlflow_artifact_prefix": os.environ["MLFLOW_ARTIFACT_PREFIX"],
             "service_account_email": os.environ["VM_SERVICE_ACCOUNT_EMAIL"],
             "vm_name": os.environ["VM_NAME"],
@@ -94,7 +99,7 @@ Path(sys.argv[1]).write_text(
 PY
 
 terraform -chdir=terraform/runs/detection_first_run_augmented init -reconfigure -input=false
-terraform -chdir=terraform/runs/detection_first_run_augmented plan -input=false -out="$plan_path" -var="project_id=$project_id" -var="vm_name=$vm_name" -var="training_image=$training_image" -var="dataset_artifact_prefix=$variant_prefix" -var="data_reference=$data_reference" -var="mlflow_artifact_prefix=$MLFLOW_ARTIFACT_PREFIX" -var="run_id=$run_id" -var="service_account_email=$VM_SERVICE_ACCOUNT_EMAIL"
+terraform -chdir=terraform/runs/detection_first_run_augmented plan -input=false -out="$plan_path" -var="project_id=$project_id" -var="vm_name=$vm_name" -var="training_image=$training_image" -var="dataset_artifact_prefix=$variant_prefix" -var="source_annotation_generation=$source_annotation_generation" -var="run_config_name=runs/detection_first_run_augmented" -var="service_account_email=$VM_SERVICE_ACCOUNT_EMAIL"
 
 echo "Prepared immutable run manifest: $manifest_path"
 echo "Review Terraform plan before running scripts/runs/detection_first_run_augmented.sh"

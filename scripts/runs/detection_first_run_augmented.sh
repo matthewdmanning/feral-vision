@@ -24,7 +24,6 @@ PY
 
 readonly run_id="$(read_manifest run_id)"
 readonly plan_path="$(read_manifest terraform_plan)"
-readonly artifact_prefix="$(read_manifest mlflow_artifact_prefix)"
 readonly vm_name="$(read_manifest vm_name)"
 readonly evidence_dir="$(dirname "$manifest_path")"
 readonly project_id="cs-poc-kewg0kffb7uwobgq1rex2af"

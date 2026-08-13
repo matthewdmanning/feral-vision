@@ -39,16 +39,23 @@ def test_variant_materialization_build_uses_selected_identity_and_image_input() 
 # ---------------------------------------------------------------------------
 
 
-def test_run_terraform_passes_manifest_and_mlflow_inputs_to_startup_template() -> None:
+def test_run_terraform_passes_modular_training_inputs_to_startup_template() -> None:
     repository_root = Path(__file__).resolve().parents[1]
     terraform_root = repository_root / "terraform/runs/detection_first_run_augmented"
     main = (terraform_root / "main.tf").read_text()
     variables = (terraform_root / "variables.tf").read_text()
     startup = (terraform_root / "templates/trainer_startup.sh.tftpl").read_text()
 
-    for name in ("mlflow_artifact_prefix", "run_id", "data_reference"):
+    for name in (
+        "source_annotation_generation",
+        "dataset_host_mount_dir",
+        "dataset_container_mount_dir",
+        "run_config_name",
+        "mlflow_tracking_uri",
+    ):
         assert f'variable "{name}"' in variables
         assert f"{name} " in main and f"var.{name}" in main
-        assert f'readonly {name}="${{{name}}}"' in startup
-    assert 'readonly mlflow_tracking_uri="http://127.0.0.1:5000"' in startup
-    assert "mlflow server --host 127.0.0.1 --port 5000" in startup
+        assert f"${{{name}}}" in startup
+    assert 'readonly local_ssd_device="/dev/nvme0n1"' in startup
+    assert 'uv run --no-sync dvc init --no-scm' in startup
+    assert 'cp dvc.lock "${dataset_container_mount_dir}/dvc.lock"' in startup
