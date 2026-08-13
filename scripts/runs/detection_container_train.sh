@@ -6,8 +6,7 @@ set -euo pipefail
 
 test -d "${TRAIN_DATA}/images"
 test -d "${TRAIN_DATA}/annotations"
-test -f "${TRAIN_DATA}/dataset-artifact.json"
-test -f "${TRAIN_DATA}/dataset-artifact.dvc"
+test -f "${TRAIN_DATA}/dvc.lock"
 
 exec uv run --no-sync python -m feral_vision.training.trainer \
   --config-name runs/detection \

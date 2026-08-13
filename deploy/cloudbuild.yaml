@@ -1,4 +1,4 @@
-# Configuration for the manual cloud smoke. Operational steps live in
+# Configuration for the cloud . Operational steps live in
 # scripts/cloud/ and consume these values through scripts/cloud/run.py.
 defaults:
   - deploy_schema
@@ -10,7 +10,7 @@ substitutions:
   _REPO: feral-docker
   _BASE_IMAGE_NAME: feral-vision
   _IMAGE_NAME: feral-vision-gcp
-  _IMAGE_TAG: smoke
+  _IMAGE_TAG: default
 
 options:
   logging: CLOUD_LOGGING_ONLY
