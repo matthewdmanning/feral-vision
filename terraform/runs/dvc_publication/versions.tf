@@ -3,7 +3,7 @@ terraform {
 
   backend "gcs" {
     bucket = "feral-vision-operations-us-east4"
-    prefix = "terraform/cloud-smoke"
+    prefix = "terraform/runs/dvc-publication"
   }
 
   required_providers {

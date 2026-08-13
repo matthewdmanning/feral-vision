@@ -5,7 +5,7 @@ variable "project_id" {
 }
 
 variable "bucket_name" {
-  description = "Existing dataset-only bucket that contains the selected Dataset Variant Artifact."
+  description = "Existing dataset-only bucket that contains the selected Dataset Artifact."
   type        = string
   default     = "mobile-training-images"
   nullable    = false
@@ -40,10 +40,25 @@ variable "vm_name" {
 }
 
 variable "machine_type" {
-  description = "Compute Engine machine type for the GPU trainer."
+  description = "Compute Engine machine type for the GPU trainer with one attached local SSD."
   type        = string
   default     = "n1-standard-4"
   nullable    = false
+}
+
+variable "flex_start_max_run_duration_seconds" {
+  description = "Maximum duration of the Flex-start training VM before Compute Engine deletes it."
+  type        = number
+  default     = 86400
+  nullable    = false
+
+  validation {
+    condition = (
+      var.flex_start_max_run_duration_seconds >= 600 &&
+      var.flex_start_max_run_duration_seconds <= 604800
+    )
+    error_message = "flex_start_max_run_duration_seconds must be between 600 seconds (10 minutes) and 604800 seconds (7 days)."
+  }
 }
 
 variable "gpu_type" {
@@ -67,11 +82,127 @@ variable "deep_learning_image_project" {
   nullable    = false
 }
 
-variable "subnetwork_self_link" {
-  description = "Existing private subnet with reviewed NAT access."
+variable "network_self_link" {
+  description = "Existing VPC network that owns the training subnet."
   type        = string
-  default     = "projects/cs-poc-kewg0kffb7uwobgq1rex2af/regions/us-east4/subnetworks/default"
+  default     = "projects/cs-poc-kewg0kffb7uwobgq1rex2af/global/networks/default"
   nullable    = false
+}
+
+variable "nat_router_name" {
+  description = "Cloud Router name dedicated to the training VM's Cloud NAT."
+  type        = string
+  default     = "feral-vision-detection-router"
+  nullable    = false
+}
+
+variable "nat_name" {
+  description = "Cloud NAT name dedicated to the training VM subnet."
+  type        = string
+  default     = "feral-vision-detection-nat"
+  nullable    = false
+}
+
+variable "subnetwork_ip_cidr_range" {
+  description = "Existing IPv4 CIDR range of the imported training subnet."
+  type        = string
+  default     = "10.150.0.0/20"
+  nullable    = false
+
+  validation {
+    condition     = can(cidrhost(var.subnetwork_ip_cidr_range, 0))
+    error_message = "subnetwork_ip_cidr_range must be a valid IPv4 CIDR range."
+  }
+}
+
+variable "subnetwork_name" {
+  description = "Name of the existing training subnetwork."
+  type        = string
+  default     = "default"
+  nullable    = false
+}
+
+variable "instance_tags" {
+  description = "Network tags applied to the detection VM."
+  type        = list(string)
+  default     = ["cloud-detection-gpu"]
+  nullable    = false
+}
+
+variable "on_host_maintenance" {
+  description = "Compute Engine host-maintenance action for the detection VM."
+  type        = string
+  default     = "TERMINATE"
+  nullable    = false
+}
+
+variable "automatic_restart" {
+  description = "Whether Compute Engine automatically restarts the detection VM."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "provisioning_model" {
+  description = "Compute Engine provisioning model for the detection VM."
+  type        = string
+  default     = "FLEX_START"
+  nullable    = false
+}
+
+variable "instance_termination_action" {
+  description = "Action when the detection VM reaches its maximum Flex-start duration."
+  type        = string
+  default     = "DELETE"
+  nullable    = false
+}
+
+variable "accelerator_count" {
+  description = "Number of GPU accelerator cards attached to the detection VM."
+  type        = number
+  default     = 1
+  nullable    = false
+
+  validation {
+    condition     = var.accelerator_count > 0
+    error_message = "accelerator_count must be positive."
+  }
+}
+
+variable "boot_disk_size_gb" {
+  description = "Detection VM boot disk size in gigabytes."
+  type        = number
+  default     = 100
+  nullable    = false
+
+  validation {
+    condition     = var.boot_disk_size_gb > 0
+    error_message = "boot_disk_size_gb must be positive."
+  }
+}
+
+variable "boot_disk_type" {
+  description = "Detection VM boot disk type."
+  type        = string
+  default     = "pd-ssd"
+  nullable    = false
+}
+
+variable "scratch_disk_interface" {
+  description = "Local SSD interface attached to the detection VM."
+  type        = string
+  default     = "NVME"
+  nullable    = false
+}
+
+variable "instance_metadata" {
+  description = "Metadata values applied to the detection VM."
+  type        = map(string)
+  default = {
+    enable-oslogin        = "TRUE"
+    install-nvidia-driver = "True"
+  }
+  nullable = false
 }
 
 variable "service_account_email" {
@@ -92,7 +223,7 @@ variable "training_image" {
 }
 
 variable "dataset_artifact_prefix" {
-  description = "Immutable Dataset Variant Artifact prefix containing payload, manifest, and tracker."
+  description = "Source Dataset Artifact prefix containing the selected image payload and manifest."
   type        = string
   nullable    = false
 
@@ -102,21 +233,62 @@ variable "dataset_artifact_prefix" {
   }
 }
 
-variable "dataset_mount_dir" {
-  description = "SSD path used to stage the selected immutable Dataset Variant Artifact."
-  type        = string
-  default     = "/data/dataset-artifact"
-  nullable    = false
-}
-
-variable "mlflow_tracking_uri" {
-  description = "Managed non-secret MLflow tracking endpoint for this run."
+variable "source_annotation_generation" {
+  description = "Retained source annotation generation copied to the training SSD with the selected image payload."
   type        = string
   nullable    = false
 
   validation {
-    condition     = can(regex("^https://", var.mlflow_tracking_uri))
-    error_message = "mlflow_tracking_uri must be an HTTPS managed tracking endpoint."
+    condition     = can(regex("^[0-9]+$", var.source_annotation_generation))
+    error_message = "source_annotation_generation must be a Cloud Storage object generation number."
+  }
+}
+
+variable "dataset_host_mount_dir" {
+  description = "Host SSD path used to stage the Dataset payload and locally generated DVC files."
+  type        = string
+  default     = "/mnt/disks/ssd/dataset-artifact"
+  nullable    = false
+
+  validation {
+    condition     = startswith(var.dataset_host_mount_dir, "/mnt/disks/ssd/")
+    error_message = "dataset_host_mount_dir must be beneath the mounted local SSD."
+  }
+}
+
+variable "dataset_container_mount_dir" {
+  description = "Container path mapped to dataset_host_mount_dir through the local SSD bind mount."
+  type        = string
+  default     = "/data/dataset-artifact"
+  nullable    = false
+
+  validation {
+    condition     = startswith(var.dataset_container_mount_dir, "/data/")
+    error_message = "dataset_container_mount_dir must be beneath the /data SSD bind mount."
+  }
+}
+
+variable "run_config_name" {
+  description = "Hydra Run Recipe consumed by the detection training container."
+  type        = string
+  default     = "runs/baseline"
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^runs/[A-Za-z0-9_-]+$", var.run_config_name))
+    error_message = "run_config_name must name a Run Recipe below conf/runs/."
+  }
+}
+
+variable "mlflow_tracking_uri" {
+  description = "MLflow tracking URI; defaults to the local SQLite database on the mounted training SSD."
+  type        = string
+  default     = "sqlite:////data/mlflow.db"
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^(https://|sqlite:)", var.mlflow_tracking_uri))
+    error_message = "mlflow_tracking_uri must be an HTTPS endpoint or SQLite URI."
   }
 }
 
