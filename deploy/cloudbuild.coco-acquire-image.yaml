@@ -9,5 +9,10 @@ steps:
 images:
   - ${_COCO_ACQUISITION_IMAGE}
 
+serviceAccount: projects/cs-poc-kewg0kffb7uwobgq1rex2af/serviceAccounts/feral-vision-ai@cs-poc-kewg0kffb7uwobgq1rex2af.iam.gserviceaccount.com
+
 substitutions:
   _COCO_ACQUISITION_IMAGE: us-east4-docker.pkg.dev/cs-poc-kewg0kffb7uwobgq1rex2af/feral-docker/feral-vision-coco-acquire
+
+options:
+  logging: CLOUD_LOGGING_ONLY

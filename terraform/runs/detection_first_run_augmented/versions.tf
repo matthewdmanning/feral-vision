@@ -3,7 +3,7 @@ terraform {
 
   backend "gcs" {
     bucket = "feral-vision-operations-us-east4"
-    prefix = "terraform/runs/detection"
+    prefix = "terraform/runs/detection_first_run_augmented"
   }
 
   required_providers {

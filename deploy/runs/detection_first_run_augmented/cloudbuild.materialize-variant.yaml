@@ -1,0 +1,18 @@
+steps:
+  - name: ${_TRAINING_IMAGE}
+    id: materialize-detection-first-run-augmented-variant
+    entrypoint: bash
+    args:
+      - /workspace/scripts/cloud/materialize_detection_first_run_augmented.sh
+    env:
+      - GCS_BUCKET=${_GCS_BUCKET}
+      - RAW_DATASET_ARTIFACT_URI=${_RAW_DATASET_ARTIFACT_URI}
+      - VARIANT_ARTIFACT_PREFIX=${_VARIANT_ARTIFACT_PREFIX}
+
+serviceAccount: projects/cs-poc-kewg0kffb7uwobgq1rex2af/serviceAccounts/feral-vision-ai@cs-poc-kewg0kffb7uwobgq1rex2af.iam.gserviceaccount.com
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _GCS_BUCKET: mobile-training-images

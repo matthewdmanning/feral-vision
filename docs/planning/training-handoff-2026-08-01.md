@@ -28,7 +28,7 @@ completed training run or published Dataset Artifact.
 
 ## Implemented locally, pending validation
 
-- `conf/runs/detection.yaml` selects the two-class COCO-animal Dataset Variant,
+- `conf/runs/detection_first_run_augmented.yaml` selects the two-class COCO-animal Dataset Variant,
   `yolo11n.pt`, detection trainer settings, and a seeded annotation-aware
   augmentation concern.
 - `materialize_detection_variant` produces one derived image and co-transformed

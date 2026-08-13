@@ -1,9 +1,9 @@
 # First fine-tuning baseline: two-class COCO-animal detection from an augmented Artifact.
 defaults:
-  - /data@_global_.data: coco_animals_augmented
+  - /data@_global_.data: coco_animals_augmented_first_run_augmented
   - /model@_global_.model: yolo11n_default
-  - /train@_global_.train: detection
+  - /train@_global_.train: detection_first_run_augmented
   - /inference@_global_.inference: local
   - /tracking@_global_.tracking: mlflow
-  - /augmentation@_global_.augmentation: coco_animals_detection
+  - /augmentation@_global_.augmentation: coco_animals_detection_first_run_augmented
   - _self_

@@ -12,6 +12,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import math
+import os
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
@@ -93,7 +94,7 @@ def _try_log_metric(name: str, value: float, step: int) -> None:
 
 def _dvc_data_version(tracker_path: Path) -> str:
     """Identify a staged DVC tracker without running DVC."""
-    if tracker_path.name in {"data.dvc", "dvc.lock"}:
+    if tracker_path.name in {"data.dvc", "dvc.lock", "dataset-artifact.dvc"}:
         digest = hashlib.sha256(tracker_path.read_bytes()).hexdigest()
         return f"{tracker_path.name}@sha256:{digest}"
 
@@ -115,7 +116,10 @@ def _try_log_dvc_lineage(cfg: Any) -> None:
 
         data_root = getattr(getattr(cfg, "data", None), "root", None)
         staged_trackers = (
-            [Path(str(data_root)) / name for name in ("dvc.lock", "data.dvc")]
+            [
+                Path(str(data_root)) / name
+                for name in ("dataset-artifact.dvc", "dvc.lock", "data.dvc")
+            ]
             if data_root
             else []
         )
@@ -157,6 +161,9 @@ def _active_mlflow_run(cfg: Any) -> Iterator[None]:
         return
 
     with run:
+        external_run_id = os.environ.get("FERAL_VISION_RUN_ID")
+        if external_run_id:
+            mlflow.set_tag("feral_vision_run_id", external_run_id)
         yield
 
 

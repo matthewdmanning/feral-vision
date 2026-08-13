@@ -19,5 +19,7 @@ substitutions:
   _COCO_MAX_EPOCHS: "50"
   _COCO_BATCH_SIZE: "16"
 
+serviceAccount: projects/cs-poc-kewg0kffb7uwobgq1rex2af/serviceAccounts/feral-vision-ai@cs-poc-kewg0kffb7uwobgq1rex2af.iam.gserviceaccount.com
+
 options:
   logging: CLOUD_LOGGING_ONLY

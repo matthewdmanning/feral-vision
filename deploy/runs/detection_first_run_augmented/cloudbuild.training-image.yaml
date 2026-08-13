@@ -1,11 +1,11 @@
 steps:
   - name: gcr.io/cloud-builders/docker
-    id: build-detection-training-image
+    id: build-detection-first-run-augmented-training-image
     entrypoint: bash
     args:
       - -ceu
       - |
-        docker build --build-arg="BASE_IMAGE=${_BASE_IMAGE}" --tag "${_TRAINING_IMAGE}" --file=deploy/runs/detection/Dockerfile.gcp .
+        docker build --build-arg="BASE_IMAGE=${_BASE_IMAGE}" --tag "${_TRAINING_IMAGE}" --file=deploy/runs/detection_first_run_augmented/Dockerfile.gcp .
         docker push "${_TRAINING_IMAGE}"
 
 images:

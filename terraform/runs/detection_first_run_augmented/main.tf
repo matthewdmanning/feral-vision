@@ -9,7 +9,7 @@ data "google_storage_bucket" "dataset" {
   project = var.bucket_project_id
 }
 
-resource "google_compute_instance" "detection_trainer" {
+resource "google_compute_instance" "detection_first_run_augmented_trainer" {
   name         = var.vm_name
   machine_type = var.machine_type
   zone         = var.zone
@@ -52,7 +52,12 @@ resource "google_compute_instance" "detection_trainer" {
     bucket_name             = data.google_storage_bucket.dataset.name
     dataset_artifact_prefix = var.dataset_artifact_prefix
     dataset_mount_dir       = var.dataset_mount_dir
-    mlflow_tracking_uri     = var.mlflow_tracking_uri
+    data_reference          = var.data_reference
+    mlflow_artifact_prefix  = var.mlflow_artifact_prefix
+    project_id              = var.project_id
+    run_id                  = var.run_id
     training_image          = var.training_image
+    vm_name                 = var.vm_name
+    zone                    = var.zone
   })
 }

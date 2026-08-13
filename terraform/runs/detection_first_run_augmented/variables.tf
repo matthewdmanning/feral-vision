@@ -26,16 +26,16 @@ variable "region" {
 }
 
 variable "zone" {
-  description = "Compute Engine zone for this detection run."
+  description = "Compute Engine zone for this first augmented detection run."
   type        = string
   default     = "us-east4-c"
   nullable    = false
 }
 
 variable "vm_name" {
-  description = "Unique Compute Engine instance name for the detection run."
+  description = "Unique Compute Engine instance name for the first augmented detection run."
   type        = string
-  default     = "feral-vision-detection-trainer"
+  default     = "feral-vision-detection-first-run-augmented-trainer"
   nullable    = false
 }
 
@@ -81,7 +81,7 @@ variable "service_account_email" {
 }
 
 variable "training_image" {
-  description = "Digest-pinned detection training image built from deploy/runs/detection."
+  description = "Digest-pinned first augmented detection image built from deploy/runs/detection_first_run_augmented."
   type        = string
   nullable    = false
 
@@ -109,14 +109,36 @@ variable "dataset_mount_dir" {
   nullable    = false
 }
 
-variable "mlflow_tracking_uri" {
-  description = "Managed non-secret MLflow tracking endpoint for this run."
+variable "mlflow_artifact_prefix" {
+  description = "Writable non-secret Cloud Storage prefix for MLflow and run evidence."
   type        = string
   nullable    = false
 
   validation {
-    condition     = can(regex("^https://", var.mlflow_tracking_uri))
-    error_message = "mlflow_tracking_uri must be an HTTPS managed tracking endpoint."
+    condition     = can(regex("^gs://[a-z0-9][a-z0-9._-]+/.+$", var.mlflow_artifact_prefix))
+    error_message = "mlflow_artifact_prefix must be a non-empty gs:// prefix."
+  }
+}
+
+variable "run_id" {
+  description = "Immutable first-run identifier used to correlate VM, MLflow, and evidence."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]{2,62}$", var.run_id))
+    error_message = "run_id must be a lowercase hyphenated identifier."
+  }
+}
+
+variable "data_reference" {
+  description = "Version-pinned Dataset Variant tracker URI used by cloud preflight."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^gs://[^/#]+/.+#[0-9]+$", var.data_reference))
+    error_message = "data_reference must include an immutable Cloud Storage object generation."
   }
 }
 
@@ -125,7 +147,7 @@ variable "labels" {
   type        = map(string)
   default = {
     managed-by = "terraform"
-    purpose    = "detection-training"
+    purpose    = "detection-first-run-augmented-training"
   }
   nullable = false
 }

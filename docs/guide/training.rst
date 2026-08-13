@@ -25,9 +25,11 @@ Cloud training
 
 Cloud training is provisioned through Terraform and its operational scripts;
 manual Docker launches are not a supported workflow. The provisioned GPU VM
-stages data on its SSD, mounts it at ``/data`` in the training container, runs
-the configured augmentation, and starts the canonical trainer. Cloud workflow
-changes are made through the Terraform and operational-script interfaces.
+stages a reviewed Dataset Variant on its SSD, mounts it at ``/data`` in the
+training container, runs preflight, and starts the canonical trainer. Dataset
+augmentation and DVC publication occur upstream before VM provisioning. Cloud
+workflow changes are made through the Terraform and operational-script
+interfaces.
 
 Data pipeline
 -------------

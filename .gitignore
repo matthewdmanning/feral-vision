@@ -53,3 +53,6 @@ docs/external_refs/mlflow_examples.md
 
 # Local augmentation-preview renders
 aug_preview/
+
+# Ephemeral first augmented detection-run evidence
+artifacts/detection_first_run_augmented/
