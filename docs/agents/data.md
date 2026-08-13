@@ -4,6 +4,16 @@ Use this guide when changing data ingestion, dataset contracts, or dataset
 publication. Data operation entrypoints live in
 [`scripts/data/`](../../scripts/data/).
 
+## Data flow
+
+`Data Source Adapter -> request -> optional transform or format -> Dataset`
+
+`Dataset -> modification -> Dataset Variant`
+
+`Dataset or Dataset Variant -> Publish -> DVC Registry`
+
+A Dataset Variant is a Dataset. DVC owns Dataset Artifacts and their lineage.
+
 Every dataset root has `images/` and `annotations/` directories. Annotation
 files match image stems: masks use `.png` or `.jpg`, YOLO boxes use `.txt`, and
 classification labels use `.json`; `names.yaml` records class indices. The data
@@ -15,7 +25,8 @@ datasets/<dataset>/<artifact>/
 │   ├── images/
 │   └── annotations/
 ├── dataset-artifact.json
-└── dataset-artifact.dvc
+├── dataset-artifact.dvc
+└── dvc.lock
 ~~~
 
 The dataset-only bucket is the source for Dataset Artifacts and is the only
@@ -24,45 +35,33 @@ lifecycle rules, and least-privilege access for the Cloud Build publisher,
 DVC-repository automation, and training readers. General storage must not be a
 source for a Dataset Artifact.
 
-Cloud Build publishes prepared data to a versioned Cloud Storage prefix. The
-dataset bucket is the Dataset Artifact catalog: each dataset prefix contains a
-`payload/` directory, `dataset-artifact.json`, and a version-aware
-`dataset-artifact.dvc` tracker. Cloud Build creates that tracker with
-`dvc import-url --no-download --version-aware` after publishing the payload.
-The temporary no-SCM DVC workspace exists only to generate the tracker; it does
-not store dataset blobs or become a training dependency. Object Versioning must
-be enabled on the source bucket before this workflow is used.
+Cloud Build records each prepared `payload/` folder with DVC. The DVC remote
+stores the Dataset's managed data and the Dataset Artifact prefix receives only
+the resulting `dvc.lock`. The temporary no-SCM DVC workspace runs `dvc add`,
+defines the Dataset folder as a stage dependency, runs `dvc repro`, and pushes
+the DVC-managed Dataset. Object Versioning must be enabled on the source bucket
+before this workflow is used.
 
-The tracker records the GCS object generations. Training consumes the selected
-tracker and staged data, and records the tracker digest in its run manifest and
-MLflow lineage. A new cloud version is adopted only by publishing a new artifact
-prefix or updating its tracker with `dvc update --rev`; do not overwrite a
-reviewed training input in place. DVC publication may run in the training
-container when that workflow needs it.
+`dvc.lock` records the selected Dataset folder. The training VM stages its
+selected data on the local SSD, runs DVC there before model training, and
+records the resulting lock digest in MLflow lineage. Do not write that local
+run evidence back over a reviewed training input in place.
 
-## Hydra-selected data workflow
+### Uncommitted tracker recovery
 
-Use this single conditional workflow for the Hydra-specified data inputs:
-
-1. Download the Hydra-specified source files only after checking that they do
-   not already exist on the server.
-2. Publish and version the raw Dataset Artifact only after checking that it
-   does not already exist.
-3. If augmentation is specified, create and publish the Dataset Variant only
-   after checking that it has not already been created.
-4. Train from the Hydra-specified training files: either the raw source files
-   or the augmented files.
-
-Completed steps are inputs to later steps and must not be repeated.
+`dataset-artifact.dvc` without `dvc.lock` is uncommitted source metadata, not
+training lineage. The training VM creates its own local DVC workspace after
+staging the canonical payload. If that workspace already has `.dvc` without
+`dvc.lock`, it runs `dvc commit`, reproduces the Dataset stage with `dvc repro`,
+and verifies the local lock before training. Do not infer a lockfile from a
+`.dvc` tracker or overwrite the source artifact with run-local metadata.
 
 ## Acquisition-publication contract
 
 An acquisition image is source-specific. It writes a canonical
-`/workspace/payload/images/` and `/workspace/payload/annotations/` layout plus
-`/workspace/dataset-input.json`. The input metadata must name the dataset and
-source and include a provenance object. The DVC publication image validates this
-shared workspace, uploads the payload and manifest through the
-Python client, then generates and uploads the version-aware tracker.
+`/workspace/payload/images/` and `/workspace/payload/annotations/` layout. The
+DVC publication image validates this shared workspace, records the folder with
+DVC, runs `dvc repro`, pushes the DVC-managed Dataset, and publishes `dvc.lock`.
 
 Every publication supplies immutable acquisition and DVC image digests and a
 new, reviewed `DATASET_ARTIFACT_PREFIX`. The prefix is intentionally a required

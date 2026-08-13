@@ -2,55 +2,10 @@
 
 ## Module-level tests
 
-### test_publish_dataset_artifact_uploads_payload_and_manifest
+### test_version_dataset_records_folder_in_lockfile
 
-Purpose: Verify canonical dataset payload files and a generation-guarded manifest are published together.
-
-Load-bearing: True
-
-Occurrence probability: 3
-
-#### payload_root
-
-#### input_path
-
-### test_publish_dataset_artifact_rejects_missing_provenance
-
-Purpose: Verify publication rejects acquisition metadata without provenance.
-
-Load-bearing: True
-
-Occurrence probability: 2
-
-#### payload_root
-
-#### tmp_path
-
-### test_publish_dataset_artifact_rejects_noncanonical_payload
-
-Purpose: Verify publication rejects payloads missing the required annotations directory.
-
-Load-bearing: True
-
-Occurrence probability: 2
-
-#### input_path
-
-#### tmp_path
-
-### test_publish_dataset_tracker_uploads_generated_dvc_file
-
-Purpose: Verify the generated DVC tracker is uploaded under the dataset artifact prefix.
-
-Load-bearing: True
-
-Occurrence probability: 3
-
-#### tmp_path
-
-### test_publish_dataset_variant_records_immutable_source_artifact_lineage
-
-Purpose: Verify a Dataset Variant Artifact records its immutable source artifact and annotation-aware operation.
+Purpose: Verify a Dataset folder is added to DVC, recorded as a stage dependency,
+and reproduced into `dvc.lock`.
 
 Load-bearing: True
 
@@ -58,7 +13,35 @@ Occurrence probability: 3
 
 #### payload_root
 
-#### input_path
+### test_publish_dataset_lock_uploads_only_lockfile
+
+Purpose: Verify Dataset publication uploads only `dvc.lock` as the Dataset
+version record.
+
+Load-bearing: True
+
+Occurrence probability: 3
+
+#### tmp_path
+
+### test_publication_script_pushes_dataset_before_its_lockfile
+
+Purpose: Verify the Cloud Job pushes DVC-managed Dataset data before making the
+lockfile available to training.
+
+Load-bearing: True
+
+Occurrence probability: 3
+
+### test_publish_dataset_lock_rejects_non_lockfile
+
+Purpose: Verify Dataset publication rejects missing or non-`dvc.lock` metadata.
+
+Load-bearing: True
+
+Occurrence probability: 3
+
+#### tmp_path
 
 ### test_preparation_config_requires_separate_immutable_images
 
@@ -68,7 +51,7 @@ Load-bearing: True
 
 Occurrence probability: 2
 
-Rationale: This is a configuration smoke test; it does not execute the built
+Rationale: This is a configuration check; it does not execute the built
 images or prove the remote publication boundary.
 
 #### default

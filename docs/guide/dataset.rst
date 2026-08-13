@@ -67,8 +67,13 @@ publication boundary without adding its dependencies to the DVC image.
 The COCO acquisition image includes FiftyOne and its MongoDB runtime; those
 source-specific dependencies are not part of the publisher.
 
-Training is given a reviewed Dataset Artifact, not a mutable bucket prefix. Its
-tracker pins the Cloud Storage object generations used by the run. A later data
-version is adopted through a reviewed tracker update (optionally with
-``dvc update --rev`` for a selected object version), rather than by overwriting
-the training input in place.
+Training stages its selected Dataset Artifact on the training VM's local SSD.
+It creates ``dataset-artifact.dvc`` and ``dvc.lock`` locally before model
+training, then records the lock in MLflow lineage. A later data version is
+adopted through a reviewed input selection, rather than by overwriting the
+source artifact in place.
+
+When a Dataset has a retained annotation generation but no live annotation or
+lockfile, the training run names that retained generation, stages it alongside
+the selected images on the local SSD, and creates its local DVC tracker and
+lock before training.

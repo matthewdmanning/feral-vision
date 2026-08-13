@@ -26,7 +26,7 @@ reported.
 
 - **References:** `cloudops.md:12-20`; `mlops.md:28-38`.
 - **Rule:** Both identify Terraform as declaring the GCP resources/access rules,
-  `deploy/cloudbuild.yaml` as image-build input, `scripts/cloud/run.py` as
+  `deploy/cloudbuild.yaml` as image-build input, `scripts/cloud/image_operations.sh` as
   `build`/`push` dispatcher, the `base -> training` image graph,
   `deploy/compose.yaml` local base reuse, `deploy/cloudbuild.build.yaml` remote
   base/final-image publishing, and `stage_model.sh` Cloud Storage staging.

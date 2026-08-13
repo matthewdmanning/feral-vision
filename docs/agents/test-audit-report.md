@@ -24,7 +24,7 @@ must not be read as a test-quality score.
    the private `_index` field. It can pass while the public `load()` behavior is
    broken and should be treated as partial coverage.
 3. `test_preparation_config_requires_separate_immutable_images` uses negative
-   substring checks against a Dockerfile. Those checks are useful smoke signals,
+   substring checks against a Dockerfile. Those checks are useful lightweight signals,
    but they do not establish that the built image or Cloud Build execution has
    the required boundary.
 4. `test_fit_trains_bbox_net_toward_real_annotation_boxes` does not test
@@ -51,7 +51,7 @@ implementations are correct or incorrect.
 `Load-bearing` means the scenario protects a supported production contract,
 data/model lineage guarantee, safety boundary, or materially invalidating
 failure. It does not mean the test is strong. Optional preview presentation,
-fixture-only smoke checks, cached-value shortcuts, and the inactive
+fixture-only checks, cached-value shortcuts, and the inactive
 Ultralytics head-rebuild capability are marked false. Occurrence scores describe
 the production scenario, not pytest frequency; rare configuration and recovery
 paths are scored 1–2 even when their tests are valuable.

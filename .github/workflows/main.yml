@@ -28,7 +28,3 @@ jobs:
   security:
     name: Security checks
     uses: ./.github/workflows/security.yml
-
-  training-smoke:
-    name: Training smoke
-    uses: ./.github/workflows/train.yml

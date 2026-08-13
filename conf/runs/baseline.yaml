@@ -1,8 +1,8 @@
 # Canonical reproducible local training recipe.
 defaults:
   - /data@_global_.data: local
-  - /model@_global_.model: net
-  - /train@_global_.train: baseline
+  - /model@_global_.model: yolo11n_binary
+  - /train@_global_.train: binary_detection
   - /inference@_global_.inference: local
   - /tracking@_global_.tracking: mlflow
   - /augmentation@_global_.augmentation: standard

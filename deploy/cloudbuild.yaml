@@ -1,5 +1,5 @@
 # Configuration for the cloud . Operational steps live in
-# scripts/cloud/ and consume these values through scripts/cloud/run.py.
+# scripts/cloud/image_operations.sh consumes these values to submit Cloud Build.
 defaults:
   - deploy_schema
   - _self_

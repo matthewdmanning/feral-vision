@@ -9,3 +9,12 @@ must always be non-null so a model remains reproducible.
 
 Consult the co-located configuration README for the concern's purpose and use a
 complete named Run Recipe for reproducible work.
+
+## Model and Run Recipe flow
+
+`Model Source Adapter -> model (+ optional weights)`
+
+Hydra owns tunable configuration and complete named Run Recipes. A Run Recipe
+names the model and Dataset selected for training; a workflow script consumes
+that configuration. The Run Recipe is information, not an actor in the
+workflow.

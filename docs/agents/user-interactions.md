@@ -17,10 +17,10 @@ interface. It does not govern messages intended for other agents.
 - When clarifying terminology, ask about one concrete object at a time; do not
   promote a proposed umbrella term to canonical vocabulary.
 
-## Cloud-run communication
+## Cloud Job communication
 
 When explaining the project pipeline to users, describe the data flow, model
-flow, Cloud Run, and its concrete outputs. Do not replace that explanation with
+flow, Cloud Job, and its concrete outputs. Do not replace that explanation with
 run-specific configuration or Cloud Operations internals.
 
 ## CLI boundary

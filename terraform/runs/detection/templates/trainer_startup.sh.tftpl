@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly training_image="${training_image}"
+readonly dataset_uri="gs://${bucket_name}/${dataset_artifact_prefix}"
+readonly dataset_payload_uri="$dataset_uri/payload"
+readonly source_annotation_uri="$dataset_payload_uri/annotations/instances.json#${source_annotation_generation}"
+readonly dataset_host_mount_dir="${dataset_host_mount_dir}"
+readonly dataset_container_mount_dir="${dataset_container_mount_dir}"
+readonly mlflow_tracking_uri="${mlflow_tracking_uri}"
+readonly local_ssd_device="/dev/nvme0n1"
+readonly local_ssd_mount_dir="/mnt/disks/ssd"
+
+test -b "$local_ssd_device"
+mkdir -p "$local_ssd_mount_dir"
+if ! mountpoint -q "$local_ssd_mount_dir"; then
+  if ! blkid "$local_ssd_device" >/dev/null 2>&1; then
+    mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0 "$local_ssd_device"
+  fi
+  mount -o discard,defaults "$local_ssd_device" "$local_ssd_mount_dir"
+fi
+
+mkdir -p "$dataset_host_mount_dir/images" "$dataset_host_mount_dir/annotations"
+docker pull "$training_image"
+
+docker run --rm \
+  -v /mnt/disks/ssd:/data \
+  --entrypoint gcloud \
+  "$training_image" storage rsync --recursive --checksums-only \
+  --dry-run --quiet \
+  "$dataset_payload_uri/images" "$dataset_container_mount_dir/images"
+
+docker run --rm \
+  -v /mnt/disks/ssd:/data \
+  --entrypoint gcloud \
+  "$training_image" storage rsync --recursive --checksums-only --quiet \
+  "$dataset_payload_uri/images" "$dataset_container_mount_dir/images"
+
+docker run --rm \
+  -v /mnt/disks/ssd:/data \
+  --entrypoint gcloud \
+  "$training_image" storage cp --quiet \
+  "$source_annotation_uri" "$dataset_container_mount_dir/annotations/instances.json"
+
+docker run --rm \
+  -v /mnt/disks/ssd:/data \
+  --entrypoint gcloud \
+  "$training_image" storage cp --quiet \
+  "$dataset_uri/dataset-artifact.json" "$dataset_container_mount_dir/dataset-artifact.json"
+
+test -d "$dataset_host_mount_dir/images"
+test -d "$dataset_host_mount_dir/annotations"
+test -s "$dataset_host_mount_dir/annotations/instances.json"
+test -f "$dataset_host_mount_dir/dataset-artifact.json"
+
+docker run --rm \
+  -v /mnt/disks/ssd:/data \
+  --entrypoint bash \
+  "$training_image" -ceu '
+    cd /data
+    if [ ! -d .dvc ]; then
+      uv run --no-sync dvc init --no-scm
+    elif [ ! -f dvc.lock ]; then
+      for tracker in *.dvc; do
+        [ -f "$tracker" ] || continue
+        uv run --no-sync dvc commit "$tracker"
+      done
+    fi
+    uv run --no-sync python -c "from pathlib import Path; from feral_vision.data.dataset_artifact import version_dataset; print(version_dataset(Path(\"${dataset_container_mount_dir}\"), workspace=Path(\"/data\")))"
+    cp dvc.lock "${dataset_container_mount_dir}/dvc.lock"
+    cp dataset-artifact.dvc "${dataset_container_mount_dir}/dataset-artifact.dvc"
+  '
+
+test -f "$dataset_host_mount_dir/dataset-artifact.dvc"
+test -f "$dataset_host_mount_dir/dvc.lock"
+
+docker run --rm \
+  --gpus all \
+  --entrypoint python \
+  "$training_image" -c 'import torch; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))'
+
+docker run --rm \
+  --gpus all \
+  -v /mnt/disks/ssd:/data \
+  -e TRAIN_DATA="$dataset_container_mount_dir" \
+  -e MLFLOW_TRACKING_URI="$mlflow_tracking_uri" \
+  -e RUN_CONFIG_NAME="${run_config_name}" \
+  "$training_image"

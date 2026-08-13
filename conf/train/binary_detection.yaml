@@ -1,0 +1,14 @@
+# Detection-specific trainer parameters for the first augmented COCO-animal run.
+defaults:
+  - train_schema
+  - optim: adam
+  - scheduler: cosine
+  - loss_fn: cross_entropy
+  - _self_
+
+epochs: 50
+batch_size: 32
+num_workers: 0
+device: cuda
+task: detection
+num_classes: 2

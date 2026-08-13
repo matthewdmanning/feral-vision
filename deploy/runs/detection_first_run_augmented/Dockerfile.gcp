@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=feral-vision:smoke
+ARG BASE_IMAGE=feral-vision:default
 FROM ${BASE_IMAGE}
 
 RUN mkdir -p /opt/feral-vision && cp -a /workspace/. /opt/feral-vision/
