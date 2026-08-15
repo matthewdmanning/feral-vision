@@ -1,4 +1,23 @@
-# MLFlow PyTorch Logging
+# MLFlow Examples
+
+## Server Setup
+
+The MLFlow tracking server must be created using the bash command `mlflow server`.
+
+For locally hosted servers, add:
+
+`--host 0.0.0.0 --port 5000`
+
+Two storage backend types are supported:
+
+Local filesystem:
+`--backend-store-uri <backend_folder_path>`
+SQL Server
+`--backend_store_uri <database-connect-string>`
+
+Artifacts destination is set with the `--artifacts-destination` flag.
+
+## MLFlow PyTorch Logging
 
 To manually log a PyTorch model in MLflow, use the `mlflow.pytorch.log_model()` function inside an active run block.
 
