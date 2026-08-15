@@ -5,4 +5,4 @@ param(
 )
 
 $escaped = $SourceDir.Replace("'", "''")
-uv run python -c "from feral_vision.data.augmentation_preview_app import start_augmentation_preview_server; start_augmentation_preview_server(r'$escaped', port=$Port)"
+uv run python -c "from feral_vision.augmentation_preview import start_augmentation_preview_server; start_augmentation_preview_server(r'$escaped', port=$Port)"

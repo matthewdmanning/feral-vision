@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 IMAGE_SUFFIXES = frozenset({".bmp", ".jpeg", ".jpg", ".png"})
 PREVIEW_TRANSFORM_REFERENCE = json.loads(
     Path(__file__)
-    .with_name("albumentations_preview_reference.json")
+    .with_name("albumentations_reference.json")
     .read_text(encoding="utf-8")
 )
 
