@@ -1,6 +1,8 @@
 """Shared pytest fixtures for the test suite."""
 
 from pathlib import Path
+from types import SimpleNamespace
+from urllib.parse import urlparse
 
 import pytest
 import torch
@@ -12,6 +14,59 @@ from feral_vision.io_utils import DatasetSource
 FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures"
 
 _VALID_BBOX_FORMATS = frozenset({"cxcywh", "xyxy"})
+
+
+@pytest.fixture(params=("sqlite", "legacy-file"))
+def mlflow_tracking_backend(request, tmp_path, monkeypatch):
+    """Provide isolated SQLite and legacy filesystem MLflow backends.
+
+    The fixture uses MLflow's fluent tracking APIs for setup and keeps model
+    registration mocked. Artifact uploads and downloaded model files remain
+    real local filesystem transfers in both backend modes.
+    """
+    import mlflow
+
+    import feral_vision.training.trainer as trainer_module
+
+    previous_tracking_uri = mlflow.get_tracking_uri()
+    monkeypatch.chdir(tmp_path)
+    mlflow.end_run()
+    if request.param == "sqlite":
+        monkeypatch.delenv("MLFLOW_ALLOW_FILE_STORE", raising=False)
+        tracking_uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
+    else:
+        monkeypatch.setenv("MLFLOW_ALLOW_FILE_STORE", "true")
+        tracking_uri = (tmp_path / "mlruns").as_uri()
+
+    experiment_name = f"trainer-tests-{request.param}"
+    mlflow.set_tracking_uri(tracking_uri)
+    mlflow.set_experiment(experiment_name)
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    assert experiment is not None
+
+    # Production accepts only deployed/local-server URIs. The fixture tests
+    # MLflow's local backends without weakening that production contract.
+    monkeypatch.setattr(trainer_module, "validate_tracking_uri", lambda uri: uri)
+
+    registered_models = []
+
+    def _register_model(model_uri, name):
+        registered_models.append((model_uri, name))
+        return SimpleNamespace(version="1")
+
+    monkeypatch.setattr(mlflow, "register_model", _register_model)
+
+    artifact_location = urlparse(experiment.artifact_location)
+    yield SimpleNamespace(
+        kind=request.param,
+        tracking_uri=tracking_uri,
+        experiment_name=experiment_name,
+        artifact_root=Path(artifact_location.path),
+        registered_models=registered_models,
+    )
+
+    mlflow.end_run()
+    mlflow.set_tracking_uri(previous_tracking_uri)
 
 
 @pytest.fixture(params=[FIXTURE_ROOT, str(FIXTURE_ROOT)])

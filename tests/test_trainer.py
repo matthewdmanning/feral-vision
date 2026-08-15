@@ -1,6 +1,8 @@
 """Integration tests for the dependency-injected Trainer training loop.
 
-Uses real nn.Module/optimizer/scheduler instances throughout (no mocks). The
+Uses real nn.Module/optimizer/scheduler instances throughout. MLflow backend
+tests use the shared fixture, mocking only model-registration metadata while
+preserving real artifact transfers. The
 validation-metric tests use the real fixture-backed AnnotationDataset from
 conftest.py (trainer_fixture_dataset) rather than a stand-in, to exercise
 Trainer.fit's actual val_dataset contract end to end.
@@ -8,6 +10,7 @@ Trainer.fit's actual val_dataset contract end to end.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 import math
 from pathlib import Path
@@ -22,7 +25,30 @@ from torch import nn
 
 from feral_vision.data.annotations import BBoxAnnotation
 from feral_vision.training.optim import build_loss_fn, build_optimizer
-from feral_vision.training.trainer import Trainer
+from feral_vision.training.trainer import Trainer, _model_artifact_name
+
+
+@pytest.fixture(autouse=True)
+def mock_mlflow_for_loop_unit_tests(request, monkeypatch):
+    """Stub the MLflow boundary for tests that only exercise training loops."""
+    if (
+        "mlflow_tracking_backend" in request.fixturenames
+        or request.node.name == "test_model_artifact_name_is_passed_to_mlflow_logging"
+    ):
+        return
+
+    import feral_vision.training.trainer as trainer_module
+
+    @contextmanager
+    def _inactive_run(_cfg):
+        yield
+
+    monkeypatch.setattr(trainer_module, "_active_mlflow_run", _inactive_run)
+    monkeypatch.setattr(trainer_module, "_try_log_resolved_config", lambda _cfg: None)
+    monkeypatch.setattr(trainer_module, "_try_log_dvc_lineage", lambda _cfg: None)
+    monkeypatch.setattr(trainer_module, "_try_log_metric", lambda *_args: None)
+    monkeypatch.setattr(Trainer, "_try_log_model", lambda self, _name: None)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -143,15 +169,12 @@ def test_fit_creates_nested_parent_dir_for_checkpoint(tmp_path):
     assert nested.exists()
 
 
-def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(tmp_path):
+def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(
+    tmp_path, mlflow_tracking_backend
+):
     """Logs a two-dimensional image model with MLflow's PyTorch flavor."""
-    tracking_uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
-    mlflow.set_tracking_uri(tracking_uri)
-    artifact_root = tmp_path / "artifacts"
-    client = mlflow.tracking.MlflowClient(tracking_uri)
-    experiment_id = client.create_experiment(
-        "trainer-tests", artifact_location=artifact_root.as_uri()
-    )
+    backend = mlflow_tracking_backend
+    tracking_uri = backend.tracking_uri
     data_root = tmp_path / "data"
     data_root.mkdir()
     data_tracker = data_root / "dvc.lock"
@@ -162,7 +185,7 @@ def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(tmp_pat
         model=SimpleNamespace(architecture=SimpleNamespace(id="trainer-test-model")),
         tracking=SimpleNamespace(
             tracking_uri=tracking_uri,
-            experiment_name="trainer-tests",
+            experiment_name=backend.experiment_name,
         ),
     )
     best_path = tmp_path / "best.pt"
@@ -178,12 +201,14 @@ def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(tmp_pat
     dataloader = [(torch.randn(2, 3, 8, 8), torch.randn(2, 2, 8, 8))]
     trainer.fit(dataloader)
 
+    artifact_root = backend.artifact_root
     mlmodel_files = list(artifact_root.rglob("MLmodel"))
     assert len(mlmodel_files) == 1
     model_metadata = yaml.safe_load(mlmodel_files[0].read_text())
     assert model_metadata["signature"] is not None
     assert model_metadata["saved_input_example_info"] is not None
-    run = client.search_runs([experiment_id])[0]
+    run = mlflow.last_active_run()
+    assert run is not None
     assert run.data.params["dvc_data_version"].startswith("dvc.lock@sha256:")
     logged_trackers = list(artifact_root.rglob("dvc.lock"))
     assert len(logged_trackers) == 1
@@ -194,31 +219,34 @@ def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(tmp_pat
         "data": {"root": str(data_root)},
         "model": {"architecture": {"id": "trainer-test-model"}},
         "tracking": {
-            "experiment_name": "trainer-tests",
+            "experiment_name": backend.experiment_name,
             "tracking_uri": tracking_uri,
         },
         "train": {"epochs": 1},
     }
-    model_versions = client.search_model_versions("name = 'trainer-test-model'")
-    assert len(model_versions) == 1
-    assert model_versions[0].run_id == run.info.run_id
+    assert backend.registered_models == [
+        (
+            f"runs:/{run.info.run_id}/trainer-test-model__dataset-data__epochs-1",
+            "trainer-test-model",
+        )
+    ]
 
 
-def test_fit_logs_best_model_weights_not_final_epoch_weights(tmp_path):
+def test_fit_logs_best_model_weights_not_final_epoch_weights(
+    tmp_path, mlflow_tracking_backend
+):
     """MLflow stores only the selected best model artifact for a run."""
-    tracking_uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
-    mlflow.set_tracking_uri(tracking_uri)
-    artifact_root = tmp_path / "artifacts"
-    client = mlflow.tracking.MlflowClient(tracking_uri)
-    client.create_experiment(
-        "best-model-tests", artifact_location=artifact_root.as_uri()
-    )
+    backend = mlflow_tracking_backend
+    tracking_uri = backend.tracking_uri
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    (data_root / "dvc.lock").write_text("outs:\n- md5: immutable-data-version\n")
     cfg = SimpleNamespace(
         train=SimpleNamespace(epochs=2),
-        data=SimpleNamespace(root=str(tmp_path)),
+        data=SimpleNamespace(root=str(data_root)),
         tracking=SimpleNamespace(
             tracking_uri=tracking_uri,
-            experiment_name="best-model-tests",
+            experiment_name=backend.experiment_name,
         ),
     )
     model = nn.Conv2d(3, 1, kernel_size=1, bias=False)
@@ -232,11 +260,57 @@ def test_fit_logs_best_model_weights_not_final_epoch_weights(tmp_path):
 
     trainer.fit([])
 
-    mlmodel_file = next(artifact_root.rglob("MLmodel"))
+    mlmodel_file = next(backend.artifact_root.rglob("MLmodel"))
     logged_model = mlflow.pytorch.load_model(str(mlmodel_file.parent))
     input_example = torch.ones(2, 3, 8, 8)
     assert torch.allclose(logged_model(input_example), torch.full((2, 1, 8, 8), 3.0))
     assert torch.allclose(trainer.model(input_example), torch.full((2, 1, 8, 8), 6.0))
+
+
+def test_model_artifact_name_is_passed_to_mlflow_logging(tmp_path, monkeypatch):
+    """MLflow receives the model and training context from the Hydra config."""
+    cfg = SimpleNamespace(
+        train=SimpleNamespace(epochs=3),
+        data=SimpleNamespace(source="coco", root="/datasets/train2017"),
+        augmentation=SimpleNamespace(name="standard"),
+        model=SimpleNamespace(architecture=SimpleNamespace(id="yolo11n.pt")),
+    )
+    model = nn.Conv2d(3, 1, kernel_size=1)
+    best_path = tmp_path / "best.pt"
+    torch.save(model.state_dict(), best_path)
+    trainer = Trainer(
+        model=model,
+        optimizer=torch.optim.SGD(model.parameters(), lr=0.01),
+        loss_fn=_trivial_loss,
+        cfg=cfg,
+        best_model_path=best_path,
+    )
+    trainer._input_example = torch.ones(2, 3, 8, 8)
+    logged = {}
+
+    monkeypatch.setattr(
+        mlflow,
+        "active_run",
+        lambda: SimpleNamespace(info=SimpleNamespace(run_id="run-id")),
+    )
+    monkeypatch.setattr(
+        mlflow.pytorch,
+        "log_model",
+        lambda model, **kwargs: logged.update(kwargs),
+    )
+    monkeypatch.setattr(
+        mlflow,
+        "register_model",
+        lambda model_uri, name: SimpleNamespace(version="1"),
+    )
+    monkeypatch.setattr(mlflow, "set_tag", lambda *_args: None)
+
+    model_name = _model_artifact_name(cfg)
+    trainer._try_log_model(model_name)
+
+    assert logged["name"] == (
+        "yolo11n.pt__dataset-coco-train2017__augmentation-standard__epochs-3"
+    )
 
 
 # ---------------------------------------------------------------------------

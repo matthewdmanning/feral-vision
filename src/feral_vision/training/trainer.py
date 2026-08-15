@@ -12,6 +12,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import math
+import re
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
@@ -34,6 +35,45 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _DVC_PIPELINE_PATH = _PROJECT_ROOT / "dvc.yaml"
 
 LossFn = Callable[[Any, Any], torch.Tensor]
+
+
+def _artifact_name_component(value: Any, fallback: str = "unknown") -> str:
+    """Convert config text into a stable MLflow artifact-name component."""
+    text = str(value).strip()
+    if not text:
+        return fallback
+    component = re.sub(r"[^A-Za-z0-9._-]+", "-", text).strip("-.")
+    return component or fallback
+
+
+def _model_artifact_name(cfg: Any) -> str:
+    """Build a descriptive MLflow model artifact name from the Run Recipe."""
+    model_cfg = getattr(cfg, "model", None)
+    architecture = getattr(model_cfg, "architecture", None)
+    architecture_id = _artifact_name_component(
+        getattr(architecture, "id", None), fallback="model"
+    )
+
+    data_cfg = getattr(cfg, "data", None)
+    data_source = getattr(data_cfg, "source", None)
+    data_root = getattr(data_cfg, "root", None)
+    dataset_values = (data_source, Path(str(data_root)).name if data_root else None)
+    dataset_parts = [
+        _artifact_name_component(value) for value in dataset_values if value
+    ]
+
+    parts = [architecture_id]
+    if dataset_parts:
+        parts.append(f"dataset-{'-'.join(dataset_parts)}")
+
+    augmentation = getattr(getattr(cfg, "augmentation", None), "name", None)
+    if augmentation:
+        parts.append(f"augmentation-{_artifact_name_component(augmentation)}")
+
+    epochs = getattr(getattr(cfg, "train", None), "epochs", None)
+    if epochs is not None:
+        parts.append(f"epochs-{_artifact_name_component(epochs)}")
+    return "__".join(parts)
 
 
 def _resolved_config(cfg: Any) -> Any:
@@ -249,7 +289,7 @@ class Trainer:
         self.best_model_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(self.model.state_dict(), self.best_model_path)
 
-    def _try_log_model(self) -> None:
+    def _try_log_model(self, model_name: str) -> None:
         """Log only the selected best model to the active MLflow run."""
         if self._input_example is None or not self.best_model_path.exists():
             raise RuntimeError(
@@ -257,6 +297,7 @@ class Trainer:
             )
 
         import mlflow
+        from mlflow.pytorch import log_model
         from mlflow.models import infer_signature
 
         active_run = mlflow.active_run()
@@ -277,9 +318,9 @@ class Trainer:
             signature = infer_signature(
                 input_example, predictions.detach().cpu().numpy()
             )
-            mlflow.pytorch.log_model(
+            log_model(
                 self.model,
-                name="pytorch_model",
+                name=model_name,
                 signature=signature,
                 input_example=input_example,
             )
@@ -288,7 +329,7 @@ class Trainer:
             registered_model_name = getattr(architecture, "id", None)
             if registered_model_name:
                 model_version = mlflow.register_model(
-                    model_uri=f"runs:/{active_run.info.run_id}/pytorch_model",
+                    model_uri=f"runs:/{active_run.info.run_id}/{model_name}",
                     name=registered_model_name,
                 )
                 mlflow.set_tag("registered_model_name", registered_model_name)
@@ -307,7 +348,7 @@ class Trainer:
             _try_log_resolved_config(self.cfg)
             _try_log_dvc_lineage(self.cfg)
             history = self._fit(dataloader, val_dataset)
-            self._try_log_model()
+            self._try_log_model(_model_artifact_name(self.cfg))
             return history
 
     def _fit(
