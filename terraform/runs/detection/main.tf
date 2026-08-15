@@ -18,16 +18,6 @@ module "subnetwork" {
   ip_cidr_range = var.subnetwork_ip_cidr_range
 }
 
-module "nat" {
-  source = "../../modules/cloud_nat"
-
-  router_name = var.nat_router_name
-  nat_name    = var.nat_name
-  network     = var.network_self_link
-  region      = var.region
-  subnetwork  = module.subnetwork.self_link
-}
-
 import {
   to = module.subnetwork.google_compute_subnetwork.this
   id = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.subnetwork_name}"
@@ -53,6 +43,7 @@ module "trainer" {
   boot_disk_type              = var.boot_disk_type
   scratch_disk_interface      = var.scratch_disk_interface
   subnetwork                  = module.subnetwork.self_link
+  access_config               = [{ network_tier = var.network_tier }]
   service_account_email       = var.service_account_email
   metadata                    = var.instance_metadata
   metadata_startup_script = templatefile("${path.module}/templates/trainer_startup.sh.tftpl", {
@@ -61,12 +52,10 @@ module "trainer" {
     source_annotation_generation = var.source_annotation_generation
     dataset_host_mount_dir       = var.dataset_host_mount_dir
     dataset_container_mount_dir  = var.dataset_container_mount_dir
-    mlflow_tracking_uri          = var.mlflow_tracking_uri
     run_config_name              = var.run_config_name
     training_image               = var.training_image
   })
 
-  depends_on = [module.nat]
 }
 
 moved {

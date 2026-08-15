@@ -47,6 +47,15 @@ resource "google_compute_instance" "this" {
 
   network_interface {
     subnetwork = var.subnetwork
+
+    dynamic "access_config" {
+      for_each = var.access_config
+
+      content {
+        nat_ip       = access_config.value.nat_ip
+        network_tier = access_config.value.network_tier
+      }
+    }
   }
 
   service_account {

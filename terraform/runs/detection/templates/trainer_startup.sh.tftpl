@@ -4,12 +4,15 @@ set -euo pipefail
 readonly training_image="${training_image}"
 readonly dataset_uri="gs://${bucket_name}/${dataset_artifact_prefix}"
 readonly dataset_payload_uri="$dataset_uri/payload"
+readonly dataset_tracker_uri="$dataset_uri/dataset-artifact.dvc"
+readonly dataset_lock_uri="$dataset_uri/dvc.lock"
 readonly source_annotation_uri="$dataset_payload_uri/annotations/instances.json#${source_annotation_generation}"
 readonly dataset_host_mount_dir="${dataset_host_mount_dir}"
 readonly dataset_container_mount_dir="${dataset_container_mount_dir}"
-readonly mlflow_tracking_uri="${mlflow_tracking_uri}"
+readonly mlflow_tracking_uri="http://localhost:5000"
 readonly local_ssd_device="/dev/nvme0n1"
 readonly local_ssd_mount_dir="/mnt/disks/ssd"
+readonly mlflow_host_mount_dir="/mnt/disks/ssd/mlruns"
 
 test -b "$local_ssd_device"
 mkdir -p "$local_ssd_mount_dir"
@@ -21,6 +24,7 @@ if ! mountpoint -q "$local_ssd_mount_dir"; then
 fi
 
 mkdir -p "$dataset_host_mount_dir/images" "$dataset_host_mount_dir/annotations"
+mkdir -p "$mlflow_host_mount_dir"
 docker pull "$training_image"
 
 docker run --rm \
@@ -53,6 +57,15 @@ test -d "$dataset_host_mount_dir/annotations"
 test -s "$dataset_host_mount_dir/annotations/instances.json"
 test -f "$dataset_host_mount_dir/dataset-artifact.json"
 
+publish_dataset_tracker=false
+publish_dataset_lock=false
+if [ ! -f "$dataset_host_mount_dir/dataset-artifact.dvc" ]; then
+  publish_dataset_tracker=true
+fi
+if [ ! -f "$dataset_host_mount_dir/dvc.lock" ]; then
+  publish_dataset_lock=true
+fi
+
 docker run --rm \
   -v /mnt/disks/ssd:/data \
   --entrypoint bash \
@@ -74,6 +87,22 @@ docker run --rm \
 test -f "$dataset_host_mount_dir/dataset-artifact.dvc"
 test -f "$dataset_host_mount_dir/dvc.lock"
 
+if [ "$publish_dataset_tracker" = true ]; then
+  docker run --rm \
+    -v /mnt/disks/ssd:/data \
+    --entrypoint gcloud \
+    "$training_image" storage cp --no-clobber --quiet \
+    /data/dataset-artifact.dvc "$dataset_tracker_uri"
+fi
+
+if [ "$publish_dataset_lock" = true ]; then
+  docker run --rm \
+    -v /mnt/disks/ssd:/data \
+    --entrypoint gcloud \
+    "$training_image" storage cp --no-clobber --quiet \
+    /data/dvc.lock "$dataset_lock_uri"
+fi
+
 docker run --rm \
   --gpus all \
   --entrypoint python \
@@ -81,7 +110,9 @@ docker run --rm \
 
 docker run --rm \
   --gpus all \
+  --workdir /opt/feral-vision \
   -v /mnt/disks/ssd:/data \
+  -v /mnt/disks/ssd/mlruns:/opt/feral-vision/mlruns \
   -e TRAIN_DATA="$dataset_container_mount_dir" \
   -e MLFLOW_TRACKING_URI="$mlflow_tracking_uri" \
   -e RUN_CONFIG_NAME="${run_config_name}" \

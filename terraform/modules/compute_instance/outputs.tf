@@ -8,6 +8,11 @@ output "private_ip" {
   value       = google_compute_instance.this.network_interface[0].network_ip
 }
 
+output "public_ip" {
+  description = "Ephemeral public IPv4 address assigned to the instance, when configured."
+  value       = try(google_compute_instance.this.network_interface[0].access_config[0].nat_ip, null)
+}
+
 output "zone" {
   description = "Zone of the Compute Engine instance."
   value       = google_compute_instance.this.zone

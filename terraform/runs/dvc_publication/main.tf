@@ -9,16 +9,6 @@ data "google_storage_bucket" "dataset" {
   project = var.bucket_project_id
 }
 
-module "nat" {
-  source = "../../modules/cloud_nat"
-
-  router_name = var.nat_router_name
-  nat_name    = var.nat_name
-  network     = var.network_self_link
-  region      = var.region
-  subnetwork  = var.subnetwork_self_link
-}
-
 module "publisher" {
   source = "../../modules/compute_instance"
 
@@ -42,17 +32,6 @@ module "publisher" {
     target_dataset_artifact_prefix = var.target_dataset_artifact_prefix
   })
 
-  depends_on = [module.nat]
-}
-
-moved {
-  from = google_compute_router.dvc_publication
-  to   = module.nat.google_compute_router.this
-}
-
-moved {
-  from = google_compute_router_nat.dvc_publication
-  to   = module.nat.google_compute_router_nat.this
 }
 
 moved {

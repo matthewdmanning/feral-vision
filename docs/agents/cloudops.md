@@ -17,6 +17,19 @@ Cloud capability set: the `google-cloud-storage` Codex plugin plus the `gcloud`
 and `google-cloud-recipe-auth` skills. Remove this note once the required
 capabilities are available in the standard agent environment.
 
+## Available Tools
+
+Use the following entrypoints for Google Cloud Operations. A skill supplies
+the provider-specific guidance and guardrails; it does not grant credentials or
+IAM permissions.
+
+| Use this when you are... | Base Command | Tool Type |
+| --- | --- | --- |
+| Directing or verifying a Cloud Operation that a workflow script runs through Google Cloud, such as inspecting a Dataset Artifact, submitting an image build, checking a Training Image Digest, or verifying VM and training prerequisites; do not treat the CLI as the owner of Cloud Resources. | `gcloud <group> <resource> <verb>` | Google Cloud CLI with the `gcloud` skill |
+| Establishing or checking the Principal used by a Cloud Job or Cloud Operation | `gcloud auth` | `google-cloud-recipe-auth` skill |
+| Checking or transferring a Dataset or Dataset Variant payload and its Dataset Artifact metadata in the dataset-only bucket while a Cloud Operation acquires or stages training input; DVC still owns Publish and Data Lineage, and the DVC Registry remains distinct from Artifact Registry and operational storage. | `gcloud storage` | Google Cloud CLI |
+| Assessing a Google Cloud Storage Cloud Resource from gathered telemetry for security posture, SAIF compliance, or toxic combinations; use this for a security assessment, not for Dataset acquisition, Publish, training, or Terraform lifecycle management. | — | `google-cloud-storage` plugin / `gcs-security-assessment` skill |
+
 ## Cloud identity
 
 Load `.env.local` only into the invoking process. Do not print, commit, or copy
@@ -97,14 +110,13 @@ Cloud Job, save its outputs while the VM is active, and remove the VM once no
 Cloud Job is running. VM creation is not completion, and no idle VM is
 retained.
 
-When no tracking URI is configured, MLflow resolves its own local default URI
-to `sqlite:///mlflow.db`; it creates that SQLite database when the Cloud Job
-uses MLflow. This is not a managed HTTPS endpoint and must not be discovered as
-one. A Run Recipe may explicitly override the URI for a remote tracking
-service. At the end of the Cloud Job, the startup script uploads the local
-database, other MLflow outputs, and best-performing model weights (Model
-Artifact) to the operational Google Storage bucket, not the data-specific
-bucket, before the VM is removed.
+The detection training-job startup creates an `mlruns` directory and launches
+the MLflow server on `http://localhost:5000` with that directory as its backend
+store. The training process connects to the server rather than opening SQLite
+directly. The directory is mounted on the VM's local SSD so the Run Record,
+artifacts, checkpoints, and best-performing model weights (Model Artifact) are
+available for the job lifetime; copy them to durable operational storage before
+the disposable VM is removed if retention beyond that lifetime is required.
 
 ## Cloud verification status
 
@@ -113,6 +125,7 @@ blocker. It is a self blocking action. The correct action is to suggest or
 initiate verification first by referencing the documentation, then by running
 the workflow on the appropriate service. After referencing the documentation,
 change the state to "Ready for Cloud Verification".
+
 ## Image build flow and operations
 
 `deployment configuration -> image operations script -> Cloud Build -> base

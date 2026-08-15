@@ -27,15 +27,16 @@ it must never fall back to the raw Artifact.
 
 The isolated cloud configuration is under `terraform/runs/detection/`. It
 creates only the run-specific VM and consumes existing networking, image-pull,
-and dataset-read access. It imports the existing training subnet and provisions
-Cloud NAT scoped to that subnet for private VM egress. Its separate state prefix
-isolates this run's resources.
+and dataset-read access. It imports and uses the existing training subnet; this
+project does not provision Cloud NAT. Its separate state prefix isolates this
+run's resources.
 
 Before planning, supply a digest-pinned image built with
 `deploy/runs/detection/cloudbuild.training-image.yaml`, the immutable Dataset
-Variant Artifact prefix, the existing VM service-account email, and an HTTPS
-MLflow tracking endpoint. The run startup stages the payload, manifest, and
-tracker to SSD, then starts `runs/detection`; it never runs augmentation or DVC.
+Variant Artifact prefix, and the existing VM service-account email. The run
+startup stages the payload, manifest, and tracker to SSD, creates the SSD-backed
+`mlruns` directory, and the training-job startup launches MLflow on
+`localhost:5000`; it never runs augmentation or DVC.
 
 ## Validation status
 

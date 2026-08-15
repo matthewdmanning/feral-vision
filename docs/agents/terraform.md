@@ -5,6 +5,14 @@ lifecycle. Use [Cloud Operations](cloudops.md) for cloud identity, image builds,
 VM operations, and cloud training operations.
 Terraform test placement is defined in the [Terraform test boundary](testing.md#terraform-test-boundary).
 
+## Terraform HCP boundary
+
+This project **never uses Terraform HCP**. Do not configure HCP/Terraform Cloud
+organizations, workspaces, `cloud` blocks, or HCP remote state. Terraform runs
+use the Google Cloud Storage backend declared by each run root and execute
+through the Terraform CLI locally or in CI. The Terraform MCP Server, when
+available, is a tooling integration and does not change this project boundary.
+
 You have access to two distinct documentation tools for Terraform and Infrastructure as Code:
 
 1. **Terraform MCP Server**: Live integration with the official Terraform Registry API and HCP Terraform.
@@ -68,7 +76,8 @@ remove the VM; VM removal is a Terraform lifecycle action.
 ## Files
 
 * [`terraform/modules/`](../../terraform/modules/) contains reusable resource
-  modules for Compute Engine, Cloud NAT, and imported subnetworks.
+  modules for Compute Engine and imported subnetworks. Cloud NAT is not used by
+  this project.
 * [`terraform/runs/`](../../terraform/runs/) contains run-scoped Terraform
   modules, including detection training infrastructure.
 * Each run root's `versions.tf` declares its Terraform and provider version

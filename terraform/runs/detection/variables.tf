@@ -89,20 +89,6 @@ variable "network_self_link" {
   nullable    = false
 }
 
-variable "nat_router_name" {
-  description = "Cloud Router name dedicated to the training VM's Cloud NAT."
-  type        = string
-  default     = "feral-vision-detection-router"
-  nullable    = false
-}
-
-variable "nat_name" {
-  description = "Cloud NAT name dedicated to the training VM subnet."
-  type        = string
-  default     = "feral-vision-detection-nat"
-  nullable    = false
-}
-
 variable "subnetwork_ip_cidr_range" {
   description = "Existing IPv4 CIDR range of the imported training subnet."
   type        = string
@@ -120,6 +106,18 @@ variable "subnetwork_name" {
   type        = string
   default     = "default"
   nullable    = false
+}
+
+variable "network_tier" {
+  description = "External network tier for the detection VM's ephemeral public IPv4 address."
+  type        = string
+  default     = "PREMIUM"
+  nullable    = false
+
+  validation {
+    condition     = contains(["PREMIUM", "FIXED_STANDARD", "STANDARD"], var.network_tier)
+    error_message = "network_tier must be PREMIUM, FIXED_STANDARD, or STANDARD."
+  }
 }
 
 variable "instance_tags" {
@@ -225,6 +223,7 @@ variable "training_image" {
 variable "dataset_artifact_prefix" {
   description = "Source Dataset Artifact prefix containing the selected image payload and manifest."
   type        = string
+  default     = "datasets/coco/train2017/raw-20260806-800-animals-v2"
   nullable    = false
 
   validation {
@@ -271,24 +270,12 @@ variable "dataset_container_mount_dir" {
 variable "run_config_name" {
   description = "Hydra Run Recipe consumed by the detection training container."
   type        = string
-  default     = "runs/baseline"
+  default     = "runs/detection"
   nullable    = false
 
   validation {
     condition     = can(regex("^runs/[A-Za-z0-9_-]+$", var.run_config_name))
     error_message = "run_config_name must name a Run Recipe below conf/runs/."
-  }
-}
-
-variable "mlflow_tracking_uri" {
-  description = "MLflow tracking URI; defaults to the local SQLite database on the mounted training SSD."
-  type        = string
-  default     = "sqlite:////data/mlflow.db"
-  nullable    = false
-
-  validation {
-    condition     = can(regex("^(https://|sqlite:)", var.mlflow_tracking_uri))
-    error_message = "mlflow_tracking_uri must be an HTTPS endpoint or SQLite URI."
   }
 }
 

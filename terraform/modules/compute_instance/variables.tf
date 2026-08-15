@@ -102,6 +102,16 @@ variable "subnetwork" {
   nullable    = false
 }
 
+variable "access_config" {
+  description = "Optional external IPv4 access configurations for the instance network interface."
+  type = list(object({
+    nat_ip       = optional(string)
+    network_tier = optional(string, "PREMIUM")
+  }))
+  default  = []
+  nullable = false
+}
+
 variable "service_account_email" {
   description = "Service account attached to the instance."
   type        = string
