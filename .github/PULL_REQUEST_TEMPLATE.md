@@ -1,118 +1,109 @@
-# Summary
+## Summary
 
-What does this PR do and why? (1–3 sentences)
+<!-- Keep each answer brief. -->
 
----
+- What changed?
+- Why was it needed?
 
-## Type of change
+## Change type
 
 - [ ] Bug fix
 - [ ] Feature
-- [ ] Refactor / internal change
+- [ ] Refactor
+- [ ] Configuration
+- [ ] Terraform / cloud infrastructure
 - [ ] Documentation
+- [ ] Tests
 - [ ] CI / tooling
-- [ ] Experiment / research (non-prod)
 
----
+## Related issues or context
 
-## Related issues / context
+<!-- Link issues, discussions, incidents, or design notes. -->
 
-Link issues, discussions, or incidents (e.g. #123).
+## Change map
 
----
+| Area | Changed? | Reviewer notes |
+| --- | --- | --- |
+| Application code | [ ] | |
+| Configuration / Hydra | [ ] | |
+| Data / DVC | [ ] | |
+| Training / deployment | [ ] | |
+| Terraform / cloud | [ ] | |
+| Tests | [ ] | |
+| Documentation | [ ] | |
 
 ## Key changes
 
-- …
-- …
+-
+-
 
----
+## Interfaces and contracts
 
-## Scope and impact
+<!-- Include only when APIs, schemas, config contracts, resource addresses, or file boundaries changed. -->
 
-### Affected areas
+- Changed interfaces or contracts:
+- Migration or compatibility notes:
 
-- [ ] Data / DVC
-- [ ] Model / training code
-- [ ] Inference / deployment
-- [ ] Config (Hydra)
-- [ ] Tracking (MLflow)
-- [ ] Tests
-- [ ] Docs
+## Risk and operations
 
-### Breaking changes
+| Question | Answer |
+| --- | --- |
+| Breaking change? | None / Yes: |
+| Creates, modifies, or destroys cloud resources? | None / Details: |
+| Data, Dataset Artifact, or model-lineage impact? | None / Details: |
+| Rollback or migration required? | No / Details: |
+| Secrets or credentials involved? | No / Details: |
 
-- [ ] None
-- [ ] Yes (describe below)
+<!-- For cloud changes, state the relevant identity, region, quota, state, and lifecycle assumptions. -->
 
-If breaking:
+## Validation
 
-- What changed?
-- Migration steps?
+| Check | Command or evidence | Result |
+| --- | --- | --- |
+| Unit / integration tests | | |
+| Terraform formatting | | |
+| Terraform validation or plan | | |
+| Terraform tests (`terraform/tests/` only) | | |
+| Python tests (`tests/`) | | |
+| CI or manual verification | | |
 
----
+## Optional workflow details
 
-## Reproducibility & configs
+<details>
+<summary>Terraform / cloud</summary>
 
-If applicable:
+- Terraform roots or modules changed:
+- Provider and version changes:
+- Plan / apply status:
+- Resource lifecycle or state impact:
+- Identity, region, quota, or provider-plugin assumptions:
 
-- Hydra command(s) used:
-  - `python -m src.<project>.core.train ...`
-- Config files added/changed:
-  - `config/...`
+</details>
 
----
+<details>
+<summary>Training / data</summary>
 
-## Data & lineage (if applicable)
+- Hydra or Run Recipe changes:
+- Dataset or DVC lineage changes:
+- Image, VM, GPU, storage, or startup changes:
+- MLflow impact:
 
-- Data source: …
-- DVC updated?
-  - [ ] No
-  - [ ] Yes (what changed: `dvc.yaml` / `dvc.lock` / `.dvc` files)
-- Dataset identifiers impacted (`config/data/*.yaml`): …
+</details>
 
----
+<details>
+<summary>Additional evidence</summary>
 
-## MLflow (if applicable)
+<!-- Add only useful evidence: logs, screenshots, metrics, or follow-up links. -->
 
-- [ ] No MLflow changes
-- [ ] Tracking behavior changed (tags/params/artifacts)
-- [ ] Model registry / alias workflow impacted (dev/staging/prod/archived)
+</details>
 
-Notes:
+## Reviewer checklist
 
-- Expected experiment name / run naming: …
-- New/updated run tags: …
-
----
-
-## Screenshots / logs / outputs (optional)
-
-Attach any helpful logs, metrics screenshots, or figures.
-
----
-
-## Testing
-
-What did you run?
-
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] Manual testing
-- [ ] Not applicable
-
-Commands / steps:
-
-1. `...`
-2. `...`
-
----
-
-## Checklist
-
-- [ ] Code follows project conventions
-- [ ] Tests added/updated where appropriate
-- [ ] Docs updated where appropriate
-- [ ] Config changes are minimal and composable (Hydra groups/variants)
-- [ ] No secrets committed (tokens, credentials, tracking URIs, etc.)
-- [ ] CI checks pass
+- [ ] Scope and motivation are clear.
+- [ ] Key changes and affected areas are identified.
+- [ ] Validation commands and results are recorded.
+- [ ] Breaking changes and operational risks are documented.
+- [ ] Tests are placed in the correct project boundary.
+- [ ] Documentation is updated where needed.
+- [ ] No secrets are committed.
+- [ ] CI status is recorded.
