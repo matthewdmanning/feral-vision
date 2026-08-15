@@ -4,6 +4,7 @@ from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 
 from feral_vision.config.store import register_configs
+from feral_vision.tracking import validate_tracking_uri
 from feral_vision.utils import get_logger
 
 logger = get_logger(__name__)
@@ -30,7 +31,11 @@ def main(cfg: DictConfig) -> None:
     output_dir = HydraConfig.get().runtime.output_dir
     logger.info("hydra output dir: %s", output_dir)
 
-    mlflow.set_tracking_uri(cfg.tracking.tracking_uri)
+    tracking_uri = cfg.tracking.tracking_uri
+    if not isinstance(tracking_uri, str):
+        raise ValueError("tracking.tracking_uri must be a string")
+    validate_tracking_uri(tracking_uri)
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(cfg.tracking.experiment_name)
 
     resolved = OmegaConf.to_container(cfg, resolve=True)

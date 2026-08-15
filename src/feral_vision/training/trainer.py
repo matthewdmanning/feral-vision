@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 import torch
 from torch import nn
 
+from feral_vision.tracking import validate_tracking_uri
 from feral_vision.utils import get_logger
 
 logger = get_logger(__name__)
@@ -58,20 +59,15 @@ def _resolved_config(cfg: Any) -> Any:
 
 def _try_log_resolved_config(cfg: Any) -> None:
     """Store the exact resolved Run Recipe in an active MLflow run."""
-    try:
-        import mlflow
+    import mlflow
 
-        if mlflow.active_run() is not None:
-            mlflow.log_dict(_resolved_config(cfg), "run_config/resolved_config.json")
-    except Exception:  # pragma: no cover - logging must never break training
-        pass
+    if mlflow.active_run() is None:
+        raise RuntimeError("MLflow run is required before logging the Run Recipe")
+    mlflow.log_dict(_resolved_config(cfg), "run_config/resolved_config.json")
 
 
 def _try_log_metric(name: str, value: float, step: int) -> None:
-    """Use this function to log a single metric to MLflow when a run is active.
-
-    Guarded so the trainer never requires a running tracking server: if mlflow
-    is unavailable or no run is active, logging is silently skipped.
+    """Log a single metric to MLflow when a run is active.
 
     Parameters
     ----------
@@ -82,13 +78,11 @@ def _try_log_metric(name: str, value: float, step: int) -> None:
     step : int
         Training step (typically the epoch index).
     """
-    try:
-        import mlflow
+    import mlflow
 
-        if mlflow.active_run() is not None:
-            mlflow.log_metric(name, value, step=step)
-    except Exception:  # pragma: no cover - logging must never break training
-        pass
+    if mlflow.active_run() is None:
+        raise RuntimeError("MLflow run is required before logging metrics")
+    mlflow.log_metric(name, value, step=step)
 
 
 def _dvc_data_version(tracker_path: Path) -> str:
@@ -110,51 +104,43 @@ def _dvc_data_version(tracker_path: Path) -> str:
 
 def _try_log_dvc_lineage(cfg: Any) -> None:
     """Record the DVC pipeline metadata and tracker file in an active MLflow run."""
-    try:
-        import mlflow
+    import mlflow
 
-        data_root = getattr(getattr(cfg, "data", None), "root", None)
-        staged_trackers = (
-            [Path(str(data_root)) / name for name in ("dvc.lock", "data.dvc")]
-            if data_root
-            else []
-        )
-        tracker_path = next(
-            (candidate for candidate in staged_trackers if candidate.exists()),
-            _DVC_PIPELINE_PATH,
-        )
-        if mlflow.active_run() is not None and tracker_path.exists():
-            mlflow.log_param("dvc_data_version", _dvc_data_version(tracker_path))
-            mlflow.log_artifact(str(tracker_path), artifact_path="data_lineage")
-    except Exception:  # pragma: no cover - logging must never break training
-        pass
+    if mlflow.active_run() is None:
+        raise RuntimeError("MLflow run is required before logging DVC lineage")
+    data_root = getattr(getattr(cfg, "data", None), "root", None)
+    if not data_root:
+        raise RuntimeError("training data root is required for DVC lineage")
+    tracker_path = Path(str(data_root)) / "dvc.lock"
+    if not tracker_path.exists():
+        raise FileNotFoundError(f"required DVC lockfile is missing: {tracker_path}")
+    mlflow.log_param("dvc_data_version", _dvc_data_version(tracker_path))
+    mlflow.log_artifact(str(tracker_path), artifact_path="data_lineage")
 
 
 @contextmanager
 def _active_mlflow_run(cfg: Any) -> Iterator[None]:
-    """Start a configured MLflow run, or continue when tracking is unavailable."""
+    """Start the required HTTPS MLflow run for the training process."""
     tracking = getattr(cfg, "tracking", None)
     if tracking is None:
+        raise RuntimeError("MLflow tracking configuration is required")
+
+    import mlflow
+
+    tracking_uri = getattr(tracking, "tracking_uri", None)
+    if not isinstance(tracking_uri, str):
+        raise ValueError("MLflow tracking_uri must be a string")
+    validate_tracking_uri(tracking_uri)
+    mlflow.set_tracking_uri(tracking_uri)
+
+    experiment_name = getattr(tracking, "experiment_name", None)
+    if not isinstance(experiment_name, str) or not experiment_name:
+        raise ValueError("MLflow experiment_name is required")
+    mlflow.set_experiment(experiment_name)
+    if mlflow.active_run() is not None:
         yield
         return
-
-    try:
-        import mlflow
-
-        tracking_uri = getattr(tracking, "tracking_uri", None)
-        experiment_name = getattr(tracking, "experiment_name", None)
-        if tracking_uri is not None:
-            mlflow.set_tracking_uri(tracking_uri)
-        if experiment_name is not None:
-            mlflow.set_experiment(experiment_name)
-        if mlflow.active_run() is not None:
-            yield
-            return
-        run = mlflow.start_run()
-    except Exception:  # pragma: no cover - tracking must never break training
-        logger.warning("MLflow tracking is unavailable; continuing without a run")
-        yield
-        return
+    run = mlflow.start_run()
 
     with run:
         yield
@@ -264,60 +250,59 @@ class Trainer:
         torch.save(self.model.state_dict(), self.best_model_path)
 
     def _try_log_model(self) -> None:
-        """Log only the selected best model to MLflow when possible."""
+        """Log only the selected best model to the active MLflow run."""
         if self._input_example is None or not self.best_model_path.exists():
-            return
+            raise RuntimeError(
+                "best model checkpoint and input example are required for MLflow logging"
+            )
 
+        import mlflow
+        from mlflow.models import infer_signature
+
+        active_run = mlflow.active_run()
+        if active_run is None:
+            raise RuntimeError("MLflow run is required before logging the model")
+
+        current_state = copy.deepcopy(self.model.state_dict())
+        was_training = self.model.training
         try:
-            import mlflow
-            from mlflow.models import infer_signature
-
-            active_run = mlflow.active_run()
-            if active_run is None:
-                return
-
-            current_state = copy.deepcopy(self.model.state_dict())
-            was_training = self.model.training
-            try:
-                best_state = torch.load(
-                    self.best_model_path, map_location=self.device, weights_only=True
+            best_state = torch.load(
+                self.best_model_path, map_location=self.device, weights_only=True
+            )
+            self.model.load_state_dict(best_state)
+            input_example = self._input_example.numpy()
+            self.model.eval()
+            with torch.no_grad():
+                predictions = self.model(self._move(self._input_example))
+            signature = infer_signature(
+                input_example, predictions.detach().cpu().numpy()
+            )
+            mlflow.pytorch.log_model(
+                self.model,
+                name="pytorch_model",
+                signature=signature,
+                input_example=input_example,
+            )
+            model_cfg = getattr(self.cfg, "model", None)
+            architecture = getattr(model_cfg, "architecture", None)
+            registered_model_name = getattr(architecture, "id", None)
+            if registered_model_name:
+                model_version = mlflow.register_model(
+                    model_uri=f"runs:/{active_run.info.run_id}/pytorch_model",
+                    name=registered_model_name,
                 )
-                self.model.load_state_dict(best_state)
-                input_example = self._input_example.numpy()
-                self.model.eval()
-                with torch.no_grad():
-                    predictions = self.model(self._move(self._input_example))
-                signature = infer_signature(
-                    input_example, predictions.detach().cpu().numpy()
-                )
-                mlflow.pytorch.log_model(
-                    self.model,
-                    name="pytorch_model",
-                    signature=signature,
-                    input_example=input_example,
-                )
-                model_cfg = getattr(self.cfg, "model", None)
-                architecture = getattr(model_cfg, "architecture", None)
-                registered_model_name = getattr(architecture, "id", None)
-                if registered_model_name:
-                    model_version = mlflow.register_model(
-                        model_uri=f"runs:/{active_run.info.run_id}/pytorch_model",
-                        name=registered_model_name,
-                    )
-                    mlflow.set_tag("registered_model_name", registered_model_name)
-                    mlflow.set_tag("model_version", model_version.version)
-            finally:
-                self.model.load_state_dict(current_state)
-                self.model.train(was_training)
-        except Exception:  # pragma: no cover - logging must never break training
-            pass
+                mlflow.set_tag("registered_model_name", registered_model_name)
+                mlflow.set_tag("model_version", model_version.version)
+        finally:
+            self.model.load_state_dict(current_state)
+            self.model.train(was_training)
 
     def fit(
         self,
         dataloader: Iterable[Any],
         val_dataset: AnnotationDataset | None = None,
     ) -> dict[str, Any]:
-        """Train while recording the configured MLflow run when available."""
+        """Train while recording the required configured MLflow run."""
         with _active_mlflow_run(self.cfg):
             _try_log_resolved_config(self.cfg)
             _try_log_dvc_lineage(self.cfg)
