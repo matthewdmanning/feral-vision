@@ -1,0 +1,47 @@
+name: Terraform Tests
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: terraform-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    name: Terraform format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive terraform
+
+  run-tests:
+    name: ${{ matrix.root }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        root:
+          - terraform/runs/detection
+          - terraform/runs/dvc_publication
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+      - name: Initialize Terraform without a backend
+        run: terraform -chdir=${{ matrix.root }} init -backend=false -input=false
+      - name: Validate Terraform configuration
+        run: terraform -chdir=${{ matrix.root }} validate -no-color
+      - name: Run native Terraform tests
+        run: terraform -chdir=${{ matrix.root }} test -no-color
