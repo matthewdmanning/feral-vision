@@ -27,8 +27,6 @@ from feral_vision.config.store import register_configs
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _DIGEST_IMAGE = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
-_IMMUTABLE_GCS = re.compile(r"^gs://[^/#]+/.+#\d+$")
-_GCS_PREFIX = re.compile(r"^gs://[^/#]+(?:/.*)?$")
 _RECIPE = re.compile(r"^[a-z][a-z0-9_-]*$")
 CommandRunner = Callable[[Sequence[str]], str]
 HttpGet = Callable[[str], int]
@@ -51,6 +49,27 @@ class PreflightRequest:
     data_root: str
     expected_python: str
     expected_cuda: str
+
+    def __post_init__(self) -> None:
+        """Use this function to reject malformed Cloud Storage manifest inputs before any cloud probe runs."""
+        from google.cloud.storage import Blob, Client
+
+        client = Client.create_anonymous_client()
+        data_uri, separator, generation = self.data_reference.rpartition("#")
+        if not separator or not generation.isdecimal():
+            raise ValueError(
+                "Manifest field data_reference must end with a numeric #generation"
+            )
+        for field, uri in (
+            ("data_reference", data_uri),
+            ("mlflow_artifact_prefix", self.mlflow_artifact_prefix),
+        ):
+            try:
+                Blob.from_uri(uri, client=client)
+            except ValueError as error:
+                raise ValueError(
+                    f"Manifest field {field} is not a valid gs:// URI"
+                ) from error
 
     @classmethod
     def from_mapping(cls, values: dict[str, Any]) -> "PreflightRequest":
@@ -120,29 +139,31 @@ def _http_status(uri: str) -> int:
 
 
 def get_compute_instance(
-    project: str, zone: str, instance: str, *, http: Any | None = None
+    project: str,
+    zone: str,
+    instance: str,
+    *,
+    runner: CommandRunner = _run,
 ) -> dict[str, Any]:
-    """Read the selected GCE instance through the Compute Engine API."""
-    from googleapiclient.discovery import build
-
-    if http is None:
-        import google.auth
-        import httplib2
-        from google_auth_httplib2 import AuthorizedHttp
-
-        credentials, _ = google.auth.default(
-            scopes=["https://www.googleapis.com/auth/compute.readonly"]
+    """Read the selected GCE instance through the installed Google Cloud CLI."""
+    response = json.loads(
+        runner(
+            (
+                "gcloud",
+                "compute",
+                "instances",
+                "describe",
+                instance,
+                "--project",
+                project,
+                "--zone",
+                zone,
+                "--format=json",
+            )
         )
-        http = AuthorizedHttp(credentials, httplib2.Http())
-
-    service = build(
-        "compute", "v1", http=http, cache_discovery=False, static_discovery=False
-    )
-    response = (
-        service.instances().get(project=project, zone=zone, instance=instance).execute()
     )
     if not isinstance(response, dict):
-        raise TypeError("Compute instances.get returned a non-object response")
+        raise TypeError("gcloud returned a non-object compute instance response")
     return response
 
 
@@ -164,25 +185,17 @@ def _manifest_checks(request: PreflightRequest) -> list[Check]:
             request.image,
         ),
         Check(
-            "immutable_data_reference",
-            bool(_IMMUTABLE_GCS.fullmatch(request.data_reference)),
-            request.data_reference,
-        ),
-        Check(
             "named_run_recipe",
             bool(_RECIPE.fullmatch(request.run_recipe)),
             request.run_recipe,
-        ),
-        Check(
-            "mlflow_artifact_prefix",
-            bool(_GCS_PREFIX.fullmatch(request.mlflow_artifact_prefix)),
-            request.mlflow_artifact_prefix,
         ),
     ]
 
 
 def _recipe_check(request: PreflightRequest) -> Check:
-    """Compose the selected recipe and require its runtime data-root override."""
+    """
+    This runs locally to avoid a cloud failure.
+    Compose the selected recipe and require its runtime data-root override."""
     try:
         register_configs()
         with initialize_config_dir(
@@ -253,7 +266,9 @@ def _compute_instance_check(
             ),
             "",
         )
-    return Check("compute_instance_ready", True, emails[0]), emails[0]
+    email = emails[0]
+    assert isinstance(email, str)
+    return Check("compute_instance_ready", True, email), email
 
 
 def run_preflight(

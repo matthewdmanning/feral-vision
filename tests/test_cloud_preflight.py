@@ -1,48 +1,60 @@
-"""Google Compute client integration contract used by cloud preflight."""
+"""Google Compute CLI integration contract used by cloud preflight."""
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-import googleapiclient.discovery_cache
-from googleapiclient.http import HttpMockSequence
+import pytest
 
-from scripts.cloud_preflight import get_compute_instance
+from scripts.cloud_preflight import PreflightRequest, get_compute_instance
+
+_VALID_REQUEST = {
+    "image": "registry/image@sha256:" + "a" * 64,
+    "data_reference": "gs://dataset-bucket/datasets/animals/dvc.lock#123",
+    "run_recipe": "detection",
+    "runtime_overrides": (),
+    "mlflow_tracking_uri": "http://localhost:5000",
+    "mlflow_artifact_prefix": "gs://operations-bucket/mlflow",
+    "gcp_project": "project",
+    "gce_zone": "us-central1-a",
+    "gce_instance": "feral-vision-trainer",
+    "data_root": "/data",
+    "expected_python": "3.12",
+    "expected_cuda": "12",
+}
+
 
 # ---------------------------------------------------------------------------
-# Helpers / local fixtures
+# Manifest input contract
 # ---------------------------------------------------------------------------
 
 
-class _RecordingHttpMockSequence(HttpMockSequence):
-    """Google's HTTP response sequence with a record of outgoing requests."""
-
-    def __init__(self, responses: list[tuple[dict[str, str], str]]) -> None:
-        super().__init__(responses)
-        self.requests: list[tuple[str, str]] = []
-
-    def request(
-        self,
-        uri: str,
-        method: str = "GET",
-        body: str | None = None,
-        headers: dict[str, str] | None = None,
-        **kwargs: object,
-    ) -> tuple[object, bytes]:
-        """Record each request before returning Google's configured mock response."""
-        self.requests.append((uri, method))
-        return super().request(uri, method=method, body=body, headers=headers, **kwargs)
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("data_reference", "https://example.com/dvc.lock#123"),
+        ("mlflow_artifact_prefix", "gs://operations-bucket"),
+    ],
+)
+def test_preflight_request_rejects_malformed_cloud_storage_uri(
+    field: str, value: str
+) -> None:
+    with pytest.raises(ValueError, match=field):
+        PreflightRequest(**(_VALID_REQUEST | {field: value}))
 
 
-def _compute_discovery_document() -> str:
-    """Read the Compute v1 discovery document packaged with Google's client."""
-    path = (
-        Path(googleapiclient.discovery_cache.__file__).parent
-        / "documents"
-        / "compute.v1.json"
-    )
-    return path.read_text()
+@pytest.mark.parametrize(
+    "data_reference",
+    [
+        "gs://dataset-bucket/datasets/animals/dvc.lock",
+        "gs://dataset-bucket/datasets/animals/dvc.lock#latest",
+    ],
+)
+def test_preflight_request_requires_numeric_dataset_generation(
+    data_reference: str,
+) -> None:
+    with pytest.raises(ValueError, match="numeric #generation"):
+        PreflightRequest(**(_VALID_REQUEST | {"data_reference": data_reference}))
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +63,7 @@ def _compute_discovery_document() -> str:
 
 
 def test_get_compute_instance_calls_selected_compute_endpoint() -> None:
-    """The client requests and returns the manifest-selected GCE instance."""
+    """The CLI requests and returns the manifest-selected GCE instance."""
     response = {
         "kind": "compute#instance",
         "name": "feral-vision-trainer",
@@ -59,20 +71,29 @@ def test_get_compute_instance_calls_selected_compute_endpoint() -> None:
         "status": "RUNNING",
         "serviceAccounts": [{"email": "trainer@project.iam.gserviceaccount.com"}],
     }
-    http = _RecordingHttpMockSequence(
-        [
-            ({"status": "200"}, _compute_discovery_document()),
-            ({"status": "200"}, json.dumps(response)),
-        ]
-    )
+    commands = []
+
+    def runner(command):
+        """Record the command and return one serialized instance."""
+        commands.append(command)
+        return json.dumps(response)
 
     instance = get_compute_instance(
-        "project", "us-central1-a", "feral-vision-trainer", http=http
+        "project", "us-central1-a", "feral-vision-trainer", runner=runner
     )
 
     assert instance == response
-    assert http.requests[-1] == (
-        "https://compute.googleapis.com/compute/v1/projects/project/"
-        "zones/us-central1-a/instances/feral-vision-trainer?alt=json",
-        "GET",
-    )
+    assert commands == [
+        (
+            "gcloud",
+            "compute",
+            "instances",
+            "describe",
+            "feral-vision-trainer",
+            "--project",
+            "project",
+            "--zone",
+            "us-central1-a",
+            "--format=json",
+        )
+    ]

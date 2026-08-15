@@ -38,6 +38,11 @@ operations require authenticated Application Default Credentials or an
 equivalent `gcloud` identity with the required IAM roles; `GCP_API_KEY` is not
 an identity credential for Terraform or Compute Engine.
 
+Cloud preflight parses manifest `gs://` inputs locally with the Google Cloud
+Storage Python SDK before running probes. Parsing does not use credentials or
+contact Google Cloud; `gcloud storage` remains responsible for proving that the
+selected objects exist and that the active Principal can access them.
+
 ## Cloud Jobs
 
 Data and model flows are independent and may be composed in the same Cloud Job.
