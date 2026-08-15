@@ -20,11 +20,11 @@ import mlflow
 import pytest
 import torch
 import yaml
+from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from feral_vision.data.annotations import BBoxAnnotation
-from feral_vision.training.optim import build_loss_fn, build_optimizer
 from feral_vision.training.trainer import Trainer, _model_artifact_name
 
 
@@ -413,13 +413,13 @@ def _make_bbox_train_cfg(
 ) -> DictConfig:
     """cfg shaped like the real conf/train/base.yaml: epochs/batch_size plus
     optim/loss_fn sub-configs carrying ``_target_`` (and ``_partial_`` for
-    optim), exactly as ``build_optimizer``/``build_loss_fn`` expect.
+    optim), exactly as Hydra's deferred optimizer factory expects.
 
     ``epochs`` is pinned at 2, not parametrized — 2 is enough to exercise one
     full forward pass, backward pass, and optimizer step per batch; more
     epochs would only test convergence, not the loop mechanics under test
     here. ``_partial_: true`` on optim is likewise pinned, not parametrized —
-    ``build_optimizer`` requires the deferred-factory form
+    Hydra requires the deferred-factory form
     (``opt_factory(model.parameters())``); it is a structural requirement of
     the real config schema, not a value that varies between configs.
     """
@@ -530,8 +530,8 @@ def test_fit_trains_bbox_net_toward_real_annotation_boxes(
     target = torch.from_numpy(BBoxAnnotation(path=ann_path).load().boxes)
 
     model = bbox_net_factory(num_boxes=len(rows), box_format=box_format)
-    optimizer = build_optimizer(model.parameters(), cfg.train.optim)
-    loss_fn = build_loss_fn(cfg.train.loss_fn)
+    optimizer = instantiate(cfg.train.optim)(model.parameters())
+    loss_fn = instantiate(cfg.train.loss_fn)
     trainer = Trainer(
         model=model,
         optimizer=optimizer,

@@ -423,17 +423,16 @@ def build_trainer(cfg: Any) -> Trainer:
     Trainer
         Fully wired trainer ready to call :meth:`~Trainer.fit`.
     """
+    from hydra.utils import instantiate
+
     from feral_vision.models.register_model import model_builder
-    from feral_vision.training.optim import (
-        build_loss_fn,
-        build_optimizer,
-        build_scheduler,
-    )
 
     model = model_builder(cfg.model)
-    optimizer = build_optimizer(model.parameters(), cfg.train.optim)
-    scheduler = build_scheduler(optimizer, cfg.train.scheduler)
-    loss_fn = build_loss_fn(cfg.train.loss_fn)
+    optimizer = instantiate(cfg.train.optim)(model.parameters())
+    scheduler = (
+        instantiate(cfg.train.scheduler)(optimizer) if cfg.train.scheduler else None
+    )
+    loss_fn = instantiate(cfg.train.loss_fn)
     task_adapter = build_task_adapter(cfg)
 
     return Trainer(
