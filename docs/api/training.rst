@@ -4,5 +4,11 @@ Training
 .. automodule:: feral_vision.training.trainer
    :members:
 
+.. automodule:: feral_vision.training.Trainer
+   :members:
+
+.. automodule:: feral_vision.training.optim
+   :members:
+
 .. automodule:: feral_vision.training.losses
    :members:

@@ -13,7 +13,7 @@ via Hydra:
 
 This builds the model (:mod:`feral_vision.models.register_model`), optimizer,
 scheduler, and loss function from ``conf/train/`` (see :doc:`../api/training`),
-then runs :meth:`~feral_vision.training.trainer.Trainer.fit`. Metrics are
+then runs :meth:`~feral_vision.training.Trainer.Trainer.fit`. Metrics are
 logged to MLflow when a run is active. When artifact logging succeeds, only the
 selected best model artifact is recorded; intermediate checkpoints remain local
 and are not retained in the artifact store.

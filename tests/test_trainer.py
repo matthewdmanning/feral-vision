@@ -25,7 +25,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from feral_vision.data.annotations import BBoxAnnotation
-from feral_vision.training.trainer import Trainer, _model_artifact_name
+from feral_vision.training.Trainer import Trainer, _model_artifact_name
 
 
 @pytest.fixture(autouse=True)
@@ -37,7 +37,7 @@ def mock_mlflow_for_loop_unit_tests(request, monkeypatch):
     ):
         return
 
-    import feral_vision.training.trainer as trainer_module
+    import feral_vision.training.Trainer as trainer_module
 
     @contextmanager
     def _inactive_run(_cfg):

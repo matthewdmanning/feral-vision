@@ -26,7 +26,7 @@ def mlflow_tracking_backend(request, tmp_path, monkeypatch):
     """
     import mlflow
 
-    import feral_vision.training.trainer as trainer_module
+    import feral_vision.training.Trainer as trainer_module
 
     previous_tracking_uri = mlflow.get_tracking_uri()
     monkeypatch.chdir(tmp_path)
