@@ -56,51 +56,6 @@ def _load_adapters() -> dict[str, Path]:
     return result
 
 
-def _resolve_adapter(source: str):
-    """Use this function to load and instantiate the SourceAdapter subclass for a given source key.
-
-    Parameters
-    ----------
-    source : str
-        The SOURCE_KEY identifying the adapter (e.g. ``"hf_hub"``, ``"ultralytics"``).
-
-    Returns
-    -------
-    SourceAdapter
-        An instantiated adapter whose ``inspect()`` and ``fetch()`` methods are ready to call.
-
-    Raises
-    ------
-    KeyError
-        If no adapter file declares ``SOURCE_KEY = source``.
-    RuntimeError
-        If the adapter file is found but contains no ``SourceAdapter`` subclass.
-    """
-    from feral_vision.models.sources.SourceAdapter import SourceAdapter
-
-    adapters = _load_adapters()
-    if source not in adapters:
-        raise KeyError(f"no adapter for {source!r}; available: {sorted(adapters)}")
-
-    path = adapters[source]
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore[union-attr]
-
-    for name in dir(mod):
-        obj = getattr(mod, name)
-        try:
-            if (
-                isinstance(obj, type)
-                and issubclass(obj, SourceAdapter)
-                and obj is not SourceAdapter
-            ):
-                return obj()
-        except Exception:
-            continue
-    raise RuntimeError(f"no SourceAdapter subclass found in {path}")
-
-
 def _build_cfg(
     source: str,
     model_id: str,
@@ -179,7 +134,9 @@ def inspect_model(
         JSON string with keys ``model_outputs`` (list of CVTask values),
         ``n_classes`` (int or null), and ``metadata`` (hub-specific extras).
     """
-    adapter = _resolve_adapter(source)
+    from feral_vision.models.register_model import get_adapter
+
+    adapter = get_adapter(source)
     cfg = _build_cfg(source, model_id, weights_id, weights_location)
     props, metadata = adapter.inspect(cfg, fetch_if_needed=fetch_if_needed)
     return json.dumps(

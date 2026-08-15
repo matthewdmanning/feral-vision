@@ -5,10 +5,7 @@ from __future__ import annotations
 import torch.nn.functional as F
 from torch import nn
 
-from feral_vision.models.register_model import register
 
-
-@register("net")
 class Net(nn.Module):
     """Classic PyTorch tutorial CNN; used as a test fixture."""
 
@@ -20,10 +17,6 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
-
-    @classmethod
-    def from_config(cls, cfg) -> "Net":
-        return cls()
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))

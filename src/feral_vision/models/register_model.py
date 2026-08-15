@@ -24,15 +24,6 @@ _OUTPUTS_TAG = "feral_vision.model_outputs"
 _METADATA_TAG = "feral_vision.model_metadata"
 
 
-def register(name: str):
-    """Mark an in-repository ``nn.Module`` as constructible from its config."""
-
-    def decorator(cls: type) -> type:
-        return cls
-
-    return decorator
-
-
 def _load_offline_registry() -> dict[str, dict[str, Any]]:
     if not _OFFLINE_REGISTRY_PATH.exists():
         return {}
