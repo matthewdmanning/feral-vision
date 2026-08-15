@@ -3,43 +3,14 @@
 from __future__ import annotations
 
 import json
-from types import SimpleNamespace
 
+import mlflow
 import pytest
 from omegaconf import DictConfig, OmegaConf
 
 import feral_vision.models.register_model as registry
 from feral_vision.models.ModelProperties import ModelProperties
 from feral_vision.tasks import CVTask
-
-
-class _FakeMlflowClient:
-    """In-memory MLflow Registry client for model metadata tests."""
-
-    def __init__(self) -> None:
-        self.models: dict[str, dict[str, str]] = {}
-
-    def create_registered_model(self, name: str, tags: dict[str, str]) -> None:
-        """Create a registered model with metadata tags."""
-        if name in self.models:
-            raise ValueError("already exists")
-        self.models[name] = dict(tags)
-
-    def get_registered_model(self, name: str) -> SimpleNamespace:
-        """Return one registered model's tags."""
-        if name not in self.models:
-            raise KeyError(name)
-        return SimpleNamespace(tags=self.models[name])
-
-    def set_registered_model_tag(self, name: str, key: str, value: str) -> None:
-        """Update a registered model metadata tag."""
-        self.models[name][key] = value
-
-
-@pytest.fixture
-def mlflow_client() -> _FakeMlflowClient:
-    """Provide an isolated in-memory MLflow client."""
-    return _FakeMlflowClient()
 
 
 @pytest.fixture(
@@ -74,16 +45,17 @@ def model_definition(
 def test_register_model_persists_and_reads_definition_metadata(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
-    mlflow_client: _FakeMlflowClient,
+    mlflow_tracking_backend,
     model_definition: tuple[str, DictConfig, ModelProperties, dict],
 ) -> None:
     name, cfg, properties, metadata = model_definition
     monkeypatch.setattr(registry, "_OFFLINE_REGISTRY_PATH", tmp_path / "journal.json")
-    monkeypatch.setattr(registry, "_mlflow_client", lambda: mlflow_client)
 
     registry.register_model(name, cfg, properties, metadata)
 
-    tags = mlflow_client.models[name]
+    models = mlflow.search_logged_models(filter_string=f"name = '{name}'")
+    assert len(models) == 1
+    tags = mlflow.get_logged_model(models.iloc[0]["model_id"]).tags
     assert json.loads(tags[registry._CONFIG_TAG]) == OmegaConf.to_container(
         cfg, resolve=True
     )
@@ -100,22 +72,25 @@ def test_register_model_persists_and_reads_definition_metadata(
 def test_register_model_replays_offline_definition(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
-    mlflow_client: _FakeMlflowClient,
+    mlflow_tracking_backend,
     model_definition: tuple[str, DictConfig, ModelProperties, dict],
 ) -> None:
     name, cfg, properties, metadata = model_definition
     journal = tmp_path / "journal.json"
     monkeypatch.setattr(registry, "_OFFLINE_REGISTRY_PATH", journal)
-    monkeypatch.setattr(
-        registry,
-        "_mlflow_client",
-        lambda: (_ for _ in ()).throw(ConnectionError("offline")),
-    )
+    original_store = registry._store_in_mlflow
+
+    def _offline_store(_name, _entry):
+        raise ConnectionError("offline")
+
+    monkeypatch.setattr(registry, "_store_in_mlflow", _offline_store)
 
     registry.register_model(name, cfg, properties, metadata)
 
     assert name in json.loads(journal.read_text())
-    monkeypatch.setattr(registry, "_mlflow_client", lambda: mlflow_client)
+    monkeypatch.setattr(registry, "_store_in_mlflow", original_store)
     assert registry.load_model_registry(name).model_outputs == properties.model_outputs
-    assert json.loads(mlflow_client.models[name][registry._METADATA_TAG]) == metadata
+    models = mlflow.search_logged_models(filter_string=f"name = '{name}'")
+    tags = mlflow.get_logged_model(models.iloc[0]["model_id"]).tags
+    assert json.loads(tags[registry._METADATA_TAG]) == metadata
     assert json.loads(journal.read_text()) == {}

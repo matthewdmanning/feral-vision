@@ -53,28 +53,26 @@ def _entry(
     }
 
 
-def _mlflow_client():
-    import mlflow
-
-    tracking_uri = mlflow.get_tracking_uri()
-    if tracking_uri.startswith(("file:", "sqlite:")):
-        raise ConnectionError("MLflow cloud tracking is not configured")
-    return mlflow.tracking.MlflowClient()
+def _logged_model_filter(name: str) -> str:
+    """Build an MLflow logged-model name filter for a caller-provided name."""
+    escaped_name = name.replace("\\", "\\\\").replace("'", "\\'")
+    return f"name = '{escaped_name}'"
 
 
 def _store_in_mlflow(name: str, entry: dict[str, Any]) -> None:
-    client = _mlflow_client()
+    import mlflow
+
     tags = {
         _CONFIG_TAG: json.dumps(entry["config"], sort_keys=True),
         _OUTPUTS_TAG: json.dumps(entry["model_outputs"]),
         _METADATA_TAG: json.dumps(entry["metadata"], sort_keys=True),
     }
-    try:
-        client.create_registered_model(name, tags=tags)
-    except Exception:
-        client.get_registered_model(name)
-        for key, value in tags.items():
-            client.set_registered_model_tag(name, key, value)
+    models = mlflow.search_logged_models(filter_string=_logged_model_filter(name))
+    if len(models) == 0:
+        mlflow.create_external_model(name=name, tags=tags)
+        return
+    model_id = models.iloc[0]["model_id"]
+    mlflow.set_logged_model_tags(model_id, tags)
 
 
 def _flush_offline_registry() -> None:
@@ -101,8 +99,13 @@ def _store_or_journal(name: str, entry: dict[str, Any]) -> None:
 
 
 def _entry_from_mlflow(name: str) -> dict[str, Any]:
-    registered_model = _mlflow_client().get_registered_model(name)
-    tags = dict(registered_model.tags)
+    import mlflow
+
+    models = mlflow.search_logged_models(filter_string=_logged_model_filter(name))
+    if len(models) == 0:
+        raise KeyError(name)
+    model_id = models.iloc[0]["model_id"]
+    tags = dict(mlflow.get_logged_model(model_id).tags)
     if _CONFIG_TAG not in tags or _OUTPUTS_TAG not in tags:
         raise KeyError(f"model {name!r} has no Feral Vision definition metadata")
     return {
