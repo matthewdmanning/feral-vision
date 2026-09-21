@@ -51,7 +51,7 @@ Digest-pinned training image ----------------+-- Terraform plan --> private GPU 
 | Dataset payloads, manifests, and version-aware trackers | DVC in the dataset-only catalog (`gs://mobile-training-images/`) |
 | Augmentation and class conversion | Run-specific Cloud Build materialization; never the VM startup path |
 | Container images | Artifact Registry, addressed by immutable digest |
-| VM, network, service identity, state, and lifecycle | Terraform in `terraform/runs/detection_first_run_augmented/` |
+| VM, network, service identity, state, and lifecycle | Terraform in `terraform/runs/detection/`, scoped per run by `run_id` |
 | Training selection | Hydra Run Recipe `detection_first_run_augmented` |
 | Metrics, parameters, checkpoints, Model Artifact, and Run Record | MLflow; no raw dataset directories are logged |
 | Durable training evidence | Dedicated non-dataset GCS artifact prefix |
