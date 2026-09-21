@@ -20,7 +20,7 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "Region containing the training subnetwork, Cloud Router, and Cloud NAT."
+  description = "Region containing the training VM, Cloud Router, and Cloud NAT."
   type        = string
   default     = "us-east4"
   nullable    = false
@@ -99,18 +99,22 @@ variable "artifact_prefix" {
 }
 
 # ---------------------------------------------------------------------------
-# Network (read-only; this root never owns a subnetwork)
+# Network (read-only)
+#
+# Subnetworks are banned in this project, so the trainer attaches to the
+# network alone and Compute Engine selects the regional range. That requires
+# an auto-mode VPC; a custom-mode network cannot be addressed this way.
 # ---------------------------------------------------------------------------
 
-variable "subnetwork_name" {
-  description = "Name of the existing subnetwork the training VM attaches to. It is read through a data source and is never managed, imported, or modified by this root."
+variable "network_name" {
+  description = "Name of the existing auto-mode VPC network the training VM attaches to. It is read through a data source and is never managed, imported, or modified by this root."
   type        = string
   default     = "default"
   nullable    = false
 }
 
 variable "create_cloud_nat" {
-  description = "Whether this root creates a run-scoped Cloud Router and Cloud NAT for egress. Set to false when the subnetwork already has regional NAT egress, so two roots never contend for one NAT."
+  description = "Whether this root creates a run-scoped Cloud Router and Cloud NAT for regional egress. Set to false when the region already has NAT egress, so two roots never contend for one NAT."
   type        = bool
   default     = true
   nullable    = false

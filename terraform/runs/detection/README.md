@@ -11,11 +11,16 @@ copied per run.
 | Disposable GPU training VM | Created here, named `feral-vision-detection-<run_id>` |
 | Cloud Router and Cloud NAT | Created here when `create_cloud_nat` is `true`, named from `run_id` |
 | Dataset bucket | Read only, through `data.google_storage_bucket` |
-| Subnetwork | Read only, through `data.google_compute_subnetwork` |
+| Network | Read only, through `data.google_compute_network` |
 | IAM | Never created or modified |
 
 Nothing shared is imported or managed, so a destroy plan for a run can only
 reach that run's own resources.
+
+Subnetworks are banned in this project. The trainer attaches to the network and
+Compute Engine selects the regional range, and Cloud NAT serves every range in
+the region. This requires an auto-mode VPC: a custom-mode network cannot be
+addressed without naming a subnetwork.
 
 ## Required variables
 

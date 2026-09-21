@@ -33,7 +33,7 @@ variable "zone" {
 }
 
 variable "network_self_link" {
-  description = "Existing VPC network that owns the private publisher subnet."
+  description = "Existing auto-mode VPC network the private publisher attaches to."
   type        = string
   default     = "projects/cs-poc-kewg0kffb7uwobgq1rex2af/global/networks/default"
   nullable    = false
@@ -109,13 +109,6 @@ variable "instance_metadata" {
   nullable = false
 }
 
-variable "subnetwork_self_link" {
-  description = "Existing private subnet to serve with the dedicated Cloud NAT."
-  type        = string
-  default     = "projects/cs-poc-kewg0kffb7uwobgq1rex2af/regions/us-east4/subnetworks/default"
-  nullable    = false
-}
-
 variable "nat_router_name" {
   description = "Cloud Router name used solely by the DVC publication Cloud NAT."
   type        = string
@@ -124,7 +117,7 @@ variable "nat_router_name" {
 }
 
 variable "nat_name" {
-  description = "Cloud NAT name that provides private egress to the DVC publisher subnet."
+  description = "Cloud NAT name that provides regional private egress to the DVC publisher."
   type        = string
   default     = "feral-vision-dvc-publication-nat"
   nullable    = false

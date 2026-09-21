@@ -51,6 +51,20 @@ When generating or editing Terraform code, execute actions in this specific orde
 * **Do not invent version numbers**: Always reference the exact version string returned by the Terraform MCP Server.
 * **Prefer official Context7 repos**: Match the module source found in the MCP search directly to its corresponding GitHub repository in Context7.
 
+## Banned resources
+
+Subnetworks are banned. No Terraform file in this repository may create,
+import, manage, or read a subnetwork, and no module or run variable may name
+one. A VM attaches to its network and Compute Engine selects the regional
+range; Cloud NAT uses
+`source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES"`
+and declares no subnetwork block. That provider field name and its enum are
+the Google provider's schema, not a project-declared subnetwork.
+
+This requires an auto-mode VPC. A custom-mode network cannot be addressed
+without naming a subnetwork, so moving to one would need this rule revisited
+rather than worked around.
+
 ## Ownership
 
 Terraform can orchestrate any operation performed in the cloud; it is not
@@ -68,9 +82,9 @@ remove the VM; VM removal is a Terraform lifecycle action.
 ## Files
 
 * [`terraform/modules/`](../../terraform/modules/) contains reusable resource
-  modules for Compute Engine and Cloud NAT. No module owns a subnetwork:
-  existing network infrastructure is read through a data source, never
-  imported or managed.
+  modules for Compute Engine and Cloud NAT. Existing network infrastructure is
+  read through a data source, never imported or managed, and no module
+  references a subnetwork.
 * [`terraform/runs/`](../../terraform/runs/) contains run-scoped Terraform
   roots. `detection/` is the detection training root; it is parameterized by
   `run_id` and is not copied per run.
