@@ -14,7 +14,6 @@ readonly image_tag="${region}-docker.pkg.dev/${project_id}/${repository}/feral-v
 readonly raw_uri="gs://mobile-training-images/${raw_prefix}"
 readonly variant_prefix="${VARIANT_ARTIFACT_PREFIX:-datasets/coco/train2017/${run_id}}"
 readonly variant_uri="gs://mobile-training-images/${variant_prefix}"
-readonly vm_name="feral-vision-detection-first-run-augmented-${run_id}"
 readonly plan_path="$artifact_dir/terraform.tfplan"
 readonly manifest_path="$artifact_dir/run-manifest.json"
 
@@ -68,7 +67,6 @@ RAW_URI="$raw_uri" \
 VARIANT_PREFIX="$variant_prefix" \
 MLFLOW_ARTIFACT_PREFIX="$MLFLOW_ARTIFACT_PREFIX" \
 VM_SERVICE_ACCOUNT_EMAIL="$VM_SERVICE_ACCOUNT_EMAIL" \
-VM_NAME="$vm_name" \
 SOURCE_ANNOTATION_GENERATION="$source_annotation_generation" \
 TERRAFORM_PLAN="$plan_path" \
 python3 - "$manifest_path" <<'PY'
@@ -88,7 +86,6 @@ Path(sys.argv[1]).write_text(
             "run_config_name": "runs/detection_first_run_augmented",
             "mlflow_artifact_prefix": os.environ["MLFLOW_ARTIFACT_PREFIX"],
             "service_account_email": os.environ["VM_SERVICE_ACCOUNT_EMAIL"],
-            "vm_name": os.environ["VM_NAME"],
             "terraform_plan": os.environ["TERRAFORM_PLAN"],
         },
         indent=2,
@@ -98,8 +95,17 @@ Path(sys.argv[1]).write_text(
 )
 PY
 
-terraform -chdir=terraform/runs/detection_first_run_augmented init -reconfigure -input=false
-terraform -chdir=terraform/runs/detection_first_run_augmented plan -input=false -out="$plan_path" -var="project_id=$project_id" -var="vm_name=$vm_name" -var="training_image=$training_image" -var="dataset_artifact_prefix=$variant_prefix" -var="source_annotation_generation=$source_annotation_generation" -var="run_config_name=runs/detection_first_run_augmented" -var="service_account_email=$VM_SERVICE_ACCOUNT_EMAIL"
+readonly terraform_root="terraform/runs/detection"
+terraform -chdir="$terraform_root" init -reconfigure -input=false
+terraform -chdir="$terraform_root" plan -input=false -out="$plan_path" \
+  -var="run_id=$run_id" \
+  -var="project_id=$project_id" \
+  -var="training_image=$training_image" \
+  -var="dataset_artifact_prefix=$variant_prefix" \
+  -var="source_annotation_generation=$source_annotation_generation" \
+  -var="run_config_name=runs/detection_first_run_augmented" \
+  -var="service_account_email=$VM_SERVICE_ACCOUNT_EMAIL" \
+  -var="artifact_prefix=$MLFLOW_ARTIFACT_PREFIX"
 
 echo "Prepared immutable run manifest: $manifest_path"
 echo "Review Terraform plan before running scripts/runs/detection_first_run_augmented.sh"

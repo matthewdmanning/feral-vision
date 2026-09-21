@@ -68,11 +68,24 @@ remove the VM; VM removal is a Terraform lifecycle action.
 ## Files
 
 * [`terraform/modules/`](../../terraform/modules/) contains reusable resource
-  modules for Compute Engine, Cloud NAT, and imported subnetworks.
+  modules for Compute Engine and Cloud NAT. No module owns a subnetwork:
+  existing network infrastructure is read through a data source, never
+  imported or managed.
 * [`terraform/runs/`](../../terraform/runs/) contains run-scoped Terraform
-  modules, including detection training infrastructure.
+  roots. `detection/` is the detection training root; it is parameterized by
+  `run_id` and is not copied per run.
+* [`terraform/tests/`](../../terraform/tests/) is the harness root for
+  `*.tftest.hcl` contract tests. They use a mocked Google provider, so they
+  need no credentials:
+
+~~~bash
+terraform -chdir=terraform/tests init
+terraform -chdir=terraform/tests test
+~~~
+
 * Each run root's `versions.tf` declares its Terraform and provider version
-  constraints; do not upgrade them incidentally.
+  constraints, and its own backend `prefix`. Two roots must never share a
+  state prefix; do not upgrade the constraints incidentally.
 
 ## State, inputs, and plans
 

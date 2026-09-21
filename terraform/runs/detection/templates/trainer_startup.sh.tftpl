@@ -1,16 +1,84 @@
 #!/usr/bin/env bash
+#
+# Detection trainer startup.
+#
+# Stages one immutable Dataset Artifact from the dataset-only bucket onto the
+# attached local SSD, versions it with DVC on this VM, trains, and exports
+# durable evidence to the operational artifact prefix. Evidence is exported on
+# failure as well as success: a failed run must retain its evidence.
 set -euo pipefail
 
+readonly run_id="${run_id}"
 readonly training_image="${training_image}"
-readonly dataset_uri="gs://${bucket_name}/${dataset_artifact_prefix}"
-readonly dataset_payload_uri="$dataset_uri/payload"
+readonly dataset_base_uri="${dataset_base_uri}"
+readonly dataset_payload_uri="$dataset_base_uri/payload"
 readonly source_annotation_uri="$dataset_payload_uri/annotations/instances.json#${source_annotation_generation}"
+readonly artifact_uri="${artifact_prefix}/$run_id"
+readonly local_ssd_mount_dir="${local_ssd_mount_dir}"
 readonly dataset_host_mount_dir="${dataset_host_mount_dir}"
 readonly dataset_container_mount_dir="${dataset_container_mount_dir}"
 readonly mlflow_tracking_uri="${mlflow_tracking_uri}"
+readonly run_config_name="${run_config_name}"
 readonly local_ssd_device="/dev/nvme0n1"
-readonly local_ssd_mount_dir="/mnt/disks/ssd"
 
+# DVC names the tracker after the dataset directory inside the workspace.
+readonly dataset_dir_name="$(basename "$dataset_container_mount_dir")"
+readonly dataset_tracker_name="$dataset_dir_name.dvc"
+
+readonly evidence_path="$local_ssd_mount_dir/training-evidence.json"
+stage="startup"
+
+# Use this function inside the container, which owns the pinned gcloud CLI.
+in_container() {
+  docker run --rm \
+    -v "$local_ssd_mount_dir:/data" \
+    --entrypoint "$1" \
+    "$training_image" "$${@:2}"
+}
+
+# Use this function to record terminal run state where the launcher polls it.
+write_evidence() {
+  local status="$1"
+  cat >"$evidence_path" <<EVIDENCE
+{
+  "run_id": "$run_id",
+  "status": "$status",
+  "failed_stage": "$2",
+  "training_image": "$training_image",
+  "dataset_artifact_uri": "$dataset_base_uri",
+  "run_config_name": "$run_config_name",
+  "finished_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EVIDENCE
+}
+
+# Evidence must survive a failed run, so export it from a trap rather than
+# only on the success path. The VM itself is removed by a Terraform lifecycle
+# action, never by this script.
+export_evidence() {
+  local exit_code="$?"
+  set +e
+  if [ "$exit_code" -eq 0 ]; then
+    write_evidence "FINISHED" ""
+  else
+    write_evidence "FAILED" "$stage"
+  fi
+  gcloud storage cp "$evidence_path" "$artifact_uri/training-evidence.json" --quiet
+  gcloud storage rsync --recursive --quiet \
+    "$local_ssd_mount_dir/mlflow" "$artifact_uri/mlflow"
+  if [ -f "$local_ssd_mount_dir/mlflow.db" ]; then
+    gcloud storage cp "$local_ssd_mount_dir/mlflow.db" "$artifact_uri/mlflow.db" --quiet
+  fi
+  if [ -f "$dataset_host_mount_dir/dvc.lock" ]; then
+    gcloud storage cp "$dataset_host_mount_dir/dvc.lock" "$artifact_uri/dvc.lock" --quiet
+    gcloud storage cp "$dataset_host_mount_dir/$dataset_tracker_name" "$artifact_uri/$dataset_tracker_name" --quiet
+  fi
+  return "$exit_code"
+}
+trap export_evidence EXIT
+
+# --- Local SSD --------------------------------------------------------------
+stage="mount_local_ssd"
 test -b "$local_ssd_device"
 mkdir -p "$local_ssd_mount_dir"
 if ! mountpoint -q "$local_ssd_mount_dir"; then
@@ -19,70 +87,72 @@ if ! mountpoint -q "$local_ssd_mount_dir"; then
   fi
   mount -o discard,defaults "$local_ssd_device" "$local_ssd_mount_dir"
 fi
+mkdir -p "$dataset_host_mount_dir/images" "$dataset_host_mount_dir/annotations" "$local_ssd_mount_dir/mlflow"
 
-mkdir -p "$dataset_host_mount_dir/images" "$dataset_host_mount_dir/annotations"
+stage="pull_training_image"
 docker pull "$training_image"
 
-docker run --rm \
-  -v /mnt/disks/ssd:/data \
-  --entrypoint gcloud \
-  "$training_image" storage rsync --recursive --checksums-only \
-  --dry-run --quiet \
+# --- Preflight --------------------------------------------------------------
+# Verify the selected Dataset Artifact before staging anything. A missing
+# payload or manifest fails here rather than part-way through a transfer.
+stage="verify_dataset_artifact"
+in_container gcloud storage ls "$dataset_payload_uri/images" --quiet >/dev/null
+in_container gcloud storage ls "$dataset_base_uri/dataset-artifact.json" --quiet >/dev/null
+
+# --- Stage the Dataset payload on the local SSD -----------------------------
+stage="stage_dataset_payload"
+in_container gcloud storage rsync --recursive --checksums-only --quiet \
   "$dataset_payload_uri/images" "$dataset_container_mount_dir/images"
 
-docker run --rm \
-  -v /mnt/disks/ssd:/data \
-  --entrypoint gcloud \
-  "$training_image" storage rsync --recursive --checksums-only --quiet \
-  "$dataset_payload_uri/images" "$dataset_container_mount_dir/images"
-
-docker run --rm \
-  -v /mnt/disks/ssd:/data \
-  --entrypoint gcloud \
-  "$training_image" storage cp --quiet \
+# The annotation is pinned to a retained generation so the run trains on an
+# immutable input even if the live object is replaced mid-run.
+in_container gcloud storage cp --quiet \
   "$source_annotation_uri" "$dataset_container_mount_dir/annotations/instances.json"
 
-docker run --rm \
-  -v /mnt/disks/ssd:/data \
-  --entrypoint gcloud \
-  "$training_image" storage cp --quiet \
-  "$dataset_uri/dataset-artifact.json" "$dataset_container_mount_dir/dataset-artifact.json"
+in_container gcloud storage cp --quiet \
+  "$dataset_base_uri/dataset-artifact.json" "$dataset_container_mount_dir/dataset-artifact.json"
 
+stage="verify_staged_dataset"
 test -d "$dataset_host_mount_dir/images"
-test -d "$dataset_host_mount_dir/annotations"
+test -n "$(ls -A "$dataset_host_mount_dir/images")"
 test -s "$dataset_host_mount_dir/annotations/instances.json"
 test -f "$dataset_host_mount_dir/dataset-artifact.json"
 
+# --- Version the staged Dataset on this VM ----------------------------------
+# A .dvc tracker alone never authorizes training; version_dataset reproduces
+# the dataset stage and returns the lock, and the lock is verified below.
+stage="version_dataset"
 docker run --rm \
-  -v /mnt/disks/ssd:/data \
+  -v "$local_ssd_mount_dir:/data" \
   --entrypoint bash \
   "$training_image" -ceu '
     cd /data
     if [ ! -d .dvc ]; then
       uv run --no-sync dvc init --no-scm
-    elif [ ! -f dvc.lock ]; then
-      for tracker in *.dvc; do
-        [ -f "$tracker" ] || continue
-        uv run --no-sync dvc commit "$tracker"
-      done
     fi
-    uv run --no-sync python -c "from pathlib import Path; from feral_vision.data.dataset_artifact import version_dataset; print(version_dataset(Path(\"${dataset_container_mount_dir}\"), workspace=Path(\"/data\")))"
-    cp dvc.lock "${dataset_container_mount_dir}/dvc.lock"
-    cp dataset-artifact.dvc "${dataset_container_mount_dir}/dataset-artifact.dvc"
+    uv run --no-sync python -c "from pathlib import Path; from feral_vision.data.dataset_artifact import version_dataset; print(version_dataset(Path(\"'"$dataset_container_mount_dir"'\"), workspace=Path(\"/data\")))"
+    cp dvc.lock "'"$dataset_container_mount_dir"'/dvc.lock"
+    cp "'"$dataset_tracker_name"'" "'"$dataset_container_mount_dir"'/'"$dataset_tracker_name"'"
   '
 
-test -f "$dataset_host_mount_dir/dataset-artifact.dvc"
 test -f "$dataset_host_mount_dir/dvc.lock"
+test -f "$dataset_host_mount_dir/$dataset_tracker_name"
 
+# --- Train ------------------------------------------------------------------
+stage="verify_gpu"
 docker run --rm \
   --gpus all \
   --entrypoint python \
   "$training_image" -c 'import torch; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))'
 
+stage="train"
 docker run --rm \
   --gpus all \
-  -v /mnt/disks/ssd:/data \
+  -v "$local_ssd_mount_dir:/data" \
   -e TRAIN_DATA="$dataset_container_mount_dir" \
   -e MLFLOW_TRACKING_URI="$mlflow_tracking_uri" \
-  -e RUN_CONFIG_NAME="${run_config_name}" \
+  -e MLFLOW_ARTIFACT_PREFIX="$artifact_uri" \
+  -e RUN_CONFIG_NAME="$run_config_name" \
   "$training_image"
+
+stage="done"

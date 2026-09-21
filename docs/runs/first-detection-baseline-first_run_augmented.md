@@ -31,11 +31,13 @@ Dataset Artifact remains unchanged.
 
 ## Cloud run configuration
 
-The isolated cloud configuration is under `terraform/runs/detection_first_run_augmented/`. It
-creates only the run-specific VM and consumes existing networking, image-pull,
-and dataset-read access. It imports the existing training subnet and provisions
-Cloud NAT scoped to that subnet for private VM egress. Its separate state prefix
-isolates this run's resources.
+The cloud configuration is under `terraform/runs/detection/`. It creates only
+the run-specific VM and consumes existing networking, image-pull, and
+dataset-read access. It reads the existing training subnet through a data
+source and never owns it, and provisions Cloud NAT scoped to that subnet for
+private VM egress unless `create_cloud_nat` is disabled. Every run-scoped
+resource name derives from `run_id`, so concurrent runs cannot contend for the
+same Cloud Resource.
 
 Before planning, supply a digest-pinned image built with
 `deploy/runs/detection_first_run_augmented/cloudbuild.training-image.yaml`, the immutable Dataset
