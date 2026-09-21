@@ -15,10 +15,9 @@ override_data {
 }
 
 override_data {
-  target = data.google_compute_subnetwork.training
+  target = data.google_compute_network.training
   values = {
-    self_link = "projects/test-project/regions/us-east4/subnetworks/default"
-    network   = "projects/test-project/global/networks/default"
+    self_link = "projects/test-project/global/networks/default"
   }
 }
 
@@ -65,16 +64,16 @@ run "dataset_uri_resolves_against_the_dataset_bucket" {
   }
 }
 
-# The subnetwork is read, never owned: the trainer attaches to the value the
-# data source returned, so destroying a run cannot reach shared network
-# infrastructure.
-run "trainer_attaches_to_the_read_subnetwork" {
+# Subnetworks are banned in this project. The trainer attaches to the network
+# the data source returned; the network is read, never owned, so destroying a
+# run cannot reach shared network infrastructure.
+run "trainer_attaches_to_the_read_network" {
   command = plan
   module { source = "../runs/detection" }
 
   assert {
-    condition     = module.trainer.subnetwork == "projects/test-project/regions/us-east4/subnetworks/default"
-    error_message = "The trainer must attach to the subnetwork read from the data source."
+    condition     = module.trainer.network == "projects/test-project/global/networks/default"
+    error_message = "The trainer must attach to the network read from the data source, never to a named subnetwork."
   }
 }
 

@@ -45,8 +45,11 @@ resource "google_compute_instance" "this" {
     }
   }
 
+  # Subnetworks are banned in this project: the instance attaches to the
+  # network and Compute Engine selects the regional range for it. This
+  # requires an auto-mode VPC.
   network_interface {
-    subnetwork = var.subnetwork
+    network = var.network
   }
 
   service_account {

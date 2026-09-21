@@ -8,7 +8,7 @@ output "router_region" {
   value       = google_compute_router.this.region
 }
 
-output "nat_source_subnetwork_ip_ranges_to_nat" {
-  description = "Cloud NAT subnetwork source range mode."
-  value       = google_compute_router_nat.this.source_subnetwork_ip_ranges_to_nat
+output "nat_name" {
+  description = "Cloud NAT name."
+  value       = google_compute_router_nat.this.name
 }

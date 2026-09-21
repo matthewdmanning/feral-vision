@@ -2,8 +2,12 @@
 #
 # This root provisions one disposable, private GPU VM that trains on a Dataset
 # Artifact already published to the dataset-only Cloud Storage bucket. It reads
-# the bucket and the subnetwork; it creates only the trainer and, optionally,
-# the run-scoped egress path that trainer needs.
+# the bucket and the network; it creates only the trainer and, optionally, the
+# run-scoped egress path that trainer needs.
+#
+# Subnetworks are banned in this project. Nothing here names, reads, or
+# manages one: the trainer attaches to the network and Compute Engine picks
+# the regional range.
 #
 # Every run-scoped name derives from var.run_id, so concurrent runs cannot
 # contend for the same Cloud Resource.
@@ -27,25 +31,23 @@ data "google_storage_bucket" "dataset" {
   project = var.bucket_project_id
 }
 
-# Pre-existing shared network infrastructure. This root reads the subnetwork
-# and never owns, imports, or mutates it; a destroy of this run cannot reach it.
-data "google_compute_subnetwork" "training" {
-  name    = var.subnetwork_name
+# Pre-existing shared network infrastructure. This root reads the network and
+# never owns, imports, or mutates it; a destroy of this run cannot reach it.
+data "google_compute_network" "training" {
+  name    = var.network_name
   project = var.project_id
-  region  = var.region
 }
 
 # Egress for a VM with no external IP: it must reach Artifact Registry to pull
-# the training image. Disable when the subnetwork already has regional NAT.
+# the training image. Disable when the region already has NAT egress.
 module "nat" {
   source = "../../modules/cloud_nat"
   count  = var.create_cloud_nat ? 1 : 0
 
   router_name = local.nat_router_name
   nat_name    = local.nat_name
-  network     = data.google_compute_subnetwork.training.network
+  network     = data.google_compute_network.training.self_link
   region      = var.region
-  subnetwork  = data.google_compute_subnetwork.training.self_link
 }
 
 module "trainer" {
@@ -71,7 +73,7 @@ module "trainer" {
   boot_disk_type         = var.boot_disk_type
   scratch_disk_interface = var.scratch_disk_interface
 
-  subnetwork            = data.google_compute_subnetwork.training.self_link
+  network               = data.google_compute_network.training.self_link
   service_account_email = var.service_account_email
   metadata              = var.instance_metadata
 

@@ -96,8 +96,8 @@ variable "scratch_disk_interface" {
   default     = null
 }
 
-variable "subnetwork" {
-  description = "Subnetwork self-link for the instance network interface."
+variable "network" {
+  description = "VPC network the instance attaches to. Must be an auto-mode network: this module never names a subnetwork."
   type        = string
   nullable    = false
 }

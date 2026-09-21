@@ -23,9 +23,9 @@ output "on_host_maintenance" {
   value       = google_compute_instance.this.scheduling[0].on_host_maintenance
 }
 
-output "subnetwork" {
-  description = "Subnetwork used by the instance."
-  value       = google_compute_instance.this.network_interface[0].subnetwork
+output "network" {
+  description = "Network the instance attached to."
+  value       = google_compute_instance.this.network_interface[0].network
 }
 
 output "boot_image" {
