@@ -3,6 +3,7 @@
 # These run against a mocked Google provider: they prove the configuration's
 # own contracts without reaching Google Cloud or needing credentials.
 #
+#   terraform -chdir=terraform/tests init
 #   terraform -chdir=terraform/tests test
 
 mock_provider "google" {}
@@ -31,8 +32,8 @@ variables {
   artifact_prefix              = "gs://feral-vision-operations-us-east4/runs/detection"
 }
 
-# Every run-scoped name must derive from run_id. This is the contract that
-# stops two concurrent runs from contending for one VM, router, or NAT.
+# Every run-scoped name derives from run_id. This is the contract that stops
+# two concurrent runs from contending for one VM.
 run "run_scoped_names_derive_from_run_id" {
   command = plan
   module { source = "../runs/detection" }
@@ -40,11 +41,6 @@ run "run_scoped_names_derive_from_run_id" {
   assert {
     condition     = output.trainer_instance_name == "feral-vision-detection-run-20260921-abc"
     error_message = "Trainer instance name must derive from run_id."
-  }
-
-  assert {
-    condition     = output.cloud_nat_router_name == "feral-vision-detection-run-20260921-abc-router"
-    error_message = "Cloud Router name must derive from run_id."
   }
 
   assert {
@@ -64,32 +60,28 @@ run "dataset_uri_resolves_against_the_dataset_bucket" {
   }
 }
 
-# Subnetworks are banned in this project. The trainer attaches to the network
-# the data source returned; the network is read, never owned, so destroying a
-# run cannot reach shared network infrastructure.
+# Subnetworks and Cloud NAT are banned. The trainer attaches to the network the
+# data source returned; the network is read, never owned, so destroying a run
+# cannot reach shared network infrastructure.
 run "trainer_attaches_to_the_read_network" {
   command = plan
   module { source = "../runs/detection" }
 
   assert {
-    condition     = module.trainer.network == "projects/test-project/global/networks/default"
+    condition     = output.trainer_network == "projects/test-project/global/networks/default"
     error_message = "The trainer must attach to the network read from the data source, never to a named subnetwork."
   }
 }
 
-# Cloud NAT is optional so a run can reuse existing regional egress instead of
-# contending for a router that another configuration already owns.
-run "cloud_nat_can_be_disabled" {
+# Without Cloud NAT the trainer reaches Artifact Registry over its own external
+# address. Losing that access_config would leave the image pull with no route.
+run "trainer_has_an_external_address_for_egress" {
   command = plan
   module { source = "../runs/detection" }
 
-  variables {
-    create_cloud_nat = false
-  }
-
   assert {
-    condition     = output.cloud_nat_router_name == null
-    error_message = "Disabling create_cloud_nat must not create a Cloud Router."
+    condition     = length(google_compute_instance.trainer.network_interface[0].access_config) == 1
+    error_message = "The trainer needs an external address: Cloud NAT is banned, so nothing else provides egress."
   }
 }
 

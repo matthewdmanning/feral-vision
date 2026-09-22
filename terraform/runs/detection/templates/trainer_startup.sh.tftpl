@@ -13,7 +13,7 @@ readonly training_image="${training_image}"
 readonly dataset_base_uri="${dataset_base_uri}"
 readonly dataset_payload_uri="$dataset_base_uri/payload"
 readonly source_annotation_uri="$dataset_payload_uri/annotations/instances.json#${source_annotation_generation}"
-readonly artifact_uri="${artifact_prefix}/$run_id"
+readonly run_artifact_uri="${run_artifact_uri}"
 readonly local_ssd_mount_dir="${local_ssd_mount_dir}"
 readonly dataset_host_mount_dir="${dataset_host_mount_dir}"
 readonly dataset_container_mount_dir="${dataset_container_mount_dir}"
@@ -28,7 +28,7 @@ readonly dataset_tracker_name="$dataset_dir_name.dvc"
 readonly evidence_path="$local_ssd_mount_dir/training-evidence.json"
 stage="startup"
 
-# Use this function inside the container, which owns the pinned gcloud CLI.
+# Use this function to run the pinned CLI that ships inside the training image.
 in_container() {
   docker run --rm \
     -v "$local_ssd_mount_dir:/data" \
@@ -38,11 +38,10 @@ in_container() {
 
 # Use this function to record terminal run state where the launcher polls it.
 write_evidence() {
-  local status="$1"
   cat >"$evidence_path" <<EVIDENCE
 {
   "run_id": "$run_id",
-  "status": "$status",
+  "status": "$1",
   "failed_stage": "$2",
   "training_image": "$training_image",
   "dataset_artifact_uri": "$dataset_base_uri",
@@ -52,8 +51,8 @@ write_evidence() {
 EVIDENCE
 }
 
-# Evidence must survive a failed run, so export it from a trap rather than
-# only on the success path. The VM itself is removed by a Terraform lifecycle
+# Evidence must survive a failed run, so export it from a trap rather than only
+# on the success path. The VM itself is removed by a Terraform lifecycle
 # action, never by this script.
 export_evidence() {
   local exit_code="$?"
@@ -63,15 +62,15 @@ export_evidence() {
   else
     write_evidence "FAILED" "$stage"
   fi
-  gcloud storage cp "$evidence_path" "$artifact_uri/training-evidence.json" --quiet
+  gcloud storage cp "$evidence_path" "$run_artifact_uri/training-evidence.json" --quiet
   gcloud storage rsync --recursive --quiet \
-    "$local_ssd_mount_dir/mlflow" "$artifact_uri/mlflow"
+    "$local_ssd_mount_dir/mlflow" "$run_artifact_uri/mlflow"
   if [ -f "$local_ssd_mount_dir/mlflow.db" ]; then
-    gcloud storage cp "$local_ssd_mount_dir/mlflow.db" "$artifact_uri/mlflow.db" --quiet
+    gcloud storage cp "$local_ssd_mount_dir/mlflow.db" "$run_artifact_uri/mlflow.db" --quiet
   fi
   if [ -f "$dataset_host_mount_dir/dvc.lock" ]; then
-    gcloud storage cp "$dataset_host_mount_dir/dvc.lock" "$artifact_uri/dvc.lock" --quiet
-    gcloud storage cp "$dataset_host_mount_dir/$dataset_tracker_name" "$artifact_uri/$dataset_tracker_name" --quiet
+    gcloud storage cp "$dataset_host_mount_dir/dvc.lock" "$run_artifact_uri/dvc.lock" --quiet
+    gcloud storage cp "$dataset_host_mount_dir/$dataset_tracker_name" "$run_artifact_uri/$dataset_tracker_name" --quiet
   fi
   return "$exit_code"
 }
@@ -104,7 +103,7 @@ stage="stage_dataset_payload"
 in_container gcloud storage rsync --recursive --checksums-only --quiet \
   "$dataset_payload_uri/images" "$dataset_container_mount_dir/images"
 
-# The annotation is pinned to a retained generation so the run trains on an
+# The annotation is pinned to a retained generation, so the run trains on an
 # immutable input even if the live object is replaced mid-run.
 in_container gcloud storage cp --quiet \
   "$source_annotation_uri" "$dataset_container_mount_dir/annotations/instances.json"
@@ -151,7 +150,7 @@ docker run --rm \
   -v "$local_ssd_mount_dir:/data" \
   -e TRAIN_DATA="$dataset_container_mount_dir" \
   -e MLFLOW_TRACKING_URI="$mlflow_tracking_uri" \
-  -e MLFLOW_ARTIFACT_PREFIX="$artifact_uri" \
+  -e MLFLOW_ARTIFACT_PREFIX="$run_artifact_uri" \
   -e RUN_CONFIG_NAME="$run_config_name" \
   "$training_image"
 
