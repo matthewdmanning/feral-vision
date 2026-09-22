@@ -1,33 +1,36 @@
 # Detection training run
 
-One Terraform root that trains on a Dataset Artifact already published to the
-dataset-only Cloud Storage bucket. It is parameterized by `run_id`; it is not
-copied per run.
+One self-contained Terraform root that trains on a Dataset Artifact already
+published to the dataset-only Cloud Storage bucket. It is parameterized by
+`run_id`; it is not copied per run.
+
+There are no shared modules. This root declares every resource it creates.
 
 ## What it owns
 
 | Resource | Ownership |
 | --- | --- |
 | Disposable GPU training VM | Created here, named `feral-vision-detection-<run_id>` |
-| Cloud Router and Cloud NAT | Created here when `create_cloud_nat` is `true`, named from `run_id` |
 | Dataset bucket | Read only, through `data.google_storage_bucket` |
 | Network | Read only, through `data.google_compute_network` |
 | IAM | Never created or modified |
 
 Nothing shared is imported or managed, so a destroy plan for a run can only
-reach that run's own resources.
+reach that run's own VM.
 
-Subnetworks are banned in this project. The trainer attaches to the network and
-Compute Engine selects the regional range, and Cloud NAT serves every range in
-the region. This requires an auto-mode VPC: a custom-mode network cannot be
-addressed without naming a subnetwork.
+Subnetworks and Cloud NAT are banned in this project. The trainer attaches to
+the network and Compute Engine selects the regional range; egress to Artifact
+Registry runs over the VM's own ephemeral external address. This requires an
+auto-mode VPC, and it means the VM is reachable from the internet unless
+firewall policy says otherwise — `instance_tags` exists so existing policy can
+select it.
 
 ## Required variables
 
 | Variable | Meaning |
 | --- | --- |
-| `run_id` | Scopes every created resource name and the evidence prefix |
-| `project_id` | Project that owns the VM and its egress path |
+| `run_id` | Scopes the VM name and the evidence prefix |
+| `project_id` | Project that owns the VM |
 | `service_account_email` | Existing, reviewed VM identity |
 | `training_image` | Digest-pinned image; a mutable tag is rejected |
 | `dataset_artifact_prefix` | `datasets/...` prefix holding the payload and manifest |

@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 
 variable "run_id" {
-  description = "Unique identifier for this detection training run. Every run-scoped Cloud Resource name is derived from it so two runs can never contend for the same resource."
+  description = "Unique identifier for this detection training run. Every run-scoped name derives from it so two runs can never contend for the same Cloud Resource."
   type        = string
   nullable    = false
 
@@ -14,13 +14,13 @@ variable "run_id" {
 }
 
 variable "project_id" {
-  description = "GCP project that owns the training VM, Cloud Router, and Cloud NAT created by this root."
+  description = "GCP project that owns the training VM."
   type        = string
   nullable    = false
 }
 
 variable "region" {
-  description = "Region containing the training VM, Cloud Router, and Cloud NAT."
+  description = "Region containing the training VM."
   type        = string
   default     = "us-east4"
   nullable    = false
@@ -52,13 +52,13 @@ variable "bucket_project_id" {
 }
 
 variable "dataset_artifact_prefix" {
-  description = "Dataset Artifact prefix below the dataset bucket, for example datasets/coco/train2017/<artifact>. Every training input is derived from this one prefix; the startup script never searches other prefixes for images."
+  description = "Dataset Artifact prefix below the dataset bucket, for example datasets/coco/train2017/<artifact>. Every training input derives from this one prefix; the startup script never searches other prefixes for images."
   type        = string
   nullable    = false
 
   validation {
     condition     = can(regex("^datasets/[A-Za-z0-9._/-]+$", var.dataset_artifact_prefix))
-    error_message = "dataset_artifact_prefix must be a datasets/ prefix without a gs:// URI or a trailing slash."
+    error_message = "dataset_artifact_prefix must be a datasets/ prefix without a gs:// URI."
   }
 
   validation {
@@ -68,7 +68,7 @@ variable "dataset_artifact_prefix" {
 }
 
 variable "source_annotation_generation" {
-  description = "Retained Cloud Storage object generation of payload/annotations/instances.json, copied directly to the training SSD so the run pins an immutable annotation."
+  description = "Retained Cloud Storage object generation of payload/annotations/instances.json, so the run trains on an immutable annotation."
   type        = string
   nullable    = false
 
@@ -83,7 +83,7 @@ variable "source_annotation_generation" {
 # ---------------------------------------------------------------------------
 
 variable "artifact_prefix" {
-  description = "Writable gs:// prefix for MLflow outputs, checkpoints, Model Artifacts, and training evidence. ADR 0002 requires this to be an operational location that is not the dataset bucket."
+  description = "Writable gs:// prefix for MLflow outputs, checkpoints, Model Artifacts, and training evidence. ADR 0002 requires an operational location that is not the dataset bucket."
   type        = string
   nullable    = false
 
@@ -101,9 +101,10 @@ variable "artifact_prefix" {
 # ---------------------------------------------------------------------------
 # Network (read-only)
 #
-# Subnetworks are banned in this project, so the trainer attaches to the
-# network alone and Compute Engine selects the regional range. That requires
-# an auto-mode VPC; a custom-mode network cannot be addressed this way.
+# Subnetworks and Cloud NAT are banned. The trainer attaches to the network,
+# Compute Engine selects the regional range, and the VM reaches Artifact
+# Registry over an ephemeral external address. Addressing a VM by network
+# alone requires an auto-mode VPC.
 # ---------------------------------------------------------------------------
 
 variable "network_name" {
@@ -113,15 +114,8 @@ variable "network_name" {
   nullable    = false
 }
 
-variable "create_cloud_nat" {
-  description = "Whether this root creates a run-scoped Cloud Router and Cloud NAT for regional egress. Set to false when the region already has NAT egress, so two roots never contend for one NAT."
-  type        = bool
-  default     = true
-  nullable    = false
-}
-
 variable "instance_tags" {
-  description = "Network tags applied to the training VM."
+  description = "Network tags applied to the training VM, so existing firewall policy can select it."
   type        = list(string)
   default     = ["cloud-detection-gpu"]
   nullable    = false
@@ -199,7 +193,7 @@ variable "max_run_duration_seconds" {
 }
 
 variable "on_host_maintenance" {
-  description = "Compute Engine host-maintenance action. A GPU trainer cannot live-migrate, so this must be TERMINATE."
+  description = "Compute Engine host-maintenance action. An instance with an attached GPU cannot live-migrate."
   type        = string
   default     = "TERMINATE"
   nullable    = false
@@ -256,7 +250,7 @@ variable "boot_disk_type" {
 }
 
 variable "scratch_disk_interface" {
-  description = "Local SSD interface. The Dataset payload is staged on this disk, so it is required."
+  description = "Local SSD interface. The Dataset payload is staged on this disk."
   type        = string
   default     = "NVME"
   nullable    = false
@@ -278,6 +272,13 @@ variable "service_account_email" {
   }
 }
 
+variable "service_account_scopes" {
+  description = "OAuth scopes attached to the trainer service account."
+  type        = list(string)
+  default     = ["cloud-platform"]
+  nullable    = false
+}
+
 variable "instance_metadata" {
   description = "Metadata applied to the trainer."
   type        = map(string)
@@ -289,7 +290,7 @@ variable "instance_metadata" {
 }
 
 variable "labels" {
-  description = "Labels applied to the trainer. The run_id label is added automatically."
+  description = "Labels applied to the trainer. The run-id label is added automatically."
   type        = map(string)
   default = {
     managed-by = "terraform"

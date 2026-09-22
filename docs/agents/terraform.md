@@ -53,17 +53,22 @@ When generating or editing Terraform code, execute actions in this specific orde
 
 ## Banned resources
 
-Subnetworks are banned. No Terraform file in this repository may create,
-import, manage, or read a subnetwork, and no module or run variable may name
-one. A VM attaches to its network and Compute Engine selects the regional
-range; Cloud NAT uses
-`source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES"`
-and declares no subnetwork block. That provider field name and its enum are
-the Google provider's schema, not a project-declared subnetwork.
+Subnetworks and Cloud NAT are banned. No Terraform file in this repository may
+create, import, manage, or read a subnetwork, a Cloud Router, or a Cloud NAT,
+and no variable may name one.
 
-This requires an auto-mode VPC. A custom-mode network cannot be addressed
-without naming a subnetwork, so moving to one would need this rule revisited
-rather than worked around.
+A VM attaches to its network and Compute Engine selects the regional range. A
+VM that needs egress gets an ephemeral external address through an empty
+`access_config` block; nothing else provides a route. Two consequences follow
+and must not be worked around silently:
+
+* This requires an auto-mode VPC. A custom-mode network cannot be addressed
+  without naming a subnetwork.
+* A VM with an external address is reachable from the internet unless firewall
+  policy says otherwise. Apply network tags that existing policy selects.
+
+Configurations that previously declared either resource were deleted rather
+than migrated, along with the modules they called.
 
 ## Ownership
 
@@ -81,13 +86,12 @@ remove the VM; VM removal is a Terraform lifecycle action.
 
 ## Files
 
-* [`terraform/modules/`](../../terraform/modules/) contains reusable resource
-  modules for Compute Engine and Cloud NAT. Existing network infrastructure is
-  read through a data source, never imported or managed, and no module
-  references a subnetwork.
 * [`terraform/runs/`](../../terraform/runs/) contains run-scoped Terraform
   roots. `detection/` is the detection training root; it is parameterized by
   `run_id` and is not copied per run.
+* There is no `terraform/modules/`. Run roots are self-contained and declare
+  the resources they create. The previous shared modules were deleted with the
+  banned resources they wrapped.
 * [`terraform/tests/`](../../terraform/tests/) is the harness root for
   `*.tftest.hcl` contract tests. They use a mocked Google provider, so they
   need no credentials:
@@ -129,7 +133,6 @@ normal host/CI runner or use the approved unsandboxed execution path:
 
 ~~~bash
 terraform -chdir=terraform/runs/detection validate
-terraform -chdir=terraform/runs/dvc_publication validate
 ~~~
 
 Do not change provider versions or Terraform resource configuration to work

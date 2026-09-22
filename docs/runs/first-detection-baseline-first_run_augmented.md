@@ -34,9 +34,9 @@ Dataset Artifact remains unchanged.
 The cloud configuration is under `terraform/runs/detection/`. It creates only
 the run-specific VM and consumes existing networking, image-pull, and
 dataset-read access. It reads the existing network through a data source and
-never owns it, and provisions regional Cloud NAT for private VM egress unless
-`create_cloud_nat` is disabled. Subnetworks are banned, so nothing here names
-one. Every run-scoped
+never owns it. Subnetworks and Cloud NAT are banned, so the VM attaches to the
+network alone and reaches Artifact Registry over its own ephemeral external
+address. Every run-scoped
 resource name derives from `run_id`, so concurrent runs cannot contend for the
 same Cloud Resource.
 
