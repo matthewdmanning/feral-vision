@@ -24,7 +24,6 @@ from feral_vision.config.schema import (
     # Loss variants
     CrossEntropyConfig,
     DataConfig,
-    DeployConfig,
     InferenceConfig,
     L1LossConfig,
     LinearLRConfig,
@@ -68,7 +67,6 @@ _SCHEMAS: tuple[tuple[str, str, type], ...] = (
     ("inference", "inference_schema", InferenceConfig),
     ("tracking", "tracking_schema", TrackingConfig),
     ("augmentation", "augmentation_schema", AugmentationConfig),
-    ("deploy", "deploy_schema", DeployConfig),
 )
 
 _registered = False

@@ -1,12 +1,41 @@
 steps:
   - name: gcr.io/cloud-builders/docker
     id: build-training-image
+    args:
+      - build
+      - --pull
+      - --tag
+      - ${_TRAINING_IMAGE}
+      - --file
+      - deploy/Dockerfile.gcp
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: verify-training-image-contract
     entrypoint: bash
     args:
       - -ceu
       - |
-        docker build --build-arg="BASE_IMAGE=${_BASE_IMAGE}" --tag "${_TRAINING_IMAGE}" --file=deploy/Dockerfile.gcp .
-        docker push "${_TRAINING_IMAGE}"
+        docker run --rm --entrypoint bash "${_TRAINING_IMAGE}" -ceu '
+          test -x /usr/local/bin/uv
+          test -x /workspace/.venv/bin/python
+          test -f /workspace/conf/runs/detection.yaml
+          test -f /workspace/scripts/runs/container_train.sh
+          python -c "import torch, hydra, feral_vision; print(torch.__version__)"
+          python -m feral_vision.training.trainer --config-name runs/detection --cfg job >/tmp/resolved-training-config.yaml
+          gcloud version >/dev/null
+          bash -n /workspace/scripts/runs/container_train.sh
+        '
+    waitFor:
+      - build-training-image
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-training-image
+    args:
+      - push
+      - ${_TRAINING_IMAGE}
+    waitFor:
+      - verify-training-image-contract
 
 images:
   - ${_TRAINING_IMAGE}

@@ -1,17 +1,12 @@
 # Run Recipes
 
-## Purpose
+Run Recipes are complete Hydra entrypoints. This repository intentionally has
+one training Run Recipe: `detection.yaml`.
 
-Run Recipes are the only complete Hydra entrypoints.
+Local training, container-image validation, and GPU deployment all compose
+`runs/detection`. Runtime locations such as the staged dataset root may be
+overridden, but deployment must not select or create a second Run Recipe.
 
-## Selection
-
-Use `baseline` for canonical local training and validation.
-Recipe-specific operating contracts live in `docs/runs/`. Select a different
-concern with a Hydra override, for example `model=yolo11n_seg`.
-
-## Ownership
-
-Run Recipes compose the selected concerns; concern YAML files own their variant
-values. The canonical execution path is defined in
-[the program flow](../../docs/agents/program-flow.md).
+Component YAML files under `data/`, `model/`, `train/`, `inference/`,
+`tracking/`, and `augmentation/` own their concern-specific values. They are
+not independent training deployment configurations.

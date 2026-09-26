@@ -8,6 +8,7 @@ Trainer.fit's actual val_dataset contract end to end.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -23,10 +24,6 @@ from torch import nn
 from feral_vision.data.annotations import BBoxAnnotation
 from feral_vision.training.optim import build_loss_fn, build_optimizer
 from feral_vision.training.trainer import Trainer
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _make_cfg(epochs: int) -> SimpleNamespace:
@@ -85,17 +82,10 @@ class _BestModelTrainer(Trainer):
         return float(self._epoch)
 
 
-# ---------------------------------------------------------------------------
-# fit() — epoch loop and returned history
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("epochs", [1, 2, 5])
 def test_fit_runs_and_returns_history_for_each_epoch(tmp_path, epochs):
     trainer = _build_trainer(tmp_path, epochs=epochs)
-
     history = trainer.fit(_tiny_dataloader())
-
     assert isinstance(history, dict)
     assert len(history["train_loss"]) == epochs
     assert all(math.isfinite(loss) for loss in history["train_loss"])
@@ -104,23 +94,14 @@ def test_fit_runs_and_returns_history_for_each_epoch(tmp_path, epochs):
 
 def test_fit_best_loss_is_minimum_train_loss_when_no_validation(tmp_path):
     trainer = _build_trainer(tmp_path, epochs=5)
-
     history = trainer.fit(_tiny_dataloader())
-
     assert history["best_loss"] == min(history["train_loss"])
-
-
-# ---------------------------------------------------------------------------
-# fit() — best checkpoint persistence
-# ---------------------------------------------------------------------------
 
 
 def test_fit_writes_best_checkpoint(tmp_path):
     best_path = tmp_path / "best.pt"
     trainer = _build_trainer(tmp_path, epochs=1)
-
     trainer.fit(_tiny_dataloader())
-
     assert best_path.exists()
     state = torch.load(best_path)
     assert "weight" in state and "bias" in state
@@ -137,14 +118,12 @@ def test_fit_creates_nested_parent_dir_for_checkpoint(tmp_path):
         cfg=_make_cfg(1),
         best_model_path=nested,
     )
-
     trainer.fit(_tiny_dataloader())
-
     assert nested.exists()
 
 
-def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(tmp_path):
-    """Logs a two-dimensional image model with MLflow's PyTorch flavor."""
+def test_fit_tracks_dataset_artifact_lineage_and_best_checkpoint(tmp_path):
+    """MLflow records the exact Dataset Artifact manifest used by training."""
     tracking_uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
     mlflow.set_tracking_uri(tracking_uri)
     artifact_root = tmp_path / "artifacts"
@@ -154,8 +133,19 @@ def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(tmp_pat
     )
     data_root = tmp_path / "data"
     data_root.mkdir()
-    data_tracker = data_root / "dvc.lock"
-    data_tracker.write_text("outs:\n- md5: immutable-data-version\n")
+    dataset_manifest = data_root / "dataset-artifact.json"
+    dataset_manifest.write_text(
+        json.dumps(
+            {
+                "dataset": "trainer-fixture",
+                "source": "test",
+                "provenance": {"revision": "immutable-test-version"},
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    expected_manifest_sha256 = hashlib.sha256(dataset_manifest.read_bytes()).hexdigest()
     cfg = SimpleNamespace(
         train=SimpleNamespace(epochs=1),
         data=SimpleNamespace(root=str(data_root)),
@@ -184,10 +174,10 @@ def test_fit_tracks_metrics_and_best_checkpoint_in_configured_mlflow_run(tmp_pat
     assert model_metadata["signature"] is not None
     assert model_metadata["saved_input_example_info"] is not None
     run = client.search_runs([experiment_id])[0]
-    assert run.data.params["dvc_data_version"].startswith("dvc.lock@sha256:")
-    logged_trackers = list(artifact_root.rglob("dvc.lock"))
-    assert len(logged_trackers) == 1
-    assert logged_trackers[0].read_text() == data_tracker.read_text()
+    assert run.data.params["dataset_artifact_sha256"] == expected_manifest_sha256
+    logged_manifests = list(artifact_root.rglob("dataset-artifact.json"))
+    assert len(logged_manifests) == 1
+    assert logged_manifests[0].read_bytes() == dataset_manifest.read_bytes()
     resolved_configs = list(artifact_root.rglob("resolved_config.json"))
     assert len(resolved_configs) == 1
     assert json.loads(resolved_configs[0].read_text()) == {
@@ -239,11 +229,6 @@ def test_fit_logs_best_model_weights_not_final_epoch_weights(tmp_path):
     assert torch.allclose(trainer.model(input_example), torch.full((2, 1, 8, 8), 6.0))
 
 
-# ---------------------------------------------------------------------------
-# fit() — scheduler stepping
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("epochs,gamma", [(1, 0.5), (2, 0.5), (3, 0.1)])
 def test_scheduler_steps_once_per_epoch(tmp_path, epochs, gamma):
     model = nn.Conv2d(3, 2, kernel_size=1)
@@ -257,25 +242,16 @@ def test_scheduler_steps_once_per_epoch(tmp_path, epochs, gamma):
         scheduler=scheduler,
         best_model_path=tmp_path / "best.pt",
     )
-
     trainer.fit(_tiny_dataloader())
-
     expected_lr = 0.1 * (gamma**epochs)
     assert math.isclose(optimizer.param_groups[0]["lr"], expected_lr, rel_tol=1e-6)
-
-
-# ---------------------------------------------------------------------------
-# fit() — real val_dataset integration
-# ---------------------------------------------------------------------------
 
 
 def test_base_validate_returns_empty_dict_and_falls_back_to_train_loss(
     tmp_path, trainer_fixture_dataset
 ):
     trainer = _build_trainer(tmp_path, epochs=3)
-
     history = trainer.fit(_tiny_dataloader(), val_dataset=trainer_fixture_dataset)
-
     assert set(history) == {"train_loss", "best_loss"}
     assert history["best_loss"] == min(history["train_loss"])
 
@@ -293,9 +269,7 @@ def test_validate_metric_is_tracked_per_epoch_using_real_dataset(
         cfg=_make_cfg(epochs),
         best_model_path=tmp_path / "best.pt",
     )
-
     history = trainer.fit(_tiny_dataloader(), val_dataset=trainer_fixture_dataset)
-
     assert history["val_len"] == [float(len(trainer_fixture_dataset))] * epochs
 
 
@@ -311,16 +285,8 @@ def test_validate_metric_drives_checkpoint_selection_over_train_loss(
         cfg=_make_cfg(1),
         best_model_path=tmp_path / "best.pt",
     )
-
     trainer.fit(_tiny_dataloader(), val_dataset=trainer_fixture_dataset)
-
-    # tracked_loss comes from the metric (val_len), not train_loss.
     assert trainer.best_loss == float(len(trainer_fixture_dataset))
-
-
-# ---------------------------------------------------------------------------
-# fit() — bbox regression against real BBoxAnnotation-loaded targets
-# ---------------------------------------------------------------------------
 
 
 def _write_yolo_txt(
@@ -337,18 +303,7 @@ def _make_bbox_train_cfg(
     lr: float = 0.05,
     loss_fn_target: str = "torch.nn.MSELoss",
 ) -> DictConfig:
-    """cfg shaped like the real conf/train/base.yaml: epochs/batch_size plus
-    optim/loss_fn sub-configs carrying ``_target_`` (and ``_partial_`` for
-    optim), exactly as ``build_optimizer``/``build_loss_fn`` expect.
-
-    ``epochs`` is pinned at 2, not parametrized — 2 is enough to exercise one
-    full forward pass, backward pass, and optimizer step per batch; more
-    epochs would only test convergence, not the loop mechanics under test
-    here. ``_partial_: true`` on optim is likewise pinned, not parametrized —
-    ``build_optimizer`` requires the deferred-factory form
-    (``opt_factory(model.parameters())``); it is a structural requirement of
-    the real config schema, not a value that varies between configs.
-    """
+    """Return the real optimizer/loss config shape used by Trainer tests."""
     return OmegaConf.create(
         {
             "train": {
@@ -374,7 +329,7 @@ def _bbox_dataloader(
     image_size: int,
     n_batches: int = 2,
 ):
-    """Batches of (random RGB image, target_boxes repeated per-sample), batch size from cfg.train."""
+    """Build batches whose target boxes come from real parsed annotations."""
     batch_size = cfg.train.batch_size
     targets = target_boxes.unsqueeze(0).expand(batch_size, -1, -1)
     return [
@@ -390,15 +345,11 @@ def _bbox_dataloader(
 def test_bbox_net_output_shape_matches_num_boxes(
     bbox_net_factory, in_channels, num_boxes, box_format, image_size
 ):
-    """image_size varies per case to prove _BBoxNet's adaptive pooling is
-    genuinely size-invariant, rather than assuming it from a fixed input."""
     cfg = _make_bbox_train_cfg()
     net = bbox_net_factory(
         in_channels=in_channels, num_boxes=num_boxes, box_format=box_format
     )
-
     out = net(torch.randn(cfg.train.batch_size, in_channels, image_size, image_size))
-
     assert out.shape == (cfg.train.batch_size, num_boxes, 4)
     assert out.dtype == torch.float32
 
@@ -471,7 +422,6 @@ def test_fit_trains_bbox_net_toward_real_annotation_boxes(
 
     assert len(history["train_loss"]) == cfg.train.epochs
     assert all(math.isfinite(loss) for loss in history["train_loss"])
-    # A real optimizer step actually ran against the real annotation-derived target.
     assert any(
         not torch.equal(before, after)
         for before, after in zip(params_before, model.parameters())

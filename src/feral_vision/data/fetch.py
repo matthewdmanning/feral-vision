@@ -72,12 +72,10 @@ def fetch_coco(root: str = "data") -> tuple[Path, Path]:
         with urllib.request.urlopen(COCO_ANNOTATIONS_URL) as resp:  # noqa: S310
             data = resp.read()
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
-            # The zip contains annotations/instances_train2017.json
             ann_name = "annotations/instances_train2017.json"
             with zf.open(ann_name) as f:
                 full = json.load(f)
 
-        # Filter categories to the animal supercategory.
         animal_cat_ids = {
             c["id"]
             for c in full["categories"]
@@ -89,7 +87,6 @@ def fetch_coco(root: str = "data") -> tuple[Path, Path]:
             sorted(animal_cat_ids),
         )
 
-        # Keep only annotations that belong to animal categories.
         animal_anns = [
             a for a in full["annotations"] if a["category_id"] in animal_cat_ids
         ]
@@ -113,7 +110,6 @@ def fetch_coco(root: str = "data") -> tuple[Path, Path]:
             ann_out,
         )
 
-    # --- Step 2: download images ---------------------------------------------
     image_records = filtered["images"]
     total = len(image_records)
     logger.info("downloading %d animal images to %s", total, images_dir)
@@ -134,28 +130,7 @@ def fetch_coco(root: str = "data") -> tuple[Path, Path]:
 
 
 def fetch_data(source: str = "local") -> Path:
-    """Resolve a data location and return its :class:`~pathlib.Path`.
-
-    Parameters
-    ----------
-    source:
-        A local filesystem path to a data directory. For the local source the
-        path must already exist on disk.
-
-    Returns
-    -------
-    Path
-        The resolved, existing data path.
-
-    Raises
-    ------
-    FileNotFoundError
-        If ``source`` resolves to a path that does not exist.
-    ValueError
-        If ``source`` uses an unsupported (non-local) scheme such as
-        ``http://`` or ``s3://``.
-    """
-    # Reject URI-style schemes; only plain local paths are supported for now.
+    """Resolve a local data location and return its path."""
     if "://" in source:
         scheme = source.split("://", 1)[0]
         raise ValueError(f"unsupported data source scheme: {scheme!r}")
@@ -167,7 +142,7 @@ def fetch_data(source: str = "local") -> Path:
     return path
 
 
-@hydra.main(version_base=None, config_path="../../../conf", config_name="runs/baseline")
+@hydra.main(version_base=None, config_path="../../../conf", config_name="runs/detection")
 def main(cfg: DictConfig) -> None:
     """Hydra entrypoint for the fetch DVC stage."""
     source = cfg.data.source

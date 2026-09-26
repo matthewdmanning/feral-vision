@@ -1,20 +1,29 @@
 # Configuration
 
-Use this guide when changing Hydra configuration or model configuration.
+Use this guide when changing Hydra or model configuration.
 
-Do not modify an existing Hydra `default.yaml` in place. Create a semantic named
-replacement; the planned configuration cutover retires legacy defaults only
-after the replacement recipes are validated. A required architecture `location`
-must always be non-null so a model remains reproducible.
+## Training recipe policy
 
-Consult the co-located configuration README for the concern's purpose and use a
-complete named Run Recipe for reproducible work.
+`conf/runs/detection.yaml` is the only complete training Run Recipe. Local
+training, image validation, and GPU deployment must compose it. Do not create a
+second Run Recipe for a deployment, experiment, environment, or one-off run.
+Use Hydra overrides or change the canonical component configuration when a
+value genuinely needs to vary.
 
-## Model and Run Recipe flow
+Component YAML files under `data/`, `model/`, `train/`, `inference/`,
+`tracking/`, and `augmentation/` own concern-specific values; they are not
+complete training configurations by themselves.
 
-`Model Source Adapter -> model (+ optional weights)`
+A required model architecture `location` must remain non-null so model
+construction is reproducible.
 
-Hydra owns tunable configuration and complete named Run Recipes. A Run Recipe
-names the model and Dataset selected for training; a workflow script consumes
-that configuration. The Run Recipe is information, not an actor in the
-workflow.
+## Deployment boundary
+
+Hydra owns training behavior. Terraform and image-build configuration do not
+belong in Hydra. GPU infrastructure is owned by `terraform/runs/detection/` and
+the training image is owned by `deploy/Dockerfile.gcp` plus
+`deploy/cloudbuild.training-image.yaml`.
+
+The selected Dataset Artifact is also not re-versioned by Hydra or the GPU
+runtime. Its upstream `dataset-artifact.json` crosses into training as the
+provenance contract.
