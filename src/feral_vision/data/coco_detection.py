@@ -65,6 +65,7 @@ def convert_coco_cat_vs_not_cat_detections(
             bbox = annotation.get("bbox")
             if category_name is None or not _valid_bbox(bbox):
                 continue
+            assert isinstance(bbox, list)
             x, y, box_width, box_height = bbox
             left = max(0.0, x)
             top = max(0.0, y)

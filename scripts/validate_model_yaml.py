@@ -29,18 +29,7 @@ def _model_variants() -> list[str]:
 
 
 def validate_variant(name: str) -> None:
-    """Compose and validate a single conf/model/<name>.yaml.
-
-    Parameters
-    ----------
-    name : str
-        Model config group variant name (matches the yaml filename stem).
-
-    Raises
-    ------
-    AssertionError
-        If the composed config doesn't satisfy the model-endpoint contract.
-    """
+    """Compose and validate a single conf/model/<name>.yaml."""
     from hydra import compose, initialize
     from hydra.core.global_hydra import GlobalHydra
     from omegaconf.errors import MissingMandatoryValue
@@ -51,7 +40,7 @@ def validate_variant(name: str) -> None:
     GlobalHydra.instance().clear()
     try:
         with initialize(version_base=None, config_path="../conf"):
-            cfg = compose(config_name="runs/baseline", overrides=[f"model={name}"])
+            cfg = compose(config_name="runs/detection", overrides=[f"model={name}"])
     finally:
         GlobalHydra.instance().clear()
 

@@ -1,0 +1,11 @@
+# Canonical detection training recipe used locally and by the GPU deployment.
+# Dataset paths are overridden at deployment time after the published Dataset
+# Artifact is staged on the VM Local SSD.
+defaults:
+  - /data@_global_.data: coco_animals_augmented_first_run_augmented
+  - /model@_global_.model: yolo11n_binary
+  - /train@_global_.train: binary_detection
+  - /inference@_global_.inference: local
+  - /tracking@_global_.tracking: mlflow
+  - /augmentation@_global_.augmentation: standard
+  - _self_

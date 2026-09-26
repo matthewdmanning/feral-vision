@@ -2,21 +2,25 @@
 
 ## Purpose
 
-`conf/` holds version-controlled parameter values for Feral Vision. It does not
-define program flow or tooling boundaries.
+`conf/` holds version-controlled model, data, training, inference, tracking, and
+augmentation values. Python schemas own field contracts; YAML files own the
+values selected by the executable Run Recipe.
 
-## Selection
+## Canonical training recipe
 
-Choose the complete named Run Recipe `runs/baseline`, which is the canonical
-local recipe. There is no root
-`config.yaml` selection layer.
+There is exactly one complete training Run Recipe:
 
-## Ownership
+- [`runs/detection.yaml`](runs/detection.yaml)
 
-Python schemas own field contracts, YAML files own semantic variant values, and
-Run Recipes own executable selection. The canonical program flow and tooling
-ownership are defined in [the program flow](../docs/agents/program-flow.md).
+Local training, container-image validation, and the GPU deployment all compose
+that same recipe. Deployment may override runtime locations such as
+`data.root`, but it must not select a different Run Recipe.
 
-The `deploy_schema` contract validates the root-level
-[`deploy/cloudbuild.yaml`](../deploy/cloudbuild.yaml) parameter file. That file
-is not a Run Recipe and does not define an operational workflow.
+Component YAML files under `data/`, `model/`, `train/`, `inference/`,
+`tracking/`, and `augmentation/` remain implementation components of that
+recipe; they are not additional deployment configurations.
+
+Cloud infrastructure and image-build inputs are intentionally not represented
+as Hydra configuration. GPU infrastructure is owned by
+`terraform/runs/detection/`, and the canonical training image is built through
+`deploy/Dockerfile.gcp` and `deploy/cloudbuild.training-image.yaml`.

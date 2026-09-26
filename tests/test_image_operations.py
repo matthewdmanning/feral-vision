@@ -1,4 +1,4 @@
-"""Verify the Bash image-operation script submits a configured Cloud Build."""
+"""Behavioral tests for the canonical GPU training-image build entrypoint."""
 
 from __future__ import annotations
 
@@ -10,62 +10,127 @@ import subprocess
 import pytest
 
 
-_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-_IMAGE_OPERATIONS_SCRIPT = _REPOSITORY_ROOT / "scripts/cloud/image_operations.sh"
+ROOT = Path(__file__).resolve().parents[1]
+BUILD_SCRIPT = ROOT / "scripts" / "cloud" / "build_training_image.sh"
+VALID_DIGEST = "sha256:" + "a" * 64
 
 
-def _write_mock_command(command_path: Path) -> None:
-    """Use this helper to record an image-operation command and its configured environment."""
-    command_path.write_text(
-        "#!/usr/bin/env bash\n"
-        "printf '%s|%s|%s|%s|%s|%s|%s|%s\\n' "
-        '"$GCP_PROJECT" "$REGISTRY_REGION" "$ARTIFACT_REPOSITORY" '
-        '"$BASE_IMAGE_NAME" "$TRAINING_IMAGE_NAME" "$IMAGE_TAG" '
-        '"$IMAGE_URI" "$*" > "$IMAGE_OPERATION_OUTPUT"\n'
+def _write_mock_gcloud(path: Path) -> None:
+    """Create a deterministic gcloud stub for the image-build control flow."""
+    path.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$GCLOUD_CALLS"
+
+if [[ "$1" == "auth" && "$2" == "list" ]]; then
+  printf '%s\n' 'builder@example.com'
+  exit 0
+fi
+
+if [[ "$1" == "artifacts" && "$2" == "repositories" && "$3" == "describe" ]]; then
+  printf '%s\n' '{}'
+  exit 0
+fi
+
+if [[ "$1" == "builds" && "$2" == "submit" ]]; then
+  exit 0
+fi
+
+if [[ "$1" == "artifacts" && "$2" == "docker" && "$3" == "images" && "$4" == "describe" ]]; then
+  printf '%s\n' "$MOCK_DIGEST"
+  exit 0
+fi
+
+printf 'unexpected gcloud call: %s\n' "$*" >&2
+exit 64
+"""
     )
-    command_path.chmod(command_path.stat().st_mode | stat.S_IXUSR)
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
-def _deployment_config(config_path: Path) -> None:
-    """Use this helper to create the smallest deployment YAML consumed by the Bash dispatcher."""
-    config_path.write_text(
-        "substitutions:\n"
-        "  _GCP_PROJECT: fixture-project\n"
-        "  _REGION: fixture-region\n"
-        "  _REPO: fixture-repository\n"
-        "  _BASE_IMAGE_NAME: fixture-base\n"
-        "  _IMAGE_NAME: fixture-training\n"
-        "  _IMAGE_TAG: fixture-tag\n"
-    )
+def _environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, digest: str) -> Path:
+    bin_dir = tmp_path / "bin"
+    calls = tmp_path / "gcloud-calls.txt"
+    bin_dir.mkdir()
+    _write_mock_gcloud(bin_dir / "gcloud")
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+    monkeypatch.setenv("GCLOUD_CALLS", str(calls))
+    monkeypatch.setenv("MOCK_DIGEST", digest)
+    return calls
 
 
-def test_image_operations_submits_configured_cloud_build(
+def _command() -> list[str]:
+    return [
+        str(BUILD_SCRIPT),
+        "--project",
+        "fixture-project",
+        "--region",
+        "us-east4",
+        "--repository",
+        "feral-docker",
+        "--image",
+        "trainer",
+        "--tag",
+        "candidate",
+    ]
+
+
+def test_build_training_image_submits_canonical_build_and_returns_digest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Use this test to submit one configured Cloud Build without exporting deployment values."""
-    deployment_config_file = tmp_path / "deployment.yaml"
-    command_directory = tmp_path / "bin"
-    command_output = tmp_path / "command-output.txt"
-    command_directory.mkdir()
-    _deployment_config(deployment_config_file)
-    _write_mock_command(command_directory / "gcloud")
-    monkeypatch.setenv("PATH", f"{command_directory}:{os.environ['PATH']}")
-    monkeypatch.setenv("IMAGE_OPERATION_OUTPUT", str(command_output))
+    calls_path = _environment(tmp_path, monkeypatch, VALID_DIGEST)
 
-    subprocess.run(
-        [
-            _IMAGE_OPERATIONS_SCRIPT,
-            "--config",
-            str(deployment_config_file),
-        ],
+    result = subprocess.run(
+        _command(),
+        cwd=ROOT,
         check=True,
+        capture_output=True,
+        text=True,
     )
 
-    assert command_output.read_text().strip() == (
-        "|||||||"
-        "builds submit . --project=fixture-project --region=fixture-region --quiet "
-        "--config=deploy/cloudbuild.build.yaml "
-        "--substitutions=_REGION=fixture-region,_REPO=fixture-repository,"
-        "_BASE_IMAGE_NAME=fixture-base,_IMAGE_NAME=fixture-training,_IMAGE_TAG=fixture-tag"
+    assert result.stdout.strip().splitlines()[-1] == (
+        "us-east4-docker.pkg.dev/fixture-project/feral-docker/trainer@" + VALID_DIGEST
     )
+
+    calls = calls_path.read_text().splitlines()
+    assert any(
+        call.startswith("artifacts repositories describe feral-docker ")
+        and "--location=us-east4" in call
+        and "--project=fixture-project" in call
+        for call in calls
+    )
+    assert any(
+        call.startswith("builds submit . ")
+        and "--config=deploy/cloudbuild.training-image.yaml" in call
+        and (
+            "--substitutions=_TRAINING_IMAGE="
+            "us-east4-docker.pkg.dev/fixture-project/feral-docker/trainer:candidate"
+        ) in call
+        for call in calls
+    )
+    assert any(
+        call.startswith(
+            "artifacts docker images describe "
+            "us-east4-docker.pkg.dev/fixture-project/feral-docker/trainer:candidate "
+        )
+        for call in calls
+    )
+
+
+def test_build_training_image_rejects_non_digest_registry_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _environment(tmp_path, monkeypatch, "not-a-digest")
+
+    result = subprocess.run(
+        _command(),
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "Artifact Registry returned an invalid digest" in result.stderr

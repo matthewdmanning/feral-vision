@@ -1,46 +1,57 @@
 Training
 ========
 
-Local training
+Feral Vision has one complete training Run Recipe:
+``conf/runs/detection.yaml``. Local execution, image validation, and the GPU
+training deployment all compose that same recipe.
+
+Dataset boundary
+----------------
+
+Dataset versioning and publication happen upstream of GPU training. The
+published Dataset Artifact is the handoff boundary. Training requires its
+``payload/images/``, selected annotations, and ``dataset-artifact.json``.
+
+``dataset-artifact.json`` is the provenance record consumed by training. The
+GPU workflow does not initialize DVC, generate a new ``dvc.lock``, or reproduce
+the dataset. Deployment preflight parses the published manifest and records its
+SHA-256; VM startup stages and re-hashes the exact manifest before training.
+The container verifies the same SHA-256 again before starting the trainer.
+
+Training image
 --------------
 
-The canonical training entrypoint is ``feral_vision.training.trainer``, wired
-via Hydra:
+The only supported GPU training image is ``deploy/Dockerfile.gcp``. Build it
+through ``scripts/cloud/build_training_image.sh``, which uses
+``deploy/cloudbuild.training-image.yaml`` and returns a digest-pinned Artifact
+Registry reference for Terraform.
 
-.. code-block:: bash
+The image build composes ``runs/detection`` and imports the core runtime before
+it can be pushed. GPU availability is verified later on the actual training VM.
 
-   uv run python -m feral_vision.training.trainer
-
-This builds the model (:mod:`feral_vision.models.register_model`), optimizer,
-scheduler, and loss function from ``conf/train/`` (see :doc:`../api/training`),
-then runs :meth:`~feral_vision.training.trainer.Trainer.fit`. Metrics are
-logged to MLflow when a run is active. When artifact logging succeeds, only the
-selected best model artifact is recorded; intermediate checkpoints remain local
-and are not retained in the artifact store.
-
-Recipe-specific operating contracts are maintained in ``docs/runs/``.
-
-Cloud training
+GPU deployment
 --------------
 
-Cloud training is provisioned through Terraform and its operational scripts;
-manual Docker launches are not a supported workflow. The provisioned GPU VM
-stages a reviewed Dataset Variant on its SSD, mounts it at ``/data`` in the
-training container, runs preflight, and starts the canonical trainer. Dataset
-augmentation and DVC publication occur upstream before VM provisioning. Cloud
-workflow changes are made through the Terraform and operational-script
-interfaces.
+Run ``terraform/preflight/preflight.py`` with the exact intended Terraform
+inputs before every apply. A passing preflight produces a saved Terraform plan
+and ``deployment-manifest.json`` containing the plan SHA-256, digest-pinned
+training image, Dataset Artifact URI, and Dataset Artifact manifest SHA-256.
 
-Data pipeline
--------------
+Apply only through::
 
-DVC owns data preparation only (fetch, preprocess, augment) — not training or
-evaluation:
+   scripts/runs/detection.sh --manifest terraform/preflight/reports/<timestamp>/deployment-manifest.json
 
-.. code-block:: bash
+The launcher rejects a changed plan, collects startup logs, waits for terminal
+``training-evidence.json``, and verifies that the Dataset Artifact manifest hash
+observed by the VM matches the hash approved during preflight.
 
-   dvc repro
+A VM reaching ``RUNNING`` is not training success. Terminal training evidence
+is the authoritative run result.
 
-For cloud training, the selected Dataset Artifact is prepared and reviewed
-upstream in the dedicated DVC repository. The training container receives its
-staged data and does not invoke DVC or resolve a mutable Cloud Storage prefix.
+Run metadata
+------------
+
+MLflow records the resolved training configuration and the exact
+``dataset-artifact.json`` used by the run, including its SHA-256. The startup
+workflow also preserves that manifest beside terminal run evidence in the
+operational artifact prefix.

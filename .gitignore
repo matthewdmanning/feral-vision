@@ -33,12 +33,13 @@ mlflow.db
 .codex/config.toml
 .codex/hooks/github_auth.py
 
-# Terraform local working state and plan artifacts
+# Terraform local working state, plans, and generated preflight reports
 terraform/.terraform/
 **/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/*.tfplan
+terraform/preflight/reports/
 CLAUDE.md
 bash.exe.stackdump
 .coverage

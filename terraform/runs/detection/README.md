@@ -1,68 +1,131 @@
 # Detection training run
 
-One self-contained Terraform root that trains on a Dataset Artifact already
-published to the dataset-only Cloud Storage bucket. It is parameterized by
-`run_id`; it is not copied per run.
+One self-contained Terraform root for a **single disposable GPU training VM**.
+It consumes a Dataset Artifact already published to the dataset-only Cloud
+Storage bucket. The root is reused only after the previous VM is removed; one
+Terraform state never manages concurrent trainers.
 
-There are no shared modules. This root declares every resource it creates.
+## Fixed deployment shape
 
-## What it owns
+This root creates exactly one `n1-standard-4` VM with one NVIDIA T4, one NVMe
+Local SSD, a 100 GB `pd-ssd` boot disk, and Flex-start scheduling. Shared IAM,
+firewall, router, NAT, subnetwork, registry, bucket, and network resources are
+not managed here.
 
-| Resource | Ownership |
-| --- | --- |
-| Disposable GPU training VM | Created here, named `feral-vision-detection-<run_id>` |
-| Dataset bucket | Read only, through `data.google_storage_bucket` |
-| Network | Read only, through `data.google_compute_network` |
-| IAM | Never created or modified |
-
-Nothing shared is imported or managed, so a destroy plan for a run can only
-reach that run's own VM.
-
-Subnetworks and Cloud NAT are banned in this project. The trainer attaches to
-the network and Compute Engine selects the regional range; egress to Artifact
-Registry runs over the VM's own ephemeral external address. This requires an
-auto-mode VPC, and it means the VM is reachable from the internet unless
-firewall policy says otherwise — `instance_tags` exists so existing policy can
-select it.
+The trainer reads an existing auto-mode VPC and receives an ephemeral external
+IPv4 address for Artifact Registry and Cloud Storage egress. Existing firewall
+policy may select the VM through `instance_tags`.
 
 ## Required variables
 
 | Variable | Meaning |
 | --- | --- |
-| `run_id` | Scopes the VM name and the evidence prefix |
+| `run_id` | Scopes VM/evidence names; 3–40 characters |
 | `project_id` | Project that owns the VM |
-| `service_account_email` | Existing, reviewed VM identity |
-| `training_image` | Digest-pinned image; a mutable tag is rejected |
-| `dataset_artifact_prefix` | `datasets/...` prefix holding the payload and manifest |
+| `service_account_email` | Existing reviewed VM identity |
+| `training_image` | Digest-pinned canonical training image |
+| `dataset_artifact_prefix` | `datasets/...` prefix holding payload + `dataset-artifact.json` |
 | `source_annotation_generation` | Retained generation of `payload/annotations/instances.json` |
-| `artifact_prefix` | Writable `gs://` prefix for evidence; must not be the dataset bucket |
+| `artifact_prefix` | Writable non-dataset `gs://` evidence prefix |
 
-Everything else has a default. See `variables.tf` for the validations that
-enforce these contracts at plan time.
+Machine/GPU/SSD shape and the training recipe are deliberately not variables.
+The only supported recipe is `conf/runs/detection.yaml`.
 
-## Flow
+## Data-versioning / training seam
 
-The VM stages `<dataset_artifact_prefix>/payload` onto its local SSD, pins the
-annotation to `source_annotation_generation`, versions the staged Dataset with
-DVC on the VM, verifies the resulting lock, trains, and exports MLflow outputs,
-the DVC lock, and `training-evidence.json` to `<artifact_prefix>/<run_id>`.
-Evidence is exported on failure as well as success.
+Dataset versioning happens upstream. The GPU run does not initialize or run DVC.
+The published Dataset Artifact is the input boundary:
 
-Container exit does not remove the VM. Removing it is a Terraform lifecycle
-action that requires a reviewed destroy plan:
+1. preflight reads and parses `dataset-artifact.json` and records its SHA-256;
+2. the VM stages images, the generation-pinned annotations object, and the exact
+   published `dataset-artifact.json` onto Local SSD;
+3. startup parses the staged manifest and hashes it before touching the GPU;
+4. the container entrypoint verifies that hash again before training;
+5. MLflow lineage and `training-evidence.json` record the manifest SHA-256;
+6. the exact manifest is copied to the run evidence prefix.
 
-~~~bash
+A `.dvc` tracker or `dvc.lock` is not created, required, or uploaded by this GPU
+workflow. Upstream dataset publication owns those concerns where applicable.
+
+## Build the training image
+
+There is one supported training image path:
+
+```bash
+scripts/cloud/build_training_image.sh \
+  --project <project> \
+  --region <region> \
+  --repository <artifact-registry-repository> \
+  --image feral-vision-training \
+  --tag <immutable-build-tag>
+```
+
+The script builds `deploy/Dockerfile.gcp` through
+`deploy/cloudbuild.training-image.yaml`, runs image-contract checks before the
+push, then prints the digest-pinned Artifact Registry reference required by
+Terraform.
+
+## Preflight and apply
+
+Do not use `terraform apply` to discover configuration errors. Run preflight
+with the exact deployment inputs:
+
+```bash
+python terraform/preflight/preflight.py --var-file /path/to/run.tfvars
+```
+
+Preflight verifies the canonical repository shape, Terraform syntax/schema and
+saved plan, single-VM plan contract, GCP prerequisites, Dataset Artifact
+manifest, pinned annotations generation, relevant quotas, and run-artifact
+writeability. See [`../../preflight/README.md`](../../preflight/README.md).
+
+Review the generated `deployment.tfplan`, then apply only through the generated
+manifest:
+
+```bash
+scripts/runs/detection.sh \
+  --manifest terraform/preflight/reports/<timestamp>/deployment-manifest.json
+```
+
+The launcher refuses a plan whose SHA-256 changed after preflight. It retains
+serial output, polls terminal training evidence, and checks that the Dataset
+Artifact manifest observed by the VM matches the preflight hash.
+
+VM `RUNNING` status is not training success. `training-evidence.json` is the
+terminal run record.
+
+## Runtime checkpoints
+
+The startup script logs major stages to the serial console:
+
+- `mount_local_ssd`
+- `pull_training_image`
+- `verify_dataset_artifact`
+- `stage_dataset_payload`
+- `verify_staged_dataset`
+- `verify_gpu`
+- `train`
+- `done`
+
+On failure, terminal evidence records `failed_stage` before being uploaded when
+possible.
+
+## Destroy
+
+Container exit does not remove the VM. Removal is a Terraform lifecycle action
+and requires a separately reviewed destroy plan:
+
+```bash
 terraform -chdir=terraform/runs/detection plan -destroy -out=destroy.tfplan
 terraform -chdir=terraform/runs/detection show destroy.tfplan
 terraform -chdir=terraform/runs/detection apply destroy.tfplan
-~~~
+```
 
-## Tests
+## Terraform contract tests
 
-Contract tests live in [`terraform/tests/`](../../tests/) and run against a
-mocked provider, so they need no credentials:
+Contract tests live in `terraform/tests/` and use a mocked provider:
 
-~~~bash
+```bash
 terraform -chdir=terraform/tests init
 terraform -chdir=terraform/tests test
-~~~
+```

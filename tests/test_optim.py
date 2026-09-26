@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-# third-party
 import pytest
 import torch
 from hydra import compose, initialize
@@ -12,17 +11,12 @@ from hydra.core.global_hydra import GlobalHydra
 from hydra.utils import get_class
 from omegaconf import DictConfig
 
-# project
 from feral_vision.config.store import register_configs
 from feral_vision.training.optim import (
     build_loss_fn,
     build_optimizer,
     build_scheduler,
 )
-
-# ---------------------------------------------------------------------------
-# Helpers / local fixtures
-# ---------------------------------------------------------------------------
 
 _CONF_ROOT = Path(__file__).resolve().parents[1] / "conf"
 
@@ -35,7 +29,7 @@ def _variant_names(group: str) -> tuple[str, ...]:
 def _compose_training_cfg(override: str) -> DictConfig:
     """Compose the canonical Run Recipe with one training-component override."""
     with initialize(version_base=None, config_path="../conf"):
-        return compose(config_name="runs/baseline", overrides=[override])
+        return compose(config_name="runs/detection", overrides=[override])
 
 
 @pytest.fixture(autouse=True)
@@ -65,11 +59,6 @@ def loss_cfg(request: pytest.FixtureRequest) -> DictConfig:
     return _compose_training_cfg(f"train/loss_fn={request.param}").train.loss_fn
 
 
-# ---------------------------------------------------------------------------
-# Optimizers and schedulers
-# ---------------------------------------------------------------------------
-
-
 def test_build_optimizer_binds_real_variant_and_updates_image_model(
     image_model: torch.nn.Module, optimizer_cfg: DictConfig
 ) -> None:
@@ -93,9 +82,7 @@ def test_build_scheduler_binds_every_real_variant(
 ) -> None:
     optimizer_cfg = _compose_training_cfg("train/optim=adam").train.optim
     optimizer = build_optimizer(image_model.parameters(), optimizer_cfg)
-
     scheduler = build_scheduler(optimizer, scheduler_cfg)
-
     assert isinstance(scheduler, get_class(scheduler_cfg._target_))
     assert scheduler.optimizer is optimizer
 
@@ -103,16 +90,9 @@ def test_build_scheduler_binds_every_real_variant(
 def test_build_scheduler_none_disables_scheduling(image_model: torch.nn.Module) -> None:
     optimizer_cfg = _compose_training_cfg("train/optim=adam").train.optim
     optimizer = build_optimizer(image_model.parameters(), optimizer_cfg)
-
     assert build_scheduler(optimizer, None) is None
-
-
-# ---------------------------------------------------------------------------
-# Loss functions
-# ---------------------------------------------------------------------------
 
 
 def test_build_loss_fn_instantiates_every_real_variant(loss_cfg: DictConfig) -> None:
     loss_fn = build_loss_fn(loss_cfg)
-
     assert isinstance(loss_fn, get_class(loss_cfg._target_))

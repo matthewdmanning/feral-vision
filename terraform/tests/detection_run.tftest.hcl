@@ -18,7 +18,15 @@ override_data {
 override_data {
   target = data.google_compute_network.training
   values = {
-    self_link = "projects/test-project/global/networks/default"
+    self_link               = "projects/test-project/global/networks/default"
+    auto_create_subnetworks = true
+  }
+}
+
+override_data {
+  target = data.google_compute_image.trainer_boot
+  values = {
+    self_link = "https://www.googleapis.com/compute/v1/projects/deeplearning-platform-release/global/images/pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260901"
   }
 }
 
@@ -32,9 +40,7 @@ variables {
   artifact_prefix              = "gs://feral-vision-operations-us-east4/runs/detection"
 }
 
-# Every run-scoped name derives from run_id. This is the contract that stops
-# two concurrent runs from contending for one VM.
-run "run_scoped_names_derive_from_run_id" {
+run "single_gpu_trainer_shape_is_fixed" {
   command = plan
   module { source = "../runs/detection" }
 
@@ -44,12 +50,90 @@ run "run_scoped_names_derive_from_run_id" {
   }
 
   assert {
+    condition     = length(output.trainer_instance_name) <= 63
+    error_message = "Generated trainer name must fit the Compute Engine 63-character limit."
+  }
+
+  assert {
+    condition     = google_compute_instance.trainer.machine_type == "n1-standard-4"
+    error_message = "The one-off trainer must use the reviewed n1-standard-4 shape."
+  }
+
+  assert {
+    condition = (
+      length(google_compute_instance.trainer.guest_accelerator) == 1 &&
+      google_compute_instance.trainer.guest_accelerator[0].type == "nvidia-tesla-t4" &&
+      google_compute_instance.trainer.guest_accelerator[0].count == 1
+    )
+    error_message = "The trainer must attach exactly one NVIDIA T4."
+  }
+
+  assert {
+    condition = (
+      length(google_compute_instance.trainer.scratch_disk) == 1 &&
+      google_compute_instance.trainer.scratch_disk[0].interface == "NVME"
+    )
+    error_message = "The trainer must attach exactly one NVMe Local SSD."
+  }
+
+  assert {
+    condition = (
+      google_compute_instance.trainer.scheduling[0].provisioning_model == "FLEX_START" &&
+      google_compute_instance.trainer.scheduling[0].on_host_maintenance == "TERMINATE" &&
+      google_compute_instance.trainer.scheduling[0].automatic_restart == false &&
+      google_compute_instance.trainer.scheduling[0].instance_termination_action == "DELETE"
+    )
+    error_message = "The disposable GPU trainer must keep the reviewed Flex-start lifecycle."
+  }
+
+  assert {
+    condition     = length(google_compute_instance.trainer.network_interface[0].access_config) == 1
+    error_message = "The trainer needs one ephemeral external address because this root does not manage Cloud NAT."
+  }
+
+  assert {
+    condition = (
+      length(google_compute_instance.trainer.service_account) == 1 &&
+      contains(google_compute_instance.trainer.service_account[0].scopes, "cloud-platform")
+    )
+    error_message = "The trainer must use the existing service account with cloud-platform scope."
+  }
+
+  assert {
+    condition     = output.boot_image == "https://www.googleapis.com/compute/v1/projects/deeplearning-platform-release/global/images/pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260901"
+    error_message = "The plan must pin the concrete DLVM image resolved from the NVIDIA-580 family."
+  }
+
+  assert {
+    condition     = !contains(keys(google_compute_instance.trainer.metadata), "install-nvidia-driver")
+    error_message = "The NVIDIA-580 DLVM image already includes the driver; startup must not schedule a first-boot reinstall/reboot."
+  }
+
+  assert {
     condition     = output.run_artifact_uri == "gs://feral-vision-operations-us-east4/runs/detection/run-20260921-abc"
     error_message = "Run artifact URI must be scoped to run_id."
   }
+
+  assert {
+    condition     = strcontains(google_compute_instance.trainer.metadata_startup_script, "runs/detection")
+    error_message = "The startup script must use the single canonical training recipe."
+  }
+
+  assert {
+    condition     = strcontains(google_compute_instance.trainer.metadata_startup_script, "dataset-artifact.json")
+    error_message = "The startup script must preserve the Dataset Artifact manifest seam."
+  }
+
+  assert {
+    condition = (
+      !strcontains(lower(google_compute_instance.trainer.metadata_startup_script), "dvc init") &&
+      !strcontains(lower(google_compute_instance.trainer.metadata_startup_script), "dvc repro") &&
+      !strcontains(lower(google_compute_instance.trainer.metadata_startup_script), "dvc.lock")
+    )
+    error_message = "The GPU runtime must not re-version the published Dataset Artifact with DVC."
+  }
 }
 
-# The run trains on exactly one prefix in the dataset-only bucket.
 run "dataset_uri_resolves_against_the_dataset_bucket" {
   command = plan
   module { source = "../runs/detection" }
@@ -60,32 +144,26 @@ run "dataset_uri_resolves_against_the_dataset_bucket" {
   }
 }
 
-# Subnetworks and Cloud NAT are banned. The trainer attaches to the network the
-# data source returned; the network is read, never owned, so destroying a run
-# cannot reach shared network infrastructure.
-run "trainer_attaches_to_the_read_network" {
+run "trainer_attaches_to_the_read_auto_mode_network" {
   command = plan
   module { source = "../runs/detection" }
 
   assert {
     condition     = output.trainer_network == "projects/test-project/global/networks/default"
-    error_message = "The trainer must attach to the network read from the data source, never to a named subnetwork."
+    error_message = "The trainer must attach to the network read from the data source."
   }
 }
 
-# Without Cloud NAT the trainer reaches Artifact Registry over its own external
-# address. Losing that access_config would leave the image pull with no route.
-run "trainer_has_an_external_address_for_egress" {
+run "rejects_run_id_that_would_overflow_vm_name" {
   command = plan
   module { source = "../runs/detection" }
 
-  assert {
-    condition     = length(google_compute_instance.trainer.network_interface[0].access_config) == 1
-    error_message = "The trainer needs an external address: Cloud NAT is banned, so nothing else provides egress."
+  variables {
+    run_id = "run-abcdefghijklmnopqrstuvwxyz0123456789x"
   }
-}
 
-# --- Input contracts --------------------------------------------------------
+  expect_failures = [var.run_id]
+}
 
 run "rejects_artifact_prefix_inside_the_dataset_bucket" {
   command = plan
@@ -152,16 +230,4 @@ run "rejects_plaintext_http_to_a_remote_mlflow_host" {
   }
 
   expect_failures = [var.mlflow_tracking_uri]
-}
-
-run "rejects_a_flex_start_trainer_that_is_not_deleted_at_its_limit" {
-  command = plan
-  module { source = "../runs/detection" }
-
-  variables {
-    provisioning_model          = "FLEX_START"
-    instance_termination_action = "STOP"
-  }
-
-  expect_failures = [var.instance_termination_action]
 }

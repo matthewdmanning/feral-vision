@@ -3,13 +3,17 @@
 # Detection trainer startup.
 #
 # Stages one immutable Dataset Artifact from the dataset-only bucket onto the
-# attached local SSD, versions it with DVC on this VM, trains, and exports
-# durable evidence to the operational artifact prefix. Evidence is exported on
-# failure as well as success: a failed run must retain its evidence.
+# attached Local SSD, verifies its published dataset-artifact.json contract,
+# trains, and exports durable evidence to the operational artifact prefix.
+#
+# Dataset versioning is an upstream responsibility. This VM consumes the
+# published Dataset Artifact and never initializes, mutates, or reproduces DVC
+# state.
 set -euo pipefail
 
 readonly run_id="${run_id}"
 readonly training_image="${training_image}"
+readonly registry_host="$${training_image%%/*}"
 readonly dataset_base_uri="${dataset_base_uri}"
 readonly dataset_payload_uri="$dataset_base_uri/payload"
 readonly source_annotation_uri="$dataset_payload_uri/annotations/instances.json#${source_annotation_generation}"
@@ -19,16 +23,20 @@ readonly dataset_host_mount_dir="${dataset_host_mount_dir}"
 readonly dataset_container_mount_dir="${dataset_container_mount_dir}"
 readonly mlflow_tracking_uri="${mlflow_tracking_uri}"
 readonly run_config_name="${run_config_name}"
-readonly local_ssd_device="/dev/nvme0n1"
-
-# DVC names the tracker after the dataset directory inside the workspace.
-readonly dataset_dir_name="$(basename "$dataset_container_mount_dir")"
-readonly dataset_tracker_name="$dataset_dir_name.dvc"
-
+readonly local_ssd_device="/dev/disk/by-id/google-local-nvme-ssd-0"
+readonly dataset_manifest_host_path="$dataset_host_mount_dir/dataset-artifact.json"
+readonly dataset_manifest_container_path="$dataset_container_mount_dir/dataset-artifact.json"
 readonly evidence_path="$local_ssd_mount_dir/training-evidence.json"
-stage="startup"
 
-# Use this function to run the pinned CLI that ships inside the training image.
+stage="startup"
+dataset_artifact_sha256=""
+
+checkpoint() {
+  printf '[feral-training] %s stage=%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$stage" "$1"
+}
+
+# Use the pinned tools shipped inside the training image for artifact reads so
+# preflight and runtime use the same authenticated container environment.
 in_container() {
   docker run --rm \
     -v "$local_ssd_mount_dir:/data" \
@@ -36,7 +44,6 @@ in_container() {
     "$training_image" "$${@:2}"
 }
 
-# Use this function to record terminal run state where the launcher polls it.
 write_evidence() {
   cat >"$evidence_path" <<EVIDENCE
 {
@@ -45,39 +52,44 @@ write_evidence() {
   "failed_stage": "$2",
   "training_image": "$training_image",
   "dataset_artifact_uri": "$dataset_base_uri",
+  "dataset_artifact_sha256": "$dataset_artifact_sha256",
   "run_config_name": "$run_config_name",
   "finished_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EVIDENCE
 }
 
-# Evidence must survive a failed run, so export it from a trap rather than only
-# on the success path. The VM itself is removed by a Terraform lifecycle
-# action, never by this script.
+# Evidence must survive a failed run. Preserve the exact dataset manifest used
+# by the trainer whenever it was staged successfully.
 export_evidence() {
   local exit_code="$?"
   set +e
+  checkpoint "exporting terminal evidence exit_code=$exit_code"
   if [ "$exit_code" -eq 0 ]; then
     write_evidence "FINISHED" ""
   else
     write_evidence "FAILED" "$stage"
   fi
   gcloud storage cp "$evidence_path" "$run_artifact_uri/training-evidence.json" --quiet
+  if [ -f "$dataset_manifest_host_path" ]; then
+    gcloud storage cp \
+      "$dataset_manifest_host_path" \
+      "$run_artifact_uri/dataset-artifact.json" \
+      --quiet
+  fi
   gcloud storage rsync --recursive --quiet \
     "$local_ssd_mount_dir/mlflow" "$run_artifact_uri/mlflow"
   if [ -f "$local_ssd_mount_dir/mlflow.db" ]; then
     gcloud storage cp "$local_ssd_mount_dir/mlflow.db" "$run_artifact_uri/mlflow.db" --quiet
   fi
-  if [ -f "$dataset_host_mount_dir/dvc.lock" ]; then
-    gcloud storage cp "$dataset_host_mount_dir/dvc.lock" "$run_artifact_uri/dvc.lock" --quiet
-    gcloud storage cp "$dataset_host_mount_dir/$dataset_tracker_name" "$run_artifact_uri/$dataset_tracker_name" --quiet
-  fi
+  checkpoint "terminal evidence export attempted"
   return "$exit_code"
 }
 trap export_evidence EXIT
 
 # --- Local SSD --------------------------------------------------------------
 stage="mount_local_ssd"
+checkpoint "starting"
 test -b "$local_ssd_device"
 mkdir -p "$local_ssd_mount_dir"
 if ! mountpoint -q "$local_ssd_mount_dir"; then
@@ -87,71 +99,98 @@ if ! mountpoint -q "$local_ssd_mount_dir"; then
   mount -o discard,defaults "$local_ssd_device" "$local_ssd_mount_dir"
 fi
 mkdir -p "$dataset_host_mount_dir/images" "$dataset_host_mount_dir/annotations" "$local_ssd_mount_dir/mlflow"
+checkpoint "passed device=$local_ssd_device mount=$local_ssd_mount_dir"
+
+# --- Host container/GPU tooling --------------------------------------------
+stage="verify_container_runtime"
+checkpoint "starting"
+command -v docker >/dev/null
+command -v gcloud >/dev/null
+command -v nvidia-smi >/dev/null
+docker version --format 'docker_server={{.Server.Version}}'
+nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
+checkpoint "passed"
+
+# Artifact Registry is private. IAM on the VM service account is necessary but
+# Docker must also be configured to obtain short-lived credentials through the
+# gcloud credential helper before the first pull.
+stage="authenticate_training_registry"
+checkpoint "starting registry=$registry_host"
+gcloud auth configure-docker "$registry_host" --quiet >/dev/null
+checkpoint "passed"
 
 stage="pull_training_image"
+checkpoint "starting image=$training_image"
 docker pull "$training_image"
+checkpoint "passed"
 
-# --- Preflight --------------------------------------------------------------
-# Verify the selected Dataset Artifact before staging anything. A missing
-# payload or manifest fails here rather than part-way through a transfer.
+# --- Published Dataset Artifact preflight ----------------------------------
+# The upstream publisher owns versioning. Training requires the immutable
+# payload plus its published manifest and never creates replacement lineage.
 stage="verify_dataset_artifact"
+checkpoint "starting uri=$dataset_base_uri"
 in_container gcloud storage ls "$dataset_payload_uri/images" --quiet >/dev/null
 in_container gcloud storage ls "$dataset_base_uri/dataset-artifact.json" --quiet >/dev/null
+in_container gcloud storage objects describe "$source_annotation_uri" --format=json >/dev/null
+checkpoint "passed"
 
-# --- Stage the Dataset payload on the local SSD -----------------------------
+# --- Stage the Dataset payload on the Local SSD ----------------------------
 stage="stage_dataset_payload"
+checkpoint "starting"
 in_container gcloud storage rsync --recursive --checksums-only --quiet \
   "$dataset_payload_uri/images" "$dataset_container_mount_dir/images"
 
-# The annotation is pinned to a retained generation, so the run trains on an
-# immutable input even if the live object is replaced mid-run.
+# The annotation is generation-pinned so a live object replacement cannot
+# change the training input after the plan has been reviewed.
 in_container gcloud storage cp --quiet \
   "$source_annotation_uri" "$dataset_container_mount_dir/annotations/instances.json"
 
 in_container gcloud storage cp --quiet \
-  "$dataset_base_uri/dataset-artifact.json" "$dataset_container_mount_dir/dataset-artifact.json"
+  "$dataset_base_uri/dataset-artifact.json" "$dataset_manifest_container_path"
+checkpoint "passed"
 
+# --- Validate the data-versioning / training seam --------------------------
 stage="verify_staged_dataset"
+checkpoint "starting"
 test -d "$dataset_host_mount_dir/images"
 test -n "$(ls -A "$dataset_host_mount_dir/images")"
 test -s "$dataset_host_mount_dir/annotations/instances.json"
-test -f "$dataset_host_mount_dir/dataset-artifact.json"
+test -s "$dataset_manifest_host_path"
 
-# --- Version the staged Dataset on this VM ----------------------------------
-# A .dvc tracker alone never authorizes training; version_dataset reproduces
-# the dataset stage and returns the lock, and the lock is verified below.
-stage="version_dataset"
-docker run --rm \
-  -v "$local_ssd_mount_dir:/data" \
-  --entrypoint bash \
-  "$training_image" -ceu '
-    cd /data
-    if [ ! -d .dvc ]; then
-      uv run --no-sync dvc init --no-scm
-    fi
-    uv run --no-sync python -c "from pathlib import Path; from feral_vision.data.dataset_artifact import version_dataset; print(version_dataset(Path(\"'"$dataset_container_mount_dir"'\"), workspace=Path(\"/data\")))"
-    cp dvc.lock "'"$dataset_container_mount_dir"'/dvc.lock"
-    cp "'"$dataset_tracker_name"'" "'"$dataset_container_mount_dir"'/'"$dataset_tracker_name"'"
-  '
+# Parsing is deliberately strict and side-effect free. The manifest is the
+# upstream provenance record consumed by training; malformed JSON blocks the
+# run before the GPU is touched.
+in_container python -c \
+  'import json, pathlib; p=pathlib.Path("'"$dataset_manifest_container_path"'"); obj=json.loads(p.read_text()); assert isinstance(obj, dict) and obj, "dataset-artifact.json must contain a non-empty JSON object"'
 
-test -f "$dataset_host_mount_dir/dvc.lock"
-test -f "$dataset_host_mount_dir/$dataset_tracker_name"
+dataset_artifact_sha256="$(sha256sum "$dataset_manifest_host_path" | awk '{print $1}')"
+test -n "$dataset_artifact_sha256"
+checkpoint "passed dataset_artifact_sha256=$dataset_artifact_sha256"
 
-# --- Train ------------------------------------------------------------------
+# --- GPU --------------------------------------------------------------------
 stage="verify_gpu"
+checkpoint "starting"
 docker run --rm \
   --gpus all \
   --entrypoint python \
-  "$training_image" -c 'import torch; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))'
+  "$training_image" -c 'import torch; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0)); print(torch.version.cuda)'
+checkpoint "passed"
 
+# --- Train ------------------------------------------------------------------
 stage="train"
+checkpoint "starting recipe=$run_config_name"
 docker run --rm \
   --gpus all \
   -v "$local_ssd_mount_dir:/data" \
   -e TRAIN_DATA="$dataset_container_mount_dir" \
+  -e DATASET_ARTIFACT_MANIFEST="$dataset_manifest_container_path" \
+  -e DATASET_ARTIFACT_SHA256="$dataset_artifact_sha256" \
+  -e DATASET_ARTIFACT_URI="$dataset_base_uri" \
+  -e FERAL_VISION_RUN_ID="$run_id" \
   -e MLFLOW_TRACKING_URI="$mlflow_tracking_uri" \
   -e MLFLOW_ARTIFACT_PREFIX="$run_artifact_uri" \
-  -e RUN_CONFIG_NAME="$run_config_name" \
   "$training_image"
+checkpoint "passed"
 
 stage="done"
+checkpoint "training completed"
