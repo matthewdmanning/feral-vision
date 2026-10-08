@@ -20,7 +20,9 @@ A training VM attaches to an existing auto-mode VPC and receives an ephemeral
 external address through an empty `access_config` block. This means:
 
 - the selected VPC must be auto-mode because this root intentionally does not
-  name a subnetwork;
+  name a subnetwork. The `google_compute_network` data source does not expose
+  the VPC mode, so Terraform cannot check it. `preflight.py` checks
+  `autoCreateSubnetworks` against the live network before every apply;
 - existing firewall policy must be reviewed for an externally addressed VM;
 - Terraform must not work around a network failure by introducing a router,
   NAT, firewall, or subnetwork into this training root.
@@ -36,15 +38,42 @@ variable only when the deployment genuinely needs to vary between runs.
 Terraform must not manage shared IAM, firewall, registry, bucket, or network
 resources from this root.
 
-`terraform/tests/` contains mocked-provider contract tests:
+## File map
+
+Follow the HashiCorp Terraform style guide for layout and naming.
+
+| Path | Contents |
+| --- | --- |
+| `terraform/runs/detection/terraform.tf` | Terraform version, provider requirements, and `gcs` backend |
+| `terraform/runs/detection/providers.tf` | Provider configuration |
+| `terraform/runs/detection/locals.tf` | Local values, including the fixed machine and GPU shape |
+| `terraform/runs/detection/main.tf` | Data sources and the one `google_compute_instance` |
+| `terraform/runs/detection/variables.tf` | Input variables, in alphabetical order |
+| `terraform/runs/detection/outputs.tf` | Outputs, in alphabetical order |
+| `terraform/runs/detection/templates/` | VM startup script template |
+| `terraform/runs/detection/.terraform.lock.hcl` | Provider lock; commit it |
+| `terraform/tests/` | Contract tests (see below) |
+| `terraform/preflight/` | Deployment gate (see below) |
+
+Commit both `.terraform.lock.hcl` files. A `terraform init` on another
+operating system can add platform hashes to them; review and commit that change
+on purpose, not as a side effect.
+
+## Contract tests
+
+`terraform/tests/` contains mocked-provider contract tests. Name plan-mode test
+files `*_unit_test.tftest.hcl`. Reserve `*_integration_test.tftest.hcl` for
+apply-mode tests, which this repository does not have.
 
 ~~~bash
 terraform -chdir=terraform/tests init
 terraform -chdir=terraform/tests test
 ~~~
 
-Those tests are necessary but not sufficient for deployment because they do not
-prove live GCP prerequisites.
+The tests cover the fixed VM shape, URI resolution, and negative tests for the
+main variable validations. Some validations, such as the mount-directory
+prefixes, have no negative test yet. Those tests are necessary but not sufficient for deployment
+because they do not prove live GCP prerequisites.
 
 ## Required GPU deployment gate
 
@@ -82,6 +111,11 @@ scripts/runs/detection.sh \
 The launcher rejects a saved plan whose bytes changed after preflight. Do not
 regenerate a plan between review and apply and do not use `-auto-approve` for
 this workflow.
+
+Keep the generated reports and manifest when diagnosing a failed deployment.
+They record where provisioning stopped. Compare them across retries instead of
+changing Terraform based only on the final error. See the
+[preflight guide](../../terraform/preflight/README.md) for the report files.
 
 ## Dataset boundary
 

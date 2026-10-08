@@ -81,6 +81,11 @@ the base image. The image also contains `gcloud` and uses
 [`scripts/runs/container_train.sh`](../../scripts/runs/container_train.sh) as
 its entrypoint.
 
+The CUDA major in the Dockerfile and the CUDA major in the PyTorch lock are one
+compatibility contract. Do not change either one independently. The preflight
+fails if a second training Dockerfile, Run Recipe, or container entrypoint
+appears.
+
 The Compute Engine host uses Google's current PyTorch 2.9 / CUDA 12.9 Deep
 Learning VM family with NVIDIA driver 580. CUDA 13 applications are supported
 on driver family 580 through NVIDIA CUDA minor-version compatibility. Startup
@@ -136,6 +141,11 @@ success.
 
 The VM remains Terraform-owned after container exit. Removal requires a
 separately reviewed Terraform destroy plan.
+
+[`scripts/cloud_preflight.py`](../../scripts/cloud_preflight.py) is a
+diagnostic tool for an already-running VM. It is not a second required gate in
+the automatic startup path, because the startup script owns the pre-training
+runtime gates.
 
 ## MLflow evidence
 

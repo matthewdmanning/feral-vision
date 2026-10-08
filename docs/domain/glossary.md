@@ -23,8 +23,10 @@ image order, and random seeds. It is Data Lineage.
 
 #### Feral Vision backend
 
-The record is published as `dvc.lock`; DVC manages the Dataset folder in its
-remote.
+The published Cloud Storage prefix `datasets/<source>/<split>/<artifact>/`. It
+holds `payload/` and `dataset-artifact.json`, the provenance manifest that GPU
+training consumes and hashes. Upstream DVC publication may also record
+`dvc.lock`; GPU training does not use it.
 
 _Avoid_: Dataset, Model Artifact
 

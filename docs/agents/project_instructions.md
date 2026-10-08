@@ -73,5 +73,6 @@ the action.
 | cloud identity, image builds, VMs, or cloud training | [Cloud Operations](cloudops.md) | Cloud-service credentials and operational entrypoints. Tool ownership: **Scripts and source code**. |
 | Git, GitHub Issues, pull requests, or publishing | [GitHub workflow](github.md) | Session checks, authentication, issue tracking, and branch/PR hygiene. |
 | domain terminology or an architectural decision | [Domain Docs](domain.md) | Glossary and ADR discovery. |
+| an agent reached for the wrong tool or source despite these routing instructions | [Pointer failures](pointer_failures.md) | Log of wrong-tool and wrong-source selections, with the agent's stated reason. |
 | a Wayfinder map or child ticket | [Wayfinding](wayfinding.md) | Map, child-ticket, dependency, and frontier conventions. |
 | GitHub issue workflow labels | [Triage Labels](triage-labels.md) | Canonical labels and their meanings. |
