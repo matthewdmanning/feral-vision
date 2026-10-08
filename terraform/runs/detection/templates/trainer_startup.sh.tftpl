@@ -3,7 +3,7 @@
 # Detection trainer startup.
 #
 # Stages one immutable Dataset Artifact from the dataset-only bucket onto the
-# attached Local SSD, verifies its published dataset-artifact.json contract,
+# attached Local SSD, verifies its published dataset-artifact.json,
 # trains, and exports durable evidence to the operational artifact prefix.
 #
 # Dataset versioning is an upstream responsibility. This VM consumes the
@@ -173,7 +173,7 @@ checkpoint "starting"
 docker run --rm \
   --gpus all \
   --entrypoint python \
-  "$training_image" -c 'import torch; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0)); print(torch.version.cuda)'
+  "$training_image" -c 'import torch; assert torch.cuda.is_available(); cc = torch.cuda.get_device_capability(0); arch = "sm_%d%d" % cc; assert arch in torch.cuda.get_arch_list(), "torch build has no kernels for " + arch + ": " + str(torch.cuda.get_arch_list()); print(torch.cuda.get_device_name(0)); print(torch.version.cuda); print(arch)'
 checkpoint "passed"
 
 # --- Train ------------------------------------------------------------------

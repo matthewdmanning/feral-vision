@@ -8,7 +8,7 @@ Terraform state never manages concurrent trainers.
 ## Fixed deployment shape
 
 This root creates exactly one `n1-standard-4` VM with one NVIDIA T4, one NVMe
-Local SSD, a 100 GB `pd-ssd` boot disk, and Flex-start scheduling. Shared IAM,
+Local SSD, a 100 GB `pd-ssd` boot disk, and on-demand (`STANDARD`) scheduling. Shared IAM,
 firewall, router, NAT, subnetwork, registry, bucket, and network resources are
 not managed here.
 
@@ -61,7 +61,7 @@ scripts/cloud/build_training_image.sh \
 ```
 
 The script builds `deploy/Dockerfile.gcp` through
-`deploy/cloudbuild.training-image.yaml`, runs image-contract checks before the
+`deploy/cloudbuild.training-image.yaml`, runs image checks before the
 push, then prints the digest-pinned Artifact Registry reference required by
 Terraform.
 
@@ -75,7 +75,7 @@ python terraform/preflight/preflight.py --var-file /path/to/run.tfvars
 ```
 
 Preflight verifies the canonical repository shape, Terraform syntax/schema and
-saved plan, single-VM plan contract, GCP prerequisites, Dataset Artifact
+saved plan, single-VM plan shape, GCP prerequisites, Dataset Artifact
 manifest, pinned annotations generation, relevant quotas, and run-artifact
 writeability. See [`../../preflight/README.md`](../../preflight/README.md).
 
@@ -121,9 +121,9 @@ terraform -chdir=terraform/runs/detection show destroy.tfplan
 terraform -chdir=terraform/runs/detection apply destroy.tfplan
 ```
 
-## Terraform contract tests
+## Terraform mocked-provider tests
 
-Contract tests live in `terraform/tests/` and use a mocked provider:
+The tests live in `terraform/tests/` and use a mocked provider:
 
 ```bash
 terraform -chdir=terraform/tests init

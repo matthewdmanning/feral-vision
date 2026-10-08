@@ -69,7 +69,7 @@ Every invocation writes a timestamped directory under `reports/` unless
 - `preflight-report.txt` — ordered human-readable checkpoint history;
 - `preflight-report.json` — structured results with commands and timings;
 - `deployment.tfplan` — exact saved Terraform plan inspected by preflight;
-- `deployment-plan.json` — machine-readable plan used for contract checks;
+- `deployment-plan.json` — machine-readable plan used for plan checks;
 - `deployment-manifest.json` — apply handoff containing the plan SHA-256,
   digest-pinned training image, Dataset Artifact URI and manifest SHA-256, and
   other reviewed deployment facts.
@@ -77,10 +77,10 @@ Every invocation writes a timestamped directory under `reports/` unless
 Major checkpoints are:
 
 1. `LOCAL_TOOLING`
-2. `REPOSITORY_CONTRACT`
+2. `REPOSITORY_CHECKS`
 3. `STATIC_TERRAFORM`
 4. `TERRAFORM_PLAN`
-5. `PLAN_CONTRACT`
+5. `PLAN_CHECKS`
 6. `GCP_PREREQUISITES`
 7. `ARTIFACT_WRITE_PROBE`
 8. `DEPLOYMENT_MANIFEST`
@@ -88,7 +88,7 @@ Major checkpoints are:
 
 A `FAIL` is blocking. A `WARN` records reduced certainty only where Google Cloud
 does not expose a dependable blocking signal. Do not downgrade a failed
-contract to a warning merely to get an apply through.
+check to a warning merely to get an apply through.
 
 ## Apply discipline
 

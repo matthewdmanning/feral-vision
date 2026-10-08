@@ -1,7 +1,7 @@
-# Contract tests for terraform/runs/detection.
+# Mocked-provider tests for terraform/runs/detection.
 #
 # These run against a mocked Google provider: they prove the configuration's
-# own contracts without reaching Google Cloud or needing credentials.
+# own settings without reaching Google Cloud or needing credentials.
 #
 #   terraform -chdir=terraform/tests init
 #   terraform -chdir=terraform/tests test
@@ -77,12 +77,12 @@ run "single_gpu_trainer_shape_is_fixed" {
 
   assert {
     condition = (
-      google_compute_instance.trainer.scheduling[0].provisioning_model == "FLEX_START" &&
+      google_compute_instance.trainer.scheduling[0].provisioning_model == "STANDARD" &&
       google_compute_instance.trainer.scheduling[0].on_host_maintenance == "TERMINATE" &&
       google_compute_instance.trainer.scheduling[0].automatic_restart == false &&
       google_compute_instance.trainer.scheduling[0].instance_termination_action == "DELETE"
     )
-    error_message = "The disposable GPU trainer must keep the reviewed Flex-start lifecycle."
+    error_message = "The disposable GPU trainer must keep the reviewed on-demand lifecycle."
   }
 
   assert {

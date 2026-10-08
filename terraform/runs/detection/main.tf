@@ -5,7 +5,8 @@
 # var.run_id.
 #
 # This root is intentionally narrow: one n1-standard-4 VM, one T4, one NVMe
-# Local SSD, Flex-start scheduling, and no managed networking or IAM resources.
+# Local SSD, on-demand (STANDARD) scheduling, and no managed networking or IAM
+# resources.
 
 data "google_storage_bucket" "dataset" {
   name    = var.bucket_name
@@ -37,7 +38,7 @@ resource "google_compute_instance" "trainer" {
   scheduling {
     on_host_maintenance         = "TERMINATE"
     automatic_restart           = false
-    provisioning_model          = "FLEX_START"
+    provisioning_model          = "STANDARD"
     instance_termination_action = "DELETE"
 
     max_run_duration {

@@ -3,6 +3,14 @@
 Use this guide for Terraform state, plans, tests, and Cloud Resource lifecycle.
 Use [Cloud Operations](cloudops.md) for image builds and GPU runtime behavior.
 
+## Never in CI
+
+Terraform is deployment tooling. It is not source code and not part of the
+project test suite. No Terraform command (`init`, `validate`, `plan`, `test`,
+`apply`, or `terraform/preflight/preflight.py`) may run in a GitHub workflow, a
+git hook, or `scripts/validate_ci.sh`. Run them by hand, on the operator's
+machine, only.
+
 ## Documentation sources
 
 Verify provider/resource behavior against the current Google provider schema and
@@ -52,16 +60,16 @@ Follow the HashiCorp Terraform style guide for layout and naming.
 | `terraform/runs/detection/outputs.tf` | Outputs, in alphabetical order |
 | `terraform/runs/detection/templates/` | VM startup script template |
 | `terraform/runs/detection/.terraform.lock.hcl` | Provider lock; commit it |
-| `terraform/tests/` | Contract tests (see below) |
+| `terraform/tests/` | Mocked-provider tests (see below) |
 | `terraform/preflight/` | Deployment gate (see below) |
 
 Commit both `.terraform.lock.hcl` files. A `terraform init` on another
 operating system can add platform hashes to them; review and commit that change
 on purpose, not as a side effect.
 
-## Contract tests
+## Mocked-provider tests
 
-`terraform/tests/` contains mocked-provider contract tests. Name plan-mode test
+`terraform/tests/` contains mocked-provider tests. Name plan-mode test
 files `*_unit_test.tftest.hcl`. Reserve `*_integration_test.tftest.hcl` for
 apply-mode tests, which this repository does not have.
 
@@ -90,8 +98,8 @@ The preflight must pass before apply. It checks:
 - Terraform formatting, initialization, and validation;
 - a saved plan contains only the disposable training VM and no unexpected
   update/replacement/destroy action;
-- the fixed machine, T4, NVMe Local SSD, Flex-start, network, and service-account
-  contract;
+- the fixed machine, T4, NVMe Local SSD, on-demand scheduling, network, and
+  service-account settings;
 - live project/zone/machine/GPU/network/service-account/image prerequisites;
 - the published `dataset-artifact.json`, its SHA-256, dataset image prefix, and
   generation-pinned annotations object;

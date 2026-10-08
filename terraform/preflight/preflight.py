@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail-fast preflight for the canonical single-VM GPU training deployment.
 
-This command never applies Terraform. It validates the repository contract,
+This command never applies Terraform. It validates the repository layout,
 Terraform configuration and saved plan, required GCP resources, and the exact
 published Dataset Artifact manifest. A passing run writes a hash-pinned
 deployment-manifest.json consumed by scripts/runs/detection.sh.
@@ -17,20 +17,18 @@ import shutil
 import subprocess
 import tempfile
 import time
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 from uuid import uuid4
-
 
 CLOUD_PLATFORM_SCOPES = {
     "cloud-platform",
     "https://www.googleapis.com/auth/cloud-platform",
 }
-TRAINING_IMAGE_PATTERN = re.compile(
-    r"^[a-z0-9][a-z0-9._/@:-]*@sha256:[0-9a-f]{64}$"
-)
+TRAINING_IMAGE_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._/@:-]*@sha256:[0-9a-f]{64}$")
 BOOT_IMAGE_PATTERN = re.compile(r"(?:^|/)projects/([^/]+)/global/images/([^/]+)$")
 CANONICAL_RUN_RECIPE = "detection.yaml"
 CANONICAL_BOOT_FAMILY = "pytorch-2-9-cu129-ubuntu-2204-nvidia-580"
@@ -168,8 +166,7 @@ class Reporter:
             "",
         ]
         lines.extend(
-            f"[{result.checkpoint}] {result.status:5} "
-            f"{result.name}: {result.detail}"
+            f"[{result.checkpoint}] {result.status:5} {result.name}: {result.detail}"
             for result in self.results
         )
         (report_dir / "preflight-report.txt").write_text("\n".join(lines) + "\n")
@@ -183,8 +180,8 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _repository_contract(repository_root: Path, reporter: Reporter) -> None:
-    checkpoint = "REPOSITORY_CONTRACT"
+def _repository_checks(repository_root: Path, reporter: Reporter) -> None:
+    checkpoint = "REPOSITORY_CHECKS"
 
     run_recipes = sorted((repository_root / "conf" / "runs").glob("*.yaml"))
     reporter.assertion(
@@ -249,7 +246,7 @@ def _repository_contract(repository_root: Path, reporter: Reporter) -> None:
     )
     reporter.assertion(
         checkpoint,
-        "dataset_manifest_is_runtime_contract",
+        "dataset_manifest_is_runtime_input",
         "dataset-artifact.json" in runtime,
         "dataset-artifact.json must be staged and verified before training",
     )
@@ -263,19 +260,16 @@ def _root_resources(module: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _output(plan: dict[str, Any], name: str) -> Any:
-    value = (
-        plan.get("planned_values", {})
-        .get("outputs", {})
-        .get(name, {})
-        .get("value")
-    )
+    value = plan.get("planned_values", {}).get("outputs", {}).get(name, {}).get("value")
     if value is None:
-        raise PreflightFailure(f"Terraform plan did not produce required output {name!r}")
+        raise PreflightFailure(
+            f"Terraform plan did not produce required output {name!r}"
+        )
     return value
 
 
-def _plan_contract(plan: dict[str, Any], reporter: Reporter) -> dict[str, Any]:
-    checkpoint = "PLAN_CONTRACT"
+def _plan_checks(plan: dict[str, Any], reporter: Reporter) -> dict[str, Any]:
+    checkpoint = "PLAN_CHECKS"
     root = plan.get("planned_values", {}).get("root_module", {})
     resources = _root_resources(root)
     managed = [resource for resource in resources if resource.get("mode") == "managed"]
@@ -346,9 +340,9 @@ def _plan_contract(plan: dict[str, Any], reporter: Reporter) -> dict[str, Any]:
     scheduling = values.get("scheduling", [{}])[0]
     reporter.assertion(
         checkpoint,
-        "flex_start_lifecycle",
+        "on_demand_lifecycle",
         (
-            scheduling.get("provisioning_model") == "FLEX_START"
+            scheduling.get("provisioning_model") == "STANDARD"
             and scheduling.get("on_host_maintenance") == "TERMINATE"
             and scheduling.get("automatic_restart") is False
             and scheduling.get("instance_termination_action") == "DELETE"
@@ -408,7 +402,7 @@ def _plan_contract(plan: dict[str, Any], reporter: Reporter) -> dict[str, Any]:
     startup_script = values.get("metadata_startup_script", "")
     reporter.assertion(
         checkpoint,
-        "canonical_startup_contract",
+        "canonical_startup_script",
         (
             isinstance(startup_script, str)
             and "runs/detection" in startup_script
@@ -479,24 +473,14 @@ def _quota_available(quotas: list[dict[str, Any]], metric: str) -> float | None:
     return float(quota.get("limit", 0)) - float(quota.get("usage", 0))
 
 
-def _temporary_quota(
+def _standard_quota(
     quotas: list[dict[str, Any]],
-    standard_metric: str,
-    preemptible_metric: str,
+    metric: str,
 ) -> tuple[str, float] | None:
-    preemptible = next(
-        (item for item in quotas if item.get("metric") == preemptible_metric),
-        None,
-    )
-    if preemptible and float(preemptible.get("limit", 0)) > 0:
-        return (
-            preemptible_metric,
-            float(preemptible.get("limit", 0)) - float(preemptible.get("usage", 0)),
-        )
-    standard = _quota_available(quotas, standard_metric)
-    if standard is None:
+    available = _quota_available(quotas, metric)
+    if available is None:
         return None
-    return standard_metric, standard
+    return metric, available
 
 
 def _cloud_checks(
@@ -715,7 +699,7 @@ def _cloud_checks(
     if not isinstance(quotas, list):
         raise PreflightFailure("regional quota response did not contain a quota list")
 
-    cpu_quota = _temporary_quota(quotas, "CPUS", "PREEMPTIBLE_CPUS")
+    cpu_quota = _standard_quota(quotas, "CPUS")
     if cpu_quota:
         metric, available = cpu_quota
         reporter.assertion(
@@ -728,14 +712,10 @@ def _cloud_checks(
         reporter.warning(
             checkpoint,
             "cpu_quota_at_least_4",
-            "Neither standard nor preemptible CPU quota metric was returned",
+            "CPUS quota metric was not returned",
         )
 
-    t4_quota = _temporary_quota(
-        quotas,
-        "NVIDIA_T4_GPUS",
-        "PREEMPTIBLE_NVIDIA_T4_GPUS",
-    )
+    t4_quota = _standard_quota(quotas, "NVIDIA_T4_GPUS")
     if t4_quota:
         metric, available = t4_quota
         reporter.assertion(
@@ -748,7 +728,7 @@ def _cloud_checks(
         reporter.warning(
             checkpoint,
             "t4_quota_at_least_1",
-            "Neither standard nor preemptible T4 quota metric was returned; zonal accelerator availability was verified but allocation can still fail",
+            "NVIDIA_T4_GPUS quota metric was not returned; zonal accelerator availability was verified but allocation can still fail",
         )
 
     external_ips = _quota_available(quotas, "IN_USE_ADDRESSES")
@@ -766,11 +746,7 @@ def _cloud_checks(
             "IN_USE_ADDRESSES quota metric not returned",
         )
 
-    local_ssd = _temporary_quota(
-        quotas,
-        "LOCAL_SSD_TOTAL_GB_PER_VM_FAMILY",
-        "PREEMPTIBLE_LOCAL_SSD_GB",
-    )
+    local_ssd = _standard_quota(quotas, "LOCAL_SSD_TOTAL_GB_PER_VM_FAMILY")
     if local_ssd:
         metric, available = local_ssd
         reporter.assertion(
@@ -905,7 +881,7 @@ def main() -> int:
             auth.stdout.strip() or "no active account",
         )
 
-        _repository_contract(repository_root, reporter)
+        _repository_checks(repository_root, reporter)
 
         terraform_dir = args.terraform_dir.resolve()
         reporter.assertion(
@@ -959,7 +935,7 @@ def main() -> int:
         )
         plan_json_path.write_text(shown.stdout)
         plan = json.loads(shown.stdout)
-        facts = _plan_contract(plan, reporter)
+        facts = _plan_checks(plan, reporter)
         metadata.update(facts)
 
         _cloud_checks(facts, reporter, report_dir)

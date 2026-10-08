@@ -1,4 +1,4 @@
-# Harness root for Terraform contract tests.
+# Harness root for the Terraform mocked-provider tests.
 #
 # This directory holds no infrastructure of its own. Each run block in a
 # *.tftest.hcl file points at the run module under test, which keeps every

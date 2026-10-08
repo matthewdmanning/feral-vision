@@ -29,7 +29,7 @@ variable "bucket_project_id" {
 }
 
 variable "dataset_artifact_prefix" {
-  description = "Dataset Artifact prefix below the dataset bucket, for example datasets/coco/train2017/<artifact>. The published dataset-artifact.json at this prefix is the upstream provenance contract consumed by training."
+  description = "Dataset Artifact prefix below the dataset bucket, for example datasets/coco/train2017/<artifact>. The published dataset-artifact.json at this prefix is the upstream provenance record consumed by training."
   type        = string
   nullable    = false
 
@@ -105,7 +105,7 @@ variable "local_ssd_mount_dir" {
 }
 
 variable "max_run_duration_seconds" {
-  description = "Maximum trainer run duration before Compute Engine deletes the Flex-start VM."
+  description = "Maximum trainer run duration before Compute Engine deletes the on-demand VM."
   type        = number
   default     = 86400
   nullable    = false
@@ -175,7 +175,7 @@ variable "source_annotation_generation" {
 }
 
 variable "training_image" {
-  description = "Digest-pinned detection training image from Artifact Registry."
+  description = "Digest-pinned detection training image from Artifact Registry. Run scripts/cloud/check_training_image.sh to find the existing digest before you build."
   type        = string
   nullable    = false
 
