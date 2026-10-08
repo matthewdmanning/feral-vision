@@ -7,7 +7,7 @@ and is retained only as historical context. Do not use its old script names,
 run-specific image layout, DVC-on-training assumptions, or Run Recipe names as
 operational instructions.
 
-The current GPU training contract is defined by:
+The current GPU training setup is defined by:
 
 - [`AGENTS.md`](../../AGENTS.md)
 - [Cloud operations](../agents/cloudops.md)
@@ -34,8 +34,8 @@ particular:
   the canonical paths documented in `AGENTS.md`;
 - the run-specific preparation/deployment wrappers described by the original
   ADR were removed because they had diverged from the supported Terraform and
-  image contracts.
+  image configuration.
 
 Upstream Dataset Artifact publication may still use DVC metadata. That
-publication workflow is intentionally outside the GPU runtime contract and is
+publication workflow is intentionally outside the GPU runtime and is
 not redefined by this superseding note.

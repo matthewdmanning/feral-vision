@@ -26,4 +26,4 @@ the training image is owned by `deploy/Dockerfile.gcp` plus
 
 The selected Dataset Artifact is also not re-versioned by Hydra or the GPU
 runtime. Its upstream `dataset-artifact.json` crosses into training as the
-provenance contract.
+provenance record.

@@ -39,7 +39,7 @@ flowchart TB
 Dataset versioning is upstream of GPU training. DVC may participate in the
 publication workflow, but the GPU VM consumes the already-published Dataset
 Artifact. The GPU runtime does not run DVC or generate a replacement lockfile.
-`dataset-artifact.json` is the provenance contract across the seam.
+`dataset-artifact.json` is the provenance record across the seam.
 
 The training image has one build path: `deploy/Dockerfile.gcp` through
 `deploy/cloudbuild.training-image.yaml`. The digest-pinned NVIDIA CUDA 13 base

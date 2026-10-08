@@ -13,7 +13,7 @@ Terraform module directory.
 Python tests and fixtures remain under [`tests/`](../../tests/) and test Python
 code under [`src/`](../../src/). The Python test tree and Terraform test tree
 are completely separate: do not mix their files, fixtures, runners, or test
-contracts.
+conventions.
 
 Before writing or reviewing Python tests, use the `write-python-test` skill.
 If that skill is unavailable, raise the issue immediately and do not continue

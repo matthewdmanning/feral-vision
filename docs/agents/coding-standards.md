@@ -1,8 +1,8 @@
 # Coding standards
 
 Use this guide when changing project code or authored documentation. Keep
-substantive project contracts documented with the implementation that changes
-them, and route domain vocabulary, cloud operations, data contracts, and
+substantive project behavior documented with the implementation that changes
+it, and route domain vocabulary, cloud operations, data formats, and
 workflow-specific guidance to their canonical agent references.
 
 ## Documentation
@@ -11,10 +11,10 @@ Functions longer than three lines and class definitions must have docstrings.
 All docstrings must be written using NumPy style.
 
 The main agent must update the canonical project documentation in the same
-change whenever code changes a substantive project contract. This includes
+change whenever code changes substantive project behavior. This includes
 program flow, integrations or deployment paths, runtime/configuration behavior,
-data or tracking contracts, public interfaces, and operator workflows. A purely
-internal refactor that preserves those contracts does not require documentation
+data or tracking formats, public interfaces, and operator workflows. A purely
+internal refactor that preserves that behavior does not require documentation
 changes. Do not defer this check to a later session or reviewer.
 
 When a change affects a user-visible workflow, update the relevant document in

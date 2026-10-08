@@ -1,6 +1,6 @@
 # Data and ingestion
 
-Use this guide when changing data ingestion, dataset contracts, or dataset
+Use this guide when changing data ingestion, dataset layout, or dataset
 publication. Data operation entrypoints live in
 [`scripts/data/`](../../scripts/data/).
 
@@ -57,7 +57,7 @@ source artifact with run-local metadata. GPU training never repairs it. A missin
 or malformed `dataset-artifact.json`, or a missing pinned annotation
 generation, fails deployment preflight.
 
-## Acquisition-publication contract
+## Acquisition and publication
 
 An acquisition image is source-specific. It writes a canonical
 `/workspace/payload/images/` and `/workspace/payload/annotations/` layout. The
@@ -68,4 +68,4 @@ Every publication supplies immutable acquisition and DVC image digests and a
 new, reviewed `DATASET_ARTIFACT_PREFIX`. The prefix is intentionally a required
 build substitution: a rerun must choose a new artifact prefix rather than
 overwrite a training input. New download sources implement this workspace
-contract without adding their download libraries to the DVC image.
+layout without adding their download libraries to the DVC image.
