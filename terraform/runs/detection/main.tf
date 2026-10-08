@@ -7,24 +7,13 @@
 # This root is intentionally narrow: one n1-standard-4 VM, one T4, one NVMe
 # Local SSD, Flex-start scheduling, and no managed networking or IAM resources.
 
-locals {
-  vm_name = "feral-vision-detection-${var.run_id}"
-
-  dataset_base_uri = "gs://${data.google_storage_bucket.dataset.name}/${var.dataset_artifact_prefix}"
-  run_artifact_uri = "${trimsuffix(var.artifact_prefix, "/")}/${var.run_id}"
-
-  labels = merge(var.labels, { run-id = var.run_id })
-
-  machine_type    = "n1-standard-4"
-  gpu_type        = "nvidia-tesla-t4"
-  run_config_name = "runs/detection"
-}
-
 data "google_storage_bucket" "dataset" {
   name    = var.bucket_name
   project = var.bucket_project_id
 }
 
+# The data source does not expose the VPC mode. terraform/preflight/preflight.py
+# enforces that network_name is an auto-mode VPC before every apply.
 data "google_compute_network" "training" {
   name    = var.network_name
   project = var.project_id
@@ -110,11 +99,6 @@ resource "google_compute_instance" "trainer" {
     precondition {
       condition     = length(local.vm_name) <= 63
       error_message = "Generated Compute Engine VM name exceeds the 63-character resource-name limit."
-    }
-
-    precondition {
-      condition     = data.google_compute_network.training.auto_create_subnetworks
-      error_message = "network_name must refer to an auto-mode VPC because this root intentionally does not name a subnetwork."
     }
   }
 }

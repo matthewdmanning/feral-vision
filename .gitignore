@@ -19,6 +19,7 @@ mlruns/
 mlflow.db
 
 *local*
+!locals.tf
 
 # DVC-tracked data and model artifacts
 /data/**

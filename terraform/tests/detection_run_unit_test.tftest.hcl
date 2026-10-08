@@ -18,8 +18,7 @@ override_data {
 override_data {
   target = data.google_compute_network.training
   values = {
-    self_link               = "projects/test-project/global/networks/default"
-    auto_create_subnetworks = true
+    self_link = "projects/test-project/global/networks/default"
   }
 }
 
@@ -230,4 +229,37 @@ run "rejects_plaintext_http_to_a_remote_mlflow_host" {
   }
 
   expect_failures = [var.mlflow_tracking_uri]
+}
+
+run "rejects_a_non_service_account_email" {
+  command = plan
+  module { source = "../runs/detection" }
+
+  variables {
+    service_account_email = "someone@example.com"
+  }
+
+  expect_failures = [var.service_account_email]
+}
+
+run "rejects_a_run_duration_below_the_minimum" {
+  command = plan
+  module { source = "../runs/detection" }
+
+  variables {
+    max_run_duration_seconds = 599
+  }
+
+  expect_failures = [var.max_run_duration_seconds]
+}
+
+run "rejects_a_run_duration_above_the_maximum" {
+  command = plan
+  module { source = "../runs/detection" }
+
+  variables {
+    max_run_duration_seconds = 604801
+  }
+
+  expect_failures = [var.max_run_duration_seconds]
 }
