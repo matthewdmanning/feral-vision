@@ -54,9 +54,14 @@ one.
 
 Before any cloud resource attempt, use the applicable repository documentation,
 existing configurations, workspace context, and available non-cloud tools to
-establish the intended contract and prerequisites. Do not use live cloud calls
+establish the intended behavior and prerequisites. Do not use live cloud calls
 as discovery; proceed decisively only after that local investigation supports
 the action.
+
+The one sanctioned live read is the training-image check. Before you say that
+the training image is missing, or build it, run
+[`scripts/cloud/check_training_image.sh`](../../scripts/cloud/check_training_image.sh).
+See [Check for an existing image first](cloudops.md#check-for-an-existing-image-first).
 
 ## Agent references
 
@@ -66,13 +71,15 @@ the action.
 | project code or authored documentation | [Coding standards](coding-standards.md) | Documentation and code-quality requirements. |
 | user-facing chat, summaries, or an operator command | [User interactions](user-interactions.md) | User-facing collaboration preferences, CLI ownership, and copy-pasteable command requirements. Tool ownership: **Scripts and source code**. |
 | Python tests, fixtures, or model examples | [Test writing and review](testing.md) | Required testing skill and test-data rules. |
-| data ingestion, dataset contracts, or publication | [Data and ingestion](data.md) | Dataset layout, publication, lineage, and acquisition contracts. Tool ownership: **DVC**. |
+| data ingestion, dataset layout, or publication | [Data and ingestion](data.md) | Dataset layout, publication, lineage, and acquisition. Tool ownership: **DVC**. |
 | Hydra or model configuration | [Configuration](configuration.md) | Recipe and reproducibility requirements. Tool ownership: **Hydra**. |
 | locating a Hydra configuration concern | [Hydra configuration index](hydra.md) | Configuration README index by concern. Tool ownership: **Hydra**. |
 | Terraform modules, state, plans, or Cloud Resource lifecycle | [Terraform](terraform.md) | Terraform ownership, file map, state, and plan safety. Tool ownership: **Terraform**. |
 | cloud identity, image builds, VMs, or cloud training | [Cloud Operations](cloudops.md) | Cloud-service credentials and operational entrypoints. Tool ownership: **Scripts and source code**. |
+| **a claim that the training image is or is not built, or a decision to build it** | [Check for an existing image first](cloudops.md#check-for-an-existing-image-first) | **Run `scripts/cloud/check_training_image.sh` first.** Earlier agents built the image, forgot, and said it did not exist. |
 | Git, GitHub Issues, pull requests, or publishing | [GitHub workflow](github.md) | Session checks, authentication, issue tracking, and branch/PR hygiene. |
 | domain terminology or an architectural decision | [Domain Docs](domain.md) | Glossary and ADR discovery. |
 | an agent reached for the wrong tool or source despite these routing instructions | [Pointer failures](pointer_failures.md) | Log of wrong-tool and wrong-source selections, with the agent's stated reason. |
+| downloading or working directly with models that might come from Hugging Face | [`model-inspector` MCP server](../../.mcp.json) | The server is not available until you run `mcp/server/main.py` (`uv run python mcp/server/main.py`). Start it, then connect to it, before you touch the model. |
 | a Wayfinder map or child ticket | [Wayfinding](wayfinding.md) | Map, child-ticket, dependency, and frontier conventions. |
 | GitHub issue workflow labels | [Triage Labels](triage-labels.md) | Canonical labels and their meanings. |

@@ -1,4 +1,4 @@
-"""Google Compute client integration contract used by cloud preflight."""
+"""Google Compute client integration used by cloud preflight."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def _compute_discovery_document() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Compute Engine request contract
+# Compute Engine request shape
 # ---------------------------------------------------------------------------
 
 

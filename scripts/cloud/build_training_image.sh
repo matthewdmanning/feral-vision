@@ -15,6 +15,9 @@ Usage:
 
 Builds, verifies, and pushes the one canonical GPU training image. The final
 line prints the digest-pinned Artifact Registry reference required by Terraform.
+
+FIRST run scripts/cloud/check_training_image.sh. The image may already exist.
+Build only on NO IMAGE FOUND or STALE.
 EOF
 }
 
@@ -50,6 +53,7 @@ checkpoint() {
   printf '[training-image] %-24s %s\n' "$1" "$2"
 }
 
+checkpoint "REMINDER" "did you run scripts/cloud/check_training_image.sh? The image may already exist."
 checkpoint "LOCAL_TOOLING" "checking gcloud and active account"
 command -v gcloud >/dev/null
 active_account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -n1)"
@@ -71,7 +75,7 @@ gcloud builds submit . \
   --quiet \
   --config=deploy/cloudbuild.training-image.yaml \
   --substitutions="_TRAINING_IMAGE=${image_ref}"
-checkpoint "CLOUD_BUILD" "PASS build, image contract, and push completed"
+checkpoint "CLOUD_BUILD" "PASS build, image check, and push completed"
 
 checkpoint "IMAGE_DIGEST" "resolving pushed digest"
 digest="$(gcloud artifacts docker images describe "$image_ref" \

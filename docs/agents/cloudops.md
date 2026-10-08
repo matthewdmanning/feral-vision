@@ -37,7 +37,7 @@ scripts/runs/detection.sh
 
 Do not add a run-specific training Dockerfile, duplicate Run Recipe, alternate
 image-build dispatcher, or sibling Terraform root for the same one-VM training
-job. The deployment preflight treats those as repository-contract failures.
+job. The deployment preflight fails if any of them appears.
 
 ## Dataset Artifact boundary
 
@@ -57,10 +57,10 @@ gs://<dataset-bucket>/datasets/<source>/<split>/<artifact>/
 ~~~
 
 Upstream publication may maintain additional DVC metadata. That is not part of
-the GPU runtime contract. Do not remove or redesign upstream DVC behavior while
+the GPU runtime. Do not remove or redesign upstream DVC behavior while
 working on GPU deployment without an explicit task to do so.
 
-For GPU training, `dataset-artifact.json` is the provenance contract. Preflight
+For GPU training, `dataset-artifact.json` is the provenance record. Preflight
 reads and parses it, records its SHA-256, and verifies the selected retained
 annotation generation. The VM then stages the payload and exact manifest onto
 Local SSD, re-hashes the manifest, and passes that hash into the training
@@ -81,8 +81,8 @@ the base image. The image also contains `gcloud` and uses
 [`scripts/runs/container_train.sh`](../../scripts/runs/container_train.sh) as
 its entrypoint.
 
-The CUDA major in the Dockerfile and the CUDA major in the PyTorch lock are one
-compatibility contract. Do not change either one independently. The preflight
+The CUDA major in the Dockerfile and the CUDA major in the PyTorch lock must
+match. Change both together. The preflight
 fails if a second training Dockerfile, Run Recipe, or container entrypoint
 appears.
 
@@ -92,10 +92,37 @@ on driver family 580 through NVIDIA CUDA minor-version compatibility. Startup
 must still prove the actual host driver and in-container CUDA visibility before
 training begins; documentation is not a substitute for that runtime gate.
 
+### Check for an existing image first
+
+**STOP. Before you write "the image is not built", and before you start a build,
+run the check.** Earlier agents built the image, forgot it, and claimed it did
+not exist. Artifact Registry is the only source of truth; memory, notes, and
+local files are not.
+
+```bash
+scripts/cloud/check_training_image.sh \
+  --project cs-poc-kewg0kffb7uwobgq1rex2af --region us-east4 \
+  --repository feral-docker --image feral-vision-gcp
+```
+
+The command is read-only. It lists every push of the image, compares the newest
+push with the last commit that touched a build input (`deploy/Dockerfile.gcp`,
+the Cloud Build file, `container_train.sh`, `src/`, `conf/`, `pyproject.toml`,
+`uv.lock`), and prints one of three results:
+
+| Result | Meaning | Action |
+| --- | --- | --- |
+| exit 1, `NO IMAGE FOUND` | No push exists. | Build. |
+| exit 0, `STALE` | An image exists but a build input changed after it. | Rebuild. |
+| exit 0, `CURRENT` | An image exists and no committed input changed. | Do not rebuild. Use the printed digest-pinned reference as `training_image`. |
+
+The check does not see uncommitted changes. Run `git status` before you trust
+`CURRENT`. Run the check again after every build.
+
 Build the image only through
 [`scripts/cloud/build_training_image.sh`](../../scripts/cloud/build_training_image.sh),
 which submits [`deploy/cloudbuild.training-image.yaml`](../../deploy/cloudbuild.training-image.yaml).
-Cloud Build must complete the image contract check before the image is pushed.
+Cloud Build must complete the image check before the image is pushed.
 The build script resolves the pushed image digest and prints the digest-pinned
 reference consumed by Terraform.
 

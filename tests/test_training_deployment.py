@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -25,7 +24,12 @@ def test_only_one_container_training_entrypoint_exists() -> None:
 
 def test_gpu_runtime_uses_dataset_manifest_and_not_dvc() -> None:
     runtime_paths = [
-        ROOT / "terraform" / "runs" / "detection" / "templates" / "trainer_startup.sh.tftpl",
+        ROOT
+        / "terraform"
+        / "runs"
+        / "detection"
+        / "templates"
+        / "trainer_startup.sh.tftpl",
         ROOT / "scripts" / "runs" / "container_train.sh",
     ]
     runtime = "\n".join(path.read_text().lower() for path in runtime_paths)
@@ -55,10 +59,13 @@ def test_training_image_is_reproducible_and_smoke_checked() -> None:
     assert "ghcr.io/astral-sh/uv:0.12.18@sha256:" in dockerfile
     assert "uv sync --frozen --no-dev --no-editable" in dockerfile
     assert "--config-name runs/detection --cfg job" in dockerfile
-    assert 'ENTRYPOINT ["bash", "/workspace/scripts/runs/container_train.sh"]' in dockerfile
+    assert (
+        'ENTRYPOINT ["bash", "/workspace/scripts/runs/container_train.sh"]'
+        in dockerfile
+    )
 
     build = cloudbuild.index("id: build-training-image")
-    verify = cloudbuild.index("id: verify-training-image-contract")
+    verify = cloudbuild.index("id: verify-training-image")
     push = cloudbuild.index("id: push-training-image")
     assert build < verify < push
 
@@ -73,7 +80,7 @@ def test_vm_authenticates_registry_before_pull_and_checks_host_gpu_runtime() -> 
         / "trainer_startup.sh.tftpl"
     ).read_text()
 
-    assert "stage=\"verify_container_runtime\"" in startup
+    assert 'stage="verify_container_runtime"' in startup
     assert "nvidia-smi --query-gpu=name,driver_version" in startup
     authenticate = startup.index("gcloud auth configure-docker")
     pull = startup.index('docker pull "$training_image"')
