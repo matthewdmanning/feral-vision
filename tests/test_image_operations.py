@@ -106,7 +106,8 @@ def test_build_training_image_submits_canonical_build_and_returns_digest(
         and (
             "--substitutions=_TRAINING_IMAGE="
             "us-east4-docker.pkg.dev/fixture-project/feral-docker/trainer:candidate"
-        ) in call
+        )
+        in call
         for call in calls
     )
     assert any(

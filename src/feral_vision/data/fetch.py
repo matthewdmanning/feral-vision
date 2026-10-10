@@ -142,7 +142,9 @@ def fetch_data(source: str = "local") -> Path:
     return path
 
 
-@hydra.main(version_base=None, config_path="../../../conf", config_name="runs/detection")
+@hydra.main(
+    version_base=None, config_path="../../../conf", config_name="runs/detection"
+)
 def main(cfg: DictConfig) -> None:
     """Hydra entrypoint for the fetch DVC stage."""
     source = cfg.data.source

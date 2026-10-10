@@ -211,7 +211,10 @@ def build_augmentation_previews(
                 (
                     settings,
                     A.Compose(
-                        [_instantiate_transform(operation) for operation in variant_ops],
+                        [
+                            _instantiate_transform(operation)
+                            for operation in variant_ops
+                        ],
                         seed=seed,
                     ),
                 )
@@ -619,7 +622,9 @@ def materialize_detection_variant(
     return destination_root
 
 
-@hydra.main(version_base=None, config_path="../../../conf", config_name="runs/detection")
+@hydra.main(
+    version_base=None, config_path="../../../conf", config_name="runs/detection"
+)
 def main(cfg: DictConfig) -> None:
     register_configs()
     run_augment_stage(cfg)
