@@ -1,0 +1,20 @@
+#!/bin/sh
+# Block commit if lint or format checks fail.
+
+echo "[pre-commit] Running linter..."
+uv run ruff check src tests
+status=$?
+if [ $status -ne 0 ]; then
+  echo "[pre-commit] Lint errors found — run 'uv run ruff check --fix src tests' to fix, then re-commit."
+  exit 1
+fi
+echo "[pre-commit] Linter passed."
+
+echo "[pre-commit] Running formatter check..."
+uv run ruff format --check src tests
+status=$?
+if [ $status -ne 0 ]; then
+  echo "[pre-commit] Formatting issues found — run 'uv run ruff format src tests' to fix, then re-commit."
+  exit 1
+fi
+echo "[pre-commit] Formatter passed."
