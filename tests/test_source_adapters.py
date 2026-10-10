@@ -1,26 +1,25 @@
-"""Contracts for external model-source adapters without live hub access."""
+"""Contracts for external model-source adapters; HF tests use the real client."""
 
 from __future__ import annotations
 
 # stdlib
 import sys
-from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 # third-party
 import pytest
 import torch
+from huggingface_hub import constants as hf_constants
+from huggingface_hub.errors import OfflineModeIsEnabled
 from omegaconf import OmegaConf
 from torch import nn
 
 # project
-import feral_vision.models.sources.HFAdapter as hf_module
 from feral_vision.models.sources.HFAdapter import HFAdapter
 from feral_vision.models.sources.SourceAdapter import SourceAdapter
 from feral_vision.models.sources.TorchHubAdapter import TorchHubAdapter
 from feral_vision.models.sources.UltralyticsAdapter import UltralyticsAdapter
 from feral_vision.tasks import CVTask
-
 
 # ---------------------------------------------------------------------------
 # Helpers / local fixtures
@@ -53,63 +52,51 @@ def _make_cfg(
 # ---------------------------------------------------------------------------
 
 
-def test_hf_adapter_inspect_maps_hub_metadata_to_project_model_properties(monkeypatch):
-    adapter = HFAdapter()
-    info = SimpleNamespace(
-        pipeline_tag="image-segmentation",
-        tags=["vision", "segmentation"],
-        config={"hidden_size": 32},
-    )
-    monkeypatch.setattr(hf_module, "model_info", lambda model_id: info)
-
-    properties, metadata = adapter.inspect(_make_cfg("hf_hub", "owner/model"))
-
-    assert properties.model_outputs == [CVTask.SEG_SEMANTIC, CVTask.SEG_INSTANCE]
-    assert metadata == {
-        "pipeline_tag": "image-segmentation",
-        "tags": ["vision", "segmentation"],
-        "config": {"hidden_size": 32},
-    }
+# Hugging Face's own testing org hosts a stable, tiny, public repo for exactly
+# this purpose, so these tests call the real huggingface_hub client.
+HF_TESTING_REPO = "hf-internal-testing/tiny-random-ViTForImageClassification"
 
 
-def test_hf_adapter_fetches_only_missing_cached_weight_files(tmp_path, monkeypatch):
+@pytest.mark.network
+def test_hf_adapter_inspect_maps_real_hub_metadata_to_project_model_properties():
+    properties, metadata = HFAdapter().inspect(_make_cfg("hf_hub", HF_TESTING_REPO))
+
+    assert properties.model_outputs == [CVTask.CLASSIFICATION]
+    assert metadata["pipeline_tag"] == "image-classification"
+    assert "vit" in metadata["tags"]
+    assert metadata["config"]["model_type"] == "vit"
+
+
+@pytest.mark.network
+def test_hf_adapter_downloads_only_weight_files_missing_from_the_destination(tmp_path):
     destination = tmp_path / "weights"
     destination.mkdir()
-    (destination / "already.bin").write_bytes(b"cached")
-    downloads: list[tuple[str, str, Path]] = []
-    loaded_model = nn.Linear(2, 1)
+    (destination / "config.json").write_bytes(b"cached")
 
-    def _download(repo_id: str, filename: str, local_dir: Path) -> None:
-        downloads.append((repo_id, filename, local_dir))
-        (local_dir / filename).write_bytes(b"downloaded")
-
-    monkeypatch.setattr(hf_module, "hf_hub_download", _download)
-    monkeypatch.setattr(hf_module, "_load_local", lambda dest, files: loaded_model)
-
-    model = HFAdapter().fetch(
+    HFAdapter().fetch(
         _make_cfg(
             "hf_hub",
-            "owner/model",
+            HF_TESTING_REPO,
             weights={
-                "id": ["missing.bin", "already.bin"],
+                "id": ["pytorch_model.bin", "config.json"],
                 "location": str(destination),
             },
         )
     )
 
-    assert model is loaded_model
-    assert downloads == [("owner/model", "missing.bin", destination)]
+    assert (destination / "pytorch_model.bin").stat().st_size > 0
+    assert (destination / "config.json").read_bytes() == b"cached"
 
 
-def test_hf_adapter_explains_how_to_recover_when_metadata_is_unavailable(monkeypatch):
-    monkeypatch.setattr(
-        hf_module,
-        "model_info",
-        lambda model_id: (_ for _ in ()).throw(OSError("offline")),
-    )
+def test_hf_adapter_explains_how_to_recover_when_the_hub_is_unreachable(monkeypatch):
+    # The documented switch for "no HTTP calls": the real client then raises
+    # huggingface_hub.errors.OfflineModeIsEnabled from model_info.
+    monkeypatch.setattr(hf_constants, "HF_HUB_OFFLINE", True)
 
-    with pytest.raises(RuntimeError, match="pass fetch_if_needed=True"):
-        HFAdapter().inspect(_make_cfg("hf_hub", "owner/model"))
+    with pytest.raises(RuntimeError, match="pass fetch_if_needed=True") as raised:
+        HFAdapter().inspect(_make_cfg("hf_hub", HF_TESTING_REPO))
+
+    assert isinstance(raised.value.__cause__, OfflineModeIsEnabled)
 
 
 # ---------------------------------------------------------------------------
