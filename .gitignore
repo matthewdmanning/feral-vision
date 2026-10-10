@@ -18,7 +18,8 @@ mlflow.db
 mlruns/
 mlflow.db
 
-*local*
+*.local*
+.local/
 !locals.tf
 
 # DVC-tracked data and model artifacts
@@ -46,12 +47,13 @@ terraform/preflight/reports/
 
 # Private inventory of sensitive values and where they live.
 .agents/secrets.md
+
 CLAUDE.md
 bash.exe.stackdump
 .coverage
 coverage.xml
 example_augment.txt
-yolo11n-seg.pt
+*.pt
 docs/_build
 docs/external_refs/mlflow_examples.md
 .vscode/tasks.json
