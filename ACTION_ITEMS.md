@@ -25,8 +25,6 @@ Open work, most blocking first. Remove an item when it is done.
 
 ## Decisions needed
 
-- **Remove Terraform tests?** Delete the 3 pytest tests that read Terraform
-  files, and `terraform/tests/`? Terraform is not source code and not a test.
 - **Pick publication flow.** `docs/guide/dataset.rst`, `docs/agents/data.md` and
   the code describe three different Dataset Artifact publication flows. Choose
   one. Fix the others.
@@ -46,19 +44,6 @@ Open work, most blocking first. Remove an item when it is done.
   that have no loader.
 - **Update `agent-instructions-overlap-audit.md`.** It cites guides that do not
   exist.
-
-## Git and branches
-
-- **Commit the HF update.** Branch `chore-huggingface-hub-update` has uncommitted
-  changes: `pyproject.toml`, `uv.lock`, `tests/test_source_adapters.py`. Two
-  commits: `build:` and `test:`. Merge it back into this branch.
-- **Clean up the backup.** Remove branch and worktree
-  `chore-huggingface-hub-update-from-main` with `safe-worktree-cleanup`.
-- **Sort the pending edits.** These are uncommitted and not part of this work:
-  `src/feral_vision/data/augmentations.py`, `fetch.py`,
-  `tests/test_image_operations.py`, `.githooks/pre-commit`, `.gitignore` edits
-  (`*.local*`, `.local/`, `*.pt`), `scripts/docker_container_tests.py`,
-  `skills-lock.json`, `.agents/`.
 
 ## Later
 
