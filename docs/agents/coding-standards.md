@@ -30,3 +30,6 @@ generated Pages artifact from `main`.
 Before adding project code for a capability, check whether a library already in
 use provides it. Use that library directly unless a project-specific boundary is
 genuinely required.
+
+Prettier is an npm development dependency pinned in `package.json` and
+`package-lock.json`. Run `npm ci` to install the locked version locally.
