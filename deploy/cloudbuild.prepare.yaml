@@ -1,23 +1,23 @@
 steps:
   - name: ${_ACQUISITION_IMAGE}
-    id: acquire-coco-into-workspace
+    id: acquire-dataset-into-workspace
     env:
-      - COCO_MAX_EPOCHS=${_COCO_MAX_EPOCHS}
-      - COCO_BATCH_SIZE=${_COCO_BATCH_SIZE}
+      - MAX_EPOCHS=${_MAX_EPOCHS}
+      - BATCH_SIZE=${_BATCH_SIZE}
       - DATASET_PAYLOAD_DIR=/workspace/payload
       - DATASET_INPUT_PATH=/workspace/dataset-input.json
   - name: ${_DVC_IMAGE}
     id: publish-dataset-artifact
     env:
-      - GCS_BUCKET=${_GCS_BUCKET}
+      - TRAINING_DATA_BUCKET_URI=${_TRAINING_DATA_BUCKET_URI}
       - DATASET_ARTIFACT_PREFIX=${_DATASET_ARTIFACT_PREFIX}
+      - GCS_URI_PREFIX=${_GCS_URI_PREFIX}
       - DATASET_PAYLOAD_DIR=/workspace/payload
       - DATASET_INPUT_PATH=/workspace/dataset-input.json
 
 substitutions:
-  _GCS_BUCKET: mobile-training-images
-  _COCO_MAX_EPOCHS: "50"
-  _COCO_BATCH_SIZE: "16"
+  _MAX_EPOCHS: "50"
+  _BATCH_SIZE: "16"
 
 serviceAccount: projects/cs-poc-kewg0kffb7uwobgq1rex2af/serviceAccounts/feral-vision-ai@cs-poc-kewg0kffb7uwobgq1rex2af.iam.gserviceaccount.com
 

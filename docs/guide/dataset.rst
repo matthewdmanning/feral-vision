@@ -49,31 +49,33 @@ fetch stage above.
 Cloud Dataset Artifacts
 -----------------------
 
+Publication requires ``TRAINING_DATA_BUCKET_URI``,
+``DATASET_ARTIFACT_PREFIX``, and ``GCS_URI_PREFIX`` in the environment. Set
+``GCS_URI_PREFIX`` to the Cloud Storage URI scheme and separator. Cloud Build
+passes it through the required ``_GCS_URI_PREFIX`` substitution; there is no
+hard-coded fallback. Python publication tests set an isolated URI prefix.
+
 Cloud preparation publishes the selected ``images/`` and ``annotations/``
-layout under ``payload/`` in a versioned Google Cloud Storage artifact prefix.
-It then writes ``dataset-artifact.json`` and a version-aware
-``dataset-artifact.dvc`` tracker beside that payload. The bucket is the durable
-Dataset Artifact catalog; the tracker pins the object generations without
-copying the data into the application repository.
+layout under ``payload/`` in a Google Cloud Storage artifact prefix. It then
+writes ``dataset-artifact.json`` beside that payload. The manifest lists every
+payload file with its SHA-256 and object generation. The bucket is the durable
+Dataset Artifact catalog; object retention protects each published generation.
 
 Acquisition and publication are intentionally separate. Any source-specific
 acquisition image writes ``/workspace/payload/images/``,
 ``/workspace/payload/annotations/``, and ``/workspace/dataset-input.json``.
 The input metadata identifies the dataset and source and carries a provenance
-object. A minimal source-agnostic DVC image validates that shared workspace,
-uploads the payload and manifest with the Cloud Storage Python client, and then
-creates the version-aware tracker. This lets a new download source reuse the
-publication boundary without adding its dependencies to the DVC image.
-The COCO acquisition image includes FiftyOne and its MongoDB runtime; those
+object. A minimal source-agnostic publication image validates that shared
+workspace and uploads the payload and manifest with the Cloud Storage Python
+client. This lets a new download source reuse the publication boundary without
+adding its dependencies to the publication image.
+The acquisition image includes FiftyOne and its MongoDB runtime; those
 source-specific dependencies are not part of the publisher.
 
 Training stages its selected Dataset Artifact on the training VM's local SSD.
-It creates ``dataset-artifact.dvc`` and ``dvc.lock`` locally before model
-training, then records the lock in MLflow lineage. A later data version is
-adopted through a reviewed input selection, rather than by overwriting the
-source artifact in place.
+It records the SHA-256 of ``dataset-artifact.json`` in MLflow lineage. A later
+data version is adopted through a reviewed input selection, rather than by
+overwriting the source artifact in place.
 
-When a Dataset has a retained annotation generation but no live annotation or
-lockfile, the training run names that retained generation, stages it alongside
-the selected images on the local SSD, and creates its local DVC tracker and
-lock before training.
+The training run names the retained generation of the annotations object and
+stages it alongside the selected images on the local SSD.

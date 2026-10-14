@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-: "${COCO_MAX_EPOCHS:?COCO_MAX_EPOCHS must be set}"
-: "${COCO_BATCH_SIZE:?COCO_BATCH_SIZE must be set}"
+: "${MAX_EPOCHS:?MAX_EPOCHS must be set}"
+: "${BATCH_SIZE:?BATCH_SIZE must be set}"
 
 cd /opt/feral-vision
 
@@ -17,8 +17,8 @@ from pathlib import Path
 from scripts.pull_coco_train2017 import COCO_ANIMAL_CLASSES, export_coco_train2017
 
 export_coco_train2017(
-    max_epochs=int(os.environ["COCO_MAX_EPOCHS"]),
-    batch_size=int(os.environ["COCO_BATCH_SIZE"]),
+    max_epochs=int(os.environ["MAX_EPOCHS"]),
+    batch_size=int(os.environ["BATCH_SIZE"]),
     export_dir=Path(sys.argv[1]),
 )
 PY
@@ -29,8 +29,8 @@ import os
 import sys
 from pathlib import Path
 
-max_epochs = int(os.environ["COCO_MAX_EPOCHS"])
-batch_size = int(os.environ["COCO_BATCH_SIZE"])
+max_epochs = int(os.environ["MAX_EPOCHS"])
+batch_size = int(os.environ["BATCH_SIZE"])
 metadata = {
     "dataset": "COCO 2017 train animal subset",
     "source": "FiftyOne coco-2017 train detections",

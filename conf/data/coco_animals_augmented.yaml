@@ -1,4 +1,4 @@
-# Immutable annotation-aware Dataset Variant Artifact staged for the first augmented run.
+# Immutable annotation-aware Dataset Variant Artifact staged for the augmented run.
 defaults:
   - data_schema
   - _self_

@@ -1,11 +1,10 @@
-"""Convert COCO detection annotations into the first-run binary YOLO contract."""
+"""Convert COCO detection annotations into the binary YOLO contract."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 from typing import Any
-
 
 _CAT_CLASS_ID = 0
 _NOT_CAT_CLASS_ID = 1

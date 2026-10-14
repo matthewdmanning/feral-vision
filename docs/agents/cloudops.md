@@ -131,7 +131,7 @@ push plus an immutable digest is a prerequisite; a mutable tag is never a
 Terraform training input.
 
 Dataset acquisition/publication images such as `Dockerfile.dvc` or
-`Dockerfile.coco-acquire` are separate upstream responsibilities. Do not use the
+`Dockerfile.dataset-acquire` are separate upstream responsibilities. Do not use the
 GPU training image for those jobs, and do not infer that their DVC behavior
 belongs in the GPU runtime.
 
