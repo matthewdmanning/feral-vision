@@ -66,6 +66,3 @@ aug_preview/
 
 # Ephemeral first augmented detection-run evidence
 artifacts/*/
-
-# Node development dependencies
-node_modules/

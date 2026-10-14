@@ -31,5 +31,6 @@ Before adding project code for a capability, check whether a library already in
 use provides it. Use that library directly unless a project-specific boundary is
 genuinely required.
 
-Prettier is an npm development dependency pinned in `package.json` and
-`package-lock.json`. Run `npm ci` to install the locked version locally.
+Ruff formats Python code. Pre-commit and GitHub Actions check formatting with
+`ruff format --check`. Text files use LF line endings, enforced by
+`* text=auto eol=lf` in `.gitattributes`.

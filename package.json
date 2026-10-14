@@ -1,7 +1,0 @@
-{
-  "name": "feral-vision",
-  "private": true,
-  "devDependencies": {
-    "prettier": "3.9.10"
-  }
-}
