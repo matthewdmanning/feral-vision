@@ -1,5 +1,18 @@
 #!/bin/sh
-# Block commit if lint or format checks fail.
+# Block commit if secret, lint, or format checks fail.
+
+echo "[pre-commit] Scanning staged changes for secrets..."
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "[pre-commit] gitleaks is not installed — install it, then re-commit."
+  exit 1
+fi
+gitleaks git --staged --redact --no-banner
+status=$?
+if [ $status -ne 0 ]; then
+  echo "[pre-commit] Possible secret found — remove it from the staged changes, then re-commit."
+  exit 1
+fi
+echo "[pre-commit] No secrets found."
 
 echo "[pre-commit] Running linter..."
 uv run ruff check src tests

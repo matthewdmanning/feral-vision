@@ -1,0 +1,3 @@
+#!/bin/sh
+# Validate the message with the project's Conventional Commit configuration.
+uv run cz check --commit-msg-file "$1"
