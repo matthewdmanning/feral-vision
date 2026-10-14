@@ -6,12 +6,17 @@
 #   terraform -chdir=terraform/tests init
 #   terraform -chdir=terraform/tests test
 
+variable "test_gcs_uri_prefix" {
+  description = "Cloud Storage URI prefix supplied through TF_VAR_test_gcs_uri_prefix."
+  type        = string
+}
+
 mock_provider "google" {}
 
 override_data {
   target = data.google_storage_bucket.dataset
   values = {
-    name = "mobile-training-images"
+    name = "test-dataset-bucket"
   }
 }
 
@@ -30,13 +35,15 @@ override_data {
 }
 
 variables {
+  gcs_uri_prefix               = var.test_gcs_uri_prefix
+  bucket_name                  = "test-dataset-bucket"
   run_id                       = "run-20260921-abc"
   project_id                   = "test-project"
   service_account_email        = "trainer@test-project.iam.gserviceaccount.com"
   training_image               = "us-east4-docker.pkg.dev/test-project/feral-docker/trainer@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   dataset_artifact_prefix      = "datasets/coco/train2017/variant-a"
   source_annotation_generation = "1756000000000001"
-  artifact_prefix              = "gs://feral-vision-operations-us-east4/runs/detection"
+  artifact_prefix              = "${var.gcs_uri_prefix}feral-vision-operations-us-east4/runs/detection"
 }
 
 run "single_gpu_trainer_shape_is_fixed" {
@@ -109,7 +116,7 @@ run "single_gpu_trainer_shape_is_fixed" {
   }
 
   assert {
-    condition     = output.run_artifact_uri == "gs://feral-vision-operations-us-east4/runs/detection/run-20260921-abc"
+    condition     = output.run_artifact_uri == "${var.gcs_uri_prefix}feral-vision-operations-us-east4/runs/detection/run-20260921-abc"
     error_message = "Run artifact URI must be scoped to run_id."
   }
 
@@ -138,7 +145,7 @@ run "dataset_uri_resolves_against_the_dataset_bucket" {
   module { source = "../runs/detection" }
 
   assert {
-    condition     = output.dataset_artifact_uri == "gs://mobile-training-images/datasets/coco/train2017/variant-a"
+    condition     = output.dataset_artifact_uri == "${var.gcs_uri_prefix}test-dataset-bucket/datasets/coco/train2017/variant-a"
     error_message = "Dataset Artifact URI must resolve against the dataset-only bucket and the selected prefix."
   }
 }
@@ -169,7 +176,7 @@ run "rejects_artifact_prefix_inside_the_dataset_bucket" {
   module { source = "../runs/detection" }
 
   variables {
-    artifact_prefix = "gs://mobile-training-images/runs/detection"
+    artifact_prefix = "${var.gcs_uri_prefix}test-dataset-bucket/runs/detection"
   }
 
   expect_failures = [var.artifact_prefix]
@@ -191,7 +198,7 @@ run "rejects_a_gs_uri_as_the_dataset_prefix" {
   module { source = "../runs/detection" }
 
   variables {
-    dataset_artifact_prefix = "gs://mobile-training-images/datasets/coco/train2017/variant-a"
+    dataset_artifact_prefix = "${var.gcs_uri_prefix}test-dataset-bucket/datasets/coco/train2017/variant-a"
   }
 
   expect_failures = [var.dataset_artifact_prefix]

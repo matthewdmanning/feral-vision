@@ -60,6 +60,7 @@ Follow the HashiCorp Terraform style guide for layout and naming.
 | `terraform/runs/detection/outputs.tf` | Outputs, in alphabetical order |
 | `terraform/runs/detection/templates/` | VM startup script template |
 | `terraform/runs/detection/.terraform.lock.hcl` | Provider lock; commit it |
+| `terraform/buckets/dataset/` | Dataset-only bucket root: versioning off, soft delete, Object Retention Lock, own `gcs` backend prefix |
 | `terraform/tests/` | Mocked-provider tests (see below) |
 | `terraform/preflight/` | Deployment gate (see below) |
 
@@ -75,8 +76,11 @@ apply-mode tests, which this repository does not have.
 
 ~~~bash
 terraform -chdir=terraform/tests init
-terraform -chdir=terraform/tests test
+TF_VAR_test_gcs_uri_prefix="${GCS_URI_PREFIX:?Set GCS_URI_PREFIX first}" terraform -chdir=terraform/tests test
 ~~~
+
+Run these tests by hand before a Terraform change. Never run them in CI, a git
+hook, or `scripts/validate_ci.sh`.
 
 The tests cover the fixed VM shape, URI resolution, and negative tests for the
 main variable validations. Some validations, such as the mount-directory

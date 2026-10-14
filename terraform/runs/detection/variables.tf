@@ -17,7 +17,6 @@ variable "artifact_prefix" {
 variable "bucket_name" {
   description = "Existing dataset-only bucket that holds the selected Dataset Artifact. This root reads it; it never creates or mutates it."
   type        = string
-  default     = "mobile-training-images"
   nullable    = false
 }
 
