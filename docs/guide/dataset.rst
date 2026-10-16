@@ -1,81 +1,207 @@
-Dataset Layout
-==============
+Datasets, publication, and DVC
+==============================
 
-All datasets follow a canonical two-directory layout::
+Ownership and actual process
+----------------------------
 
-   <root>/
-     images/       # raw image files (.jpg, .jpeg, .png, .bmp)
-     annotations/  # annotation files matched by stem to images/
-                   #   <stem>.png or <stem>.jpg  -- semantic mask
-                   #   <stem>.txt                -- YOLO bbox
-                   #   <stem>.json               -- classification labels
-                   #   names.yaml                -- class index reference
+Workflow scripts acquire and transform data. DVC registers each selected,
+prepared Dataset with ``dvc add`` and uploads its cached contents with
+``dvc push``. A Dataset Variant is registered the same way as a raw Dataset.
+There is no fixed raw/preprocessed/augmented DVC pipeline or ownership of those
+entire parent directories. The old ``dvc.yaml`` and its acquisition/processing
+wrappers have been removed; existing Dataset files are preserved.
 
-Annotation files are loaded by extension and are assumed to already be in the
-correct format for that extension — there is no additional validation layer.
+The unit of registration is one Dataset root containing ``images/`` and
+``annotations/``. Each root has one sibling ``<root>.dvc`` metadata file.
+Select separate, non-overlapping roots for the raw Dataset and each Variant.
+Their names and locations come from the producing workflow; DVC does not
+require specific raw or augmented parent directories. Do not register the
+repository's entire ``data/`` tree.
 
-Sources
--------
+The intended flow is::
 
-``cfg.data.source`` (:mod:`feral_vision.data.fetch`) is a pluggable dispatch
-point, not a fixed set of options. Current sources:
+   acquire if absent -> raw Dataset -> register with DVC
+                           |
+                           +-> modify if requested and Variant absent
+                                  -> Dataset Variant -> register with DVC
 
-- ``coco`` — downloads COCO train2017 (animal supercategory) via
-  :func:`~feral_vision.data.fetch.fetch_coco`.
-- anything else — treated as a local filesystem path already in the layout above,
-  via :func:`~feral_vision.data.fetch.fetch_data`.
+   selected registered Dataset -> retained payload + manifest publication
+                               -> GPU staging -> training and MLflow evidence
 
-Additional sources are added by extending the dispatch in ``fetch.py``; each must
-resolve to the layout above.
+Reuse a verified existing Dataset or Artifact. Acquisition, registration, and
+publication are separate operations; an existing upstream result must not be
+recreated merely to start training.
 
-Sampled COCO zoo pull
----------------------
+The local registration command is implemented. The cloud acquisition/publication
+build still bypasses it; connecting the exact DVC version to the retained
+manifest remains open work. See ``ACTION_ITEMS.md``. GPU training continues to
+consume an already-published Artifact and does not run DVC.
 
-For a bounded COCO 2017 training subset, call the FiftyOne helper from Python::
+Register one prepared Dataset
+-----------------------------
 
-   from scripts.pull_coco_train2017 import pull_coco_train2017
+Requirements:
 
-   dataset = pull_coco_train2017(
-       max_epochs=max_epochs,
-       batch_size=batch_size,
-   )
+* Git and DVC are initialized in the current repository. This checkout already
+  contains ``.dvc/``. Use the locked DVC 3.67.1 with GCS support; Bash and
+  ``realpath`` are required by the shell entrypoint.
+* The selected directory exists inside that repository and contains
+  ``images/`` and ``annotations/``. The registration script checks these
+  directories and repository containment; the producer must validate actual
+  data completeness, annotation format, and provenance before registration.
+* A default DVC remote is configured with credentials and permission to upload.
+  The project's durable remote is the dataset-only bucket's ``/dvc`` prefix.
+  No bucket URI is stored as an unexpanded environment variable in tracked
+  configuration. Local remote configuration stays in ``.dvc/config.local``.
 
-It loads COCO's ``train`` split with detection annotations for bird, cat, dog,
-horse, sheep, cow, elephant, bear, zebra, and giraffe. The sample limit is
-``max_epochs * batch_size``; FiftyOne manages the downloaded images and
-annotations in its dataset-zoo storage. This is separate from the DVC ``coco``
-fetch stage above.
+Export ``TRAINING_DATA_BUCKET_URI`` with the existing dataset-only bucket URI.
+Run this from the repository root to configure the remote; it does not create a
+bucket or upload data:
 
-Cloud Dataset Artifacts
+.. code-block:: bash
+
+   bash -euc '
+   : "${TRAINING_DATA_BUCKET_URI:?Export the dataset-only bucket URI}"
+   uv tool run --from "dvc[gs]==3.67.1" dvc remote add --local --default --force gcs "${TRAINING_DATA_BUCKET_URI%/}/dvc"
+   '
+
+Then export ``DATASET_ROOT`` as the selected prepared Dataset directory. This
+command records and uploads it:
+
+.. code-block:: bash
+
+   bash -euc '
+   : "${DATASET_ROOT:?Export the selected prepared Dataset directory}"
+   uv tool run --from "dvc[gs]==3.67.1" bash scripts/data/register.sh "$DATASET_ROOT"
+   '
+
+``scripts/data/register.sh`` verifies the directory, requires a default remote,
+then runs these operations for exactly that root:
+
+.. code-block:: bash
+
+   dvc add "$dataset_root"
+   dvc push "${dataset_root}.dvc"
+
+This last snippet describes the script internals; use the complete operator
+command above. Registration does not download, preprocess, augment, synchronize
+an entire plain-data tree, publish the training manifest, or require ``gcloud``.
+A failed upload remains a failed registration; the shell stops and reports
+DVC's error. It does not automatically retry or publish a success manifest.
+
+Outputs are the sibling ``.dvc`` metadata, a Git ignore update, local cache
+entries, and uploaded DVC cache objects. No ``dvc.lock`` is created or required.
+Retain the ``.dvc`` and ignore changes in Git using the normal commit/PR workflow.
+The repository's ignore rules allow these files under ``data/`` while keeping
+Dataset contents ignored. ``dvc push`` transfers data; it does not publish Git
+metadata. See the official `add reference
+<https://dvc.org/doc/command-reference/add>`_ and `push reference
+<https://dvc.org/doc/command-reference/push>`_.
+
+DVC records content identity, not how those contents were produced. Retain
+source Dataset identity, operations, resolved configuration, image order, and
+random seed in provenance, linked to the selected ``.dvc`` version. The custom
+publisher does not yet establish this link automatically.
+
+Inspect local state without using the Windows project virtual environment:
+
+.. code-block:: bash
+
+   uv tool run --from 'dvc[gs]==3.67.1' dvc status --json
+
+``{}`` means local tracked contents match their recorded state; it does not
+prove remote availability or that a Dataset has been registered at all.
+A fresh checkout with no registered Dataset can also report ``{}``.
+
+Dataset formats and producer responsibilities
+---------------------------------------------
+
+The training loader scans immediate children of ``images/`` and
+``annotations/`` and matches filenames by stem. YOLO ``.txt`` rows contain class
+index and normalized ``x_center y_center width height``. Masks use ``.png``,
+``.jpg``, ``.jpeg``, or ``.bmp``. ``names.yaml`` is excluded from matching.
+There is no on-disk classification JSON or COCO JSON loader.
+
+The implemented producers have different contracts:
+
+* ``fetch_coco`` writes nested ``images/coco_train2017/`` and
+  ``annotations/coco_train2017/instances_train2017_animals.json`` under its
+  configured root. It reuses existing files and skips failed image downloads
+  after logging warnings. Completion alone does not prove a complete Dataset.
+* ``export_coco_train2017`` in ``scripts/pull_coco_train2017.py`` uses FiftyOne's
+  COCO 2017 train detection zoo and the ten animal classes, with a sample limit
+  of ``max_epochs * batch_size``. It writes flat ``images/`` and
+  ``annotations/instances.json`` and refuses an existing export directory.
+* ``preprocess`` in ``data/transforms.py`` transforms one image in memory; it
+  is not a Dataset-producing stage. The older image-only ``run_augment_stage``
+  does not preserve detection annotations and is not the registration workflow.
+* ``materialize_detection_variant`` co-transforms YOLO boxes and images using
+  the configured operations and ``seed + image_index``. Its producer must retain
+  the source Artifact link, operations, seed, and ordering as lineage.
+
+COCO acquisition therefore requires conversion before the per-image annotation
+loader can train on it. Registering raw COCO with DVC is valid; registration
+alone does not make it compatible with the Training Script.
+
+Cloud publication: existing implementation
+------------------------------------------
+
+``deploy/cloudbuild.prepare.yaml`` runs two images sharing ``/workspace``:
+
+1. ``_ACQUISITION_IMAGE`` runs ``scripts/cloud/acquire_data_subset.sh`` with
+   ``MAX_EPOCHS`` and ``BATCH_SIZE`` (build defaults 50 and 16). It writes
+   ``payload/images/``, ``payload/annotations/instances.json``, and
+   ``dataset-input.json``. Metadata contains ``dataset``, ``source``, and
+   ``provenance`` with classes, sample limit, and ``random_seed: null``.
+2. ``_DVC_IMAGE`` runs ``scripts/cloud/publish_dataset_artifact.sh`` and calls
+   ``publish_dataset_artifact``. Despite the image substitution name, it runs
+   no DVC commands. Its Dockerfile is now
+   ``deploy/dataset-publisher/Dockerfile``, selected by
+   ``deploy/cloudbuild.dvc-image.yaml``.
+
+Required substitutions are ``_ACQUISITION_IMAGE``, ``_DVC_IMAGE``,
+``_TRAINING_DATA_BUCKET_URI``, ``_DATASET_ARTIFACT_PREFIX``, and
+``_GCS_URI_PREFIX``. Supply reviewed digest-pinned images, an existing
+dataset-only bucket URI, a new reviewed Artifact prefix, and the URI
+scheme/separator from configuration. Image pinning is an operator requirement; the YAML
+does not enforce it. Verify the configured build service account before use.
+
+The publisher needs Python, the project publication module,
+``google.cloud.storage``, credentials, and object creation/retention permissions.
+Its shell requires exported ``TRAINING_DATA_BUCKET_URI``,
+``DATASET_ARTIFACT_PREFIX``, and ``GCS_URI_PREFIX``. Optional inputs are
+``DATASET_PAYLOAD_DIR`` (default ``/workspace/payload``), ``DATASET_INPUT_PATH``
+(default ``/workspace/dataset-input.json``), and ``DATASET_RETENTION_DAYS``
+(default 365, at least one). Acquisition carries FiftyOne and MongoDB in its
+own image; publication does not need those dependencies.
+
+The publisher checks directories and basic metadata, not annotation semantics,
+non-empty payloads, or full provenance. It uploads each file with
+``if_generation_match=0`` and Unlocked retention, then writes
+``dataset-artifact.json`` last. The manifest carries input metadata plus
+``files[relative_path] = {sha256, generation}``. Success prints the Artifact URI::
+
+   <TRAINING_DATA_BUCKET_URI>/<DATASET_ARTIFACT_PREFIX>/
+     payload/images/...
+     payload/annotations/...
+     dataset-artifact.json
+
+A failed publication can leave a partial prefix. Diagnose before retrying and
+use a new reviewed prefix for a fresh publication. This custom publication still
+needs integration with the exact registered DVC Dataset version.
+
+Remaining training seam
 -----------------------
 
-Publication requires ``TRAINING_DATA_BUCKET_URI``,
-``DATASET_ARTIFACT_PREFIX``, and ``GCS_URI_PREFIX`` in the environment. Set
-``GCS_URI_PREFIX`` to the Cloud Storage URI scheme and separator. Cloud Build
-passes it through the required ``_GCS_URI_PREFIX`` substitution; there is no
-hard-coded fallback. Python publication tests set an isolated URI prefix.
+``scripts/cloud/materialize_detection_variant.sh`` ends by importing the absent
+``publish_dataset_variant_artifact``. Its per-image YOLO output also conflicts
+with preflight/startup's requirement for a pinned
+``payload/annotations/instances.json`` generation. Resolve these gaps before
+claiming an end-to-end GPU workflow.
 
-Cloud preparation publishes the selected ``images/`` and ``annotations/``
-layout under ``payload/`` in a Google Cloud Storage artifact prefix. It then
-writes ``dataset-artifact.json`` beside that payload. The manifest lists every
-payload file with its SHA-256 and object generation. The bucket is the durable
-Dataset Artifact catalog; object retention protects each published generation.
-
-Acquisition and publication are intentionally separate. Any source-specific
-acquisition image writes ``/workspace/payload/images/``,
-``/workspace/payload/annotations/``, and ``/workspace/dataset-input.json``.
-The input metadata identifies the dataset and source and carries a provenance
-object. A minimal source-agnostic publication image validates that shared
-workspace and uploads the payload and manifest with the Cloud Storage Python
-client. This lets a new download source reuse the publication boundary without
-adding its dependencies to the publication image.
-The acquisition image includes FiftyOne and its MongoDB runtime; those
-source-specific dependencies are not part of the publisher.
-
-Training stages its selected Dataset Artifact on the training VM's local SSD.
-It records the SHA-256 of ``dataset-artifact.json`` in MLflow lineage. A later
-data version is adopted through a reviewed input selection, rather than by
-overwriting the source artifact in place.
-
-The training run names the retained generation of the annotations object and
-stages it alongside the selected images on the local SSD.
+GPU preflight currently checks a non-empty JSON manifest, its hash, an images
+prefix, and the pinned COCO object; it does not validate every listed file/hash
+or prove annotation compatibility. The VM stages the published input on local
+SSD, and MLflow and terminal evidence record its manifest SHA-256. See
+:doc:`training` for the deployment workflow. No live cloud or GPU validation was
+performed for this redesign.

@@ -1,57 +1,62 @@
 # test_dataset_artifact.py
 
-## Module-level tests
+## test_publish_dataset_artifact_uploads_payload_then_manifest
 
-### test_version_dataset_records_folder_in_lockfile
-
-Purpose: Verify a Dataset folder is added to DVC, recorded as a stage dependency,
-and reproduced into `dvc.lock`.
-
-Load-bearing: True
-
-Occurrence probability: 3
-
-#### payload_root
-
-### test_publish_dataset_lock_uploads_only_lockfile
-
-Purpose: Verify Dataset publication uploads only `dvc.lock` as the Dataset
-version record.
+Purpose: Verify every payload file is uploaded with create-only generation
+preconditions and retention, followed by the manifest containing file hashes
+and generations.
 
 Load-bearing: True
 
 Occurrence probability: 3
 
-#### tmp_path
+Fixtures: `dataset_root`, `tmp_path`, in-memory storage client.
 
-### test_publication_script_pushes_dataset_before_its_lockfile
+## test_publish_dataset_artifact_rejects_empty_input
 
-Purpose: Verify the Cloud Job pushes DVC-managed Dataset data before making the
-lockfile available to training.
-
-Load-bearing: True
-
-Occurrence probability: 3
-
-### test_publish_dataset_lock_rejects_non_lockfile
-
-Purpose: Verify Dataset publication rejects missing or non-`dvc.lock` metadata.
+Purpose: Reject an empty metadata object before cloud writes.
 
 Load-bearing: True
 
 Occurrence probability: 3
 
-#### tmp_path
+Fixtures: `dataset_root`, `tmp_path`.
 
-### test_preparation_config_requires_separate_immutable_images
+## test_publish_dataset_artifact_rejects_input_that_defines_files
 
-Purpose: Verify acquisition and DVC publication use separate stages and keep training dependencies out of the publisher image.
+Purpose: Prevent caller metadata from supplying the publisher-owned file list.
+
+Load-bearing: True
+
+Occurrence probability: 3
+
+Fixtures: `dataset_root`, `tmp_path`.
+
+## test_publish_dataset_artifact_rejects_zero_retention
+
+Purpose: Reject publication without a positive retention interval.
+
+Load-bearing: True
+
+Occurrence probability: 3
+
+Fixtures: `dataset_root`, `tmp_path`.
+
+## test_publication_script_publishes_without_dvc
+
+Purpose: Document that the existing cloud publisher invokes the payload/manifest
+API directly; it does not prove the outstanding DVC integration.
+
+Load-bearing: False
+
+Occurrence probability: 2
+
+## test_preparation_config_requires_separate_immutable_images
+
+Purpose: Check acquisition/publication separation and exclusion of training and
+source-specific dependencies from the renamed publisher Dockerfile. The test
+does not execute images or enforce digest pinning.
 
 Load-bearing: True
 
 Occurrence probability: 2
-
-Rationale: This is a configuration check; it does not execute the built
-images or prove the remote publication boundary.
-
-#### default

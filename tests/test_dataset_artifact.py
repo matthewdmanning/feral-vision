@@ -199,7 +199,9 @@ def test_preparation_config_requires_separate_immutable_images() -> None:
     config = yaml.safe_load(
         (repository_root / "deploy/cloudbuild.prepare.yaml").read_text()
     )
-    dvc_dockerfile = (repository_root / "deploy/Dockerfile.dvc").read_text().lower()
+    dvc_dockerfile = (
+        (repository_root / "deploy/dataset-publisher/Dockerfile").read_text().lower()
+    )
 
     assert [step["id"] for step in config["steps"]] == [
         "acquire-dataset-into-workspace",

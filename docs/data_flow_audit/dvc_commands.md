@@ -182,3 +182,126 @@ those leftovers have not been established.
   integration with the existing model catalogue.
 
 No end-to-end lifecycle or cloud behavior has been validated by these trials.
+
+## Training-data association spec — 2026-10-16
+
+This section records the subsequent diagnosis and proposed verification scope.
+It does not select a final record format or claim implementation or runtime
+validation. The user instructed the analysis to examine input requirements and
+available information, including hashes, and to assume scripts compare values
+correctly. The authoritative requirements remain in [instructions.md](instructions.md).
+
+### Problem Statement
+
+The MLflow Run Record must preserve a DVC output associated with the Dataset
+used for training. The current path preserves a custom manifest and checks its
+hash, but does not establish the connection between the registered DVC version,
+the manifest, and the staged training data. Identifying the metadata document
+alone does not establish which data its contents describe.
+
+### Solution
+
+Establish a continuous association from the registered DVC record, through the
+matching staged Dataset, to the loader and the record logged in MLflow. Use
+identifiers and successful comparisons at the relevant boundaries. Once the
+verified data root is passed to the loader, ordinary script execution establishes
+that connection; repeated observation of every individual training read is not
+required by this diagnosis.
+
+### User Stories
+
+1. As a training operator, I want the logged DVC output to identify the selected training Dataset, so that the Run Record describes its actual input.
+2. As a data maintainer, I want a unique Dataset registration identifier, so that I can resolve the intended catalogue entry.
+3. As a data maintainer, I want content hashes to identify registered contents, so that I can compare a staged copy with those contents.
+4. As a training operator, I want filenames and membership included in the association, so that matching a few files does not accidentally identify a different Dataset.
+5. As a training operator, I want images and their annotations covered together, so that the recorded Dataset describes the training input pairs.
+6. As a cloud operator, I want the required DVC records copied with data to ephemeral GCE, so that training can retain the selected registration evidence.
+7. As a training operator, I want the loader to receive the verified staged root, so that verification and training refer to the same data.
+8. As an experiment reviewer, I want MLflow to retain the associated DVC output, so that the training Dataset can be identified after GCE is deleted.
+9. As a data maintainer, I want identifiers to resolve retained source and parent references, so that copying data does not lose Data Lineage.
+10. As a data maintainer, I want inference-derived data to resolve the producing model through the existing model catalogue, so that model provenance remains locatable.
+11. As a data maintainer, I want distinct registrations to remain distinguishable when their bytes match, so that content deduplication does not erase source history.
+12. As a training operator, I want a mismatching input rejected before training, so that unrelated metadata cannot be recorded as its Dataset evidence.
+
+### Implementation Decisions
+
+- The diagnosed gap is an omitted association/comparison, not an incompatibility
+  between DVC outputs and MLflow artifact logging.
+- The current publisher records relative filenames, SHA-256 values, and GCS
+  object generations. Staging checks existence and manifest syntax, then hashes
+  the manifest. The container entrypoint compares that manifest hash, and the
+  trainer logs the manifest. These operations do not compare its file entries
+  against the staged payload or connect it to the separate DVC registration.
+- A file content hash identifies bytes for this workflow. A DVC directory hash
+  identifies its directory index, whose entries identify relative filenames and
+  file hashes. Verifying that representation requires its referenced contents,
+  not merely hashing an arbitrary directory listing.
+- A unique catalogue identifier or registered filename can distinguish Dataset
+  registrations and resolve retained provenance. Equal content hashes alone do
+  not distinguish different source histories.
+- A GCS bucket, object name, and generation identify a stored object version.
+  A manifest hash identifies the exact metadata document. Neither alone checks
+  that local training files match the registered contents.
+- Compare hashes using the same algorithm and representation. DVC MD5 values
+  and the custom manifest's SHA-256 values are not directly comparable.
+- A sufficient direct approach is to retain the selected DVC record and any
+  required directory index, verify the staged input against its names and
+  hashes, pass the verified root to the loader, and log that record to MLflow.
+- If the custom manifest remains an intermediary, publication must establish
+  its connection to the DVC version, and staging must establish the connection
+  between its entries and the training payload. This is an alternative, not a
+  decision to retain that manifest or add a second catalogue.
+- Verification must account for the loader's input selection. If it consumes
+  a subset of a registered Dataset, preserve that selection's association;
+  this does not prescribe a new DVC record granularity.
+- Relative paths or symlinks can locate staged data. Retained catalogue
+  references must still locate root sources and lineage after GCE disappears.
+- Identifier format, record layout, provenance schema, and the choice between
+  direct verification and a manifest intermediary remain unresolved.
+
+### Testing Decisions
+
+The following seam is proposed, not user-confirmed or implemented: exercise the
+staging-to-training handoff through the existing container training entrypoint,
+using the real verification and loader construction and a bounded training
+operation. Inspect the resulting MLflow evidence. Keep the test at this shared
+boundary where practical, rather than testing comparison syntax in isolation.
+
+- A matching Dataset and DVC record should reach training and produce the
+  associated logged record.
+- A changed image or annotation, or a mismatched DVC record, should be rejected
+  before training. Exercise missing and extra loader-visible files as membership
+  cases, accounting for any explicitly selected subset.
+- Identical bytes under distinct registered names should retain their catalogue
+  identities and provenance references.
+- Existing publication tests cover manifest filenames, hashes, and object
+  generations; the trainer tracking test covers preserving manifest bytes in
+  MLflow. These are useful prior art but do not currently prove the full DVC
+  association. Deployment tests also inspect entrypoint wiring.
+- Test external outcomes: accepted or rejected training input and the record
+  retained by MLflow. Do not simulate comparisons mysteriously failing or
+  require a second audit of each successful loader read.
+- Any trial must follow the existing project-root temporary-folder, copied-data,
+  unique-identifier, operations-document, ignore, and cleanup rules.
+
+### Out of Scope
+
+DVC orchestration of training; a mandatory MetaDataset integration; mandatory
+per-image DVC files; a mandatory lockfile; a new provenance catalogue; cloud
+resource provisioning; and verification of every transformed tensor or read.
+This spec does not authorize implementation changes or select unresolved
+formats.
+
+### Further Notes
+
+The diagnosis follows the inspected publisher, staging template, container
+entrypoint, loader construction, and MLflow logging path. An independently
+supplied dataloader accepted by the trainer API does not invalidate the concrete
+entrypoint's use of its configured root.
+
+The DVC [tracking-file specification](https://doc.dvc.org/user-guide/project-structure/dvc-files)
+and [directory-cache specification](https://doc.dvc.org/user-guide/project-structure/internal-files#directories)
+describe the path/hash and directory-index representations used in this analysis.
+Existing source evidence is recorded in the
+[MLflow findings](mlflow_dvc_findings.md#follow-up-association-in-the-inspected-project-code).
+No new trials, cloud operations, or end-to-end training validation were performed.

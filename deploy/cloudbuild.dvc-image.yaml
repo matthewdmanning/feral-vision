@@ -5,7 +5,7 @@ steps:
     args:
       - -ceu
       - |
-        docker build --tag "${_DVC_IMAGE}" --file=deploy/Dockerfile.dvc .
+        docker build --tag "${_DVC_IMAGE}" --file=deploy/dataset-publisher/Dockerfile .
         docker push "${_DVC_IMAGE}"
 
 images:

@@ -28,6 +28,9 @@ Registry reference for Terraform.
 
 The image build composes ``runs/detection`` and imports the core runtime before
 it can be pushed. GPU availability is verified later on the actual training VM.
+Check Artifact Registry for an existing image before requesting a build.
+Verify the selected digest against the run requirements; image age and commit
+timestamps do not determine whether a build is needed.
 
 GPU deployment
 --------------

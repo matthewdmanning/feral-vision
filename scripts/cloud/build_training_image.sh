@@ -17,7 +17,7 @@ Builds, verifies, and pushes the one canonical GPU training image. The final
 line prints the digest-pinned Artifact Registry reference required by Terraform.
 
 FIRST run scripts/cloud/check_training_image.sh. The image may already exist.
-Build only on NO IMAGE FOUND or STALE.
+An image's age does not determine whether a build is needed.
 EOF
 }
 

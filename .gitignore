@@ -24,7 +24,10 @@ mlflow.db
 
 # DVC-tracked data and model artifacts
 /data/**
+!/data/**/
 !/data/**/.gitkeep
+!/data/**/*.dvc
+!/data/**/.gitignore
 /models/**
 !/models/**/.gitkeep
 .dvc/tmp/

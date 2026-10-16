@@ -17,7 +17,7 @@ or session may have built the image already.
 
 Exit 0: at least one image exists. The last line is the newest digest-pinned
         reference, ready for training_image in run.tfvars.
-Exit 1: no image exists. Only now is a build justified.
+Exit 1: no image exists.
 EOF
 }
 
@@ -56,7 +56,7 @@ rows="$(gcloud artifacts docker images list "$path" \
   --format='csv[no-heading,separator=" | "](package,version,tags,createTime)')"
 
 if [ -z "$rows" ]; then
-  echo "[training-image-check] NO IMAGE FOUND under ${path}. A build is justified." >&2
+  echo "[training-image-check] NO IMAGE FOUND under ${path}." >&2
   exit 1
 fi
 
@@ -65,17 +65,4 @@ newest_package="$(printf '%s\n' "$rows" | head -n1 | awk -F' [|] ' '{print $1}')
 newest_digest="$(printf '%s\n' "$rows" | head -n1 | awk -F' [|] ' '{print $2}')"
 echo "[training-image-check] IMAGE EXISTS."
 
-# An image is current only if no input of the build changed after it was created.
-newest_created="$(printf '%s\n' "$rows" | head -n1 | awk -F' [|] ' '{print $4}')"
-last_input_change="$(git log -1 --format=%cI -- \
-  deploy/Dockerfile.gcp deploy/cloudbuild.training-image.yaml \
-  scripts/runs/container_train.sh src conf pyproject.toml uv.lock)"
-echo "[training-image-check] newest image created : ${newest_created}"
-echo "[training-image-check] last build-input commit: ${last_input_change}"
-if [ "$(date -d "$last_input_change" +%s)" -gt "$(date -d "$newest_created" +%s)" ]; then
-  echo "[training-image-check] STALE: build inputs changed after the newest image. Rebuild." >&2
-  echo "[training-image-check] (Uncommitted changes are not covered. Run git status.)" >&2
-else
-  echo "[training-image-check] CURRENT: no committed build input changed since that image."
-fi
 printf '%s@%s\n' "$newest_package" "$newest_digest"

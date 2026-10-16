@@ -36,10 +36,18 @@ flowchart TB
     staged --> evidence
 ```
 
-Dataset versioning is upstream of GPU training. DVC may participate in the
-publication workflow, but the GPU VM consumes the already-published Dataset
-Artifact. The GPU runtime does not run DVC or generate a replacement lockfile.
-`dataset-artifact.json` is the provenance record across the seam.
+Scripts acquire or modify a Dataset only when the requested input is absent.
+DVC registers each selected prepared Dataset independently through
+`scripts/data/register.sh`: `dvc add` creates its sibling metadata file and a
+targeted `dvc push` stores its contents. There is no fixed DVC preparation DAG
+or broad ownership of raw/processed/augmented parent directories.
+
+The cloud publisher still uploads the payload and manifest directly; connecting
+that input to its durably preserved DVC version remains open work. See the
+[Dataset guide](../guide/dataset.rst) for commands, inputs, outputs, and remaining
+gaps. The GPU VM consumes the already-published Dataset Artifact and does not
+run DVC or generate a replacement lockfile. `dataset-artifact.json` is the
+provenance record across that seam.
 
 The training image has one build path: `deploy/Dockerfile.gcp` through
 `deploy/cloudbuild.training-image.yaml`. The digest-pinned NVIDIA CUDA 13 base

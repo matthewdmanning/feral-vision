@@ -80,6 +80,6 @@ See [Check for an existing image first](cloudops.md#check-for-an-existing-image-
 | Git, GitHub Issues, pull requests, or publishing | [GitHub workflow](github.md) | Session checks, authentication, issue tracking, and branch/PR hygiene. |
 | domain terminology or an architectural decision | [Domain Docs](domain.md) | Glossary and ADR discovery. |
 | an agent reached for the wrong tool or source despite these routing instructions | [Pointer failures](pointer_failures.md) | Log of wrong-tool and wrong-source selections, with the agent's stated reason. |
-| downloading or working directly with models that might come from Hugging Face | [`model-inspector` MCP server](../../.mcp.json) | The server is not available until you run `mcp/server/main.py` (`uv run python mcp/server/main.py`). Start it, then connect to it, before you touch the model. |
+| downloading or working directly with models that might come from Hugging Face | [`model-inspector` MCP server](../../.mcp.json) | The MCP 2 stdio server is not available until a client launches `mcp/server/main.py` (`uv run --frozen python mcp/server/main.py`). Connect to it before you touch the model. |
 | a Wayfinder map or child ticket | [Wayfinding](wayfinding.md) | Map, child-ticket, dependency, and frontier conventions. |
 | GitHub issue workflow labels | [Triage Labels](triage-labels.md) | Canonical labels and their meanings. |

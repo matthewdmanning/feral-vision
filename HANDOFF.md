@@ -6,8 +6,8 @@ Written 2026-10-08. Branch `claude/terraform-gcp-dataset-training-6j1tko`, HEAD 
 
 - The Terraform root `terraform/runs/detection/` plans one on-demand `n1-standard-4` VM with one T4 and one NVMe Local SSD.
 - No GPU run has happened. Four things stop the first run:
-  1. **Stale image.** The newest training image in Artifact Registry predates `scripts/runs/container_train.sh` (added 2026-09-26). Rebuild it.
-  2. **Missing bucket.** The operations bucket named in `terraform/runs/detection/terraform.tf` returns 404. It is the Terraform backend and the `artifact_prefix` bucket. Preflight and apply cannot run without it.
+  1. **Verify image requirements.** Check Artifact Registry and verify the selected digest supports the run. Image age does not require a build.
+  2. **Verify bucket configuration.** Use `TRAINING_DATA_BUCKET_URI` from `.env.local` for the training data bucket check. Resolve `PROJECT_NAME` to its project ID before passing `--project`. Reconcile the Terraform backend and operational output location separately.
   3. **Docker is down.** The Docker pre-push tests have not run on this machine.
   4. **Unfinished `run.tfvars`.** `training_image` is deliberately unset. Three values are assumptions (service account, `artifact_prefix`, dataset prefix). The file is gitignored. `.agents/secrets.md` maps its keys.
 - T4 with the locked torch 2.12.1 cu13 wheels: a subagent found CUDA 13.0 and the PyTorch cu13 build matrix support `sm_75`. Driver 580 is enough. `torch.compile` and Triton on Turing are unverified. The repo uses no bf16 or compile. The `verify_gpu` startup stage now asserts `sm_75` is in `torch.cuda.get_arch_list()`. This is not yet tested on a VM.
@@ -53,7 +53,7 @@ Written 2026-10-08. Branch `claude/terraform-gcp-dataset-training-6j1tko`, HEAD 
 The full list is `ACTION_ITEMS.md`, most blocking first.
 
 - **Start Docker.** Run the Docker tests. Confirm the 4 failures pass on Linux.
-- **Rebuild the image.** Run the check script, then the build script from a clean checkout. Needs approval.
-- **Create the bucket.** Needs approval. Then finish `run.tfvars` and run preflight by hand.
+- **Verify the image.** Run the check script and verify the selected digest against the run requirements. A billed build needs approval if required.
+- **Verify bucket configuration.** Use `.env.local`, then reconcile Terraform inputs and run preflight by hand.
 - **Decide Terraform tests.** Keep or delete the 3 pytest tests that read Terraform files, and `terraform/tests/`.
 - **Decide publication flow.** Pick the one flow `dataset.rst` and `data.md` describe.

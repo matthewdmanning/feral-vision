@@ -1,4 +1,0 @@
-[core]
-    remote = gcs
-[remote "gcs"]
-    url = ${TRAINING_DATA_BUCKET_URI}/dvc

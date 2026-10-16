@@ -7,6 +7,12 @@ plans, and lifecycle ownership, see [Terraform](terraform.md). See
 
 ## Cloud identity
 
+`PROJECT_NAME` in `.env.local` is the project's display name. Resolve it to
+the Resource Manager `projectId` before passing `--project` to a cloud command.
+Do not compare that display name directly with Terraform's `project_id`.
+`TRAINING_DATA_BUCKET_URI` supplies the training data bucket URI; checking a
+bucket by that URI does not validate the project identifier passed to the CLI.
+
 Load `.env.local` only into the invoking process. Do not print, commit, or copy
 its values into Terraform variables, plans, logs, or documentation. Cloud
 operations require authenticated Application Default Credentials or an
@@ -100,24 +106,32 @@ not exist. Artifact Registry is the only source of truth; memory, notes, and
 local files are not.
 
 ```bash
+set -a
+source <(sed 's/\r$//' .env.local)
+set +a
+resolved_project_id="$(gcloud projects list \
+  --filter="name=${PROJECT_NAME:?Set PROJECT_NAME in .env.local}" \
+  --limit=2 --format='value(projectId)' --quiet)"
+if [[ -z "$resolved_project_id" || "$resolved_project_id" == *$'\n'* ]]; then
+  echo 'PROJECT_NAME must resolve to exactly one accessible project.' >&2
+  exit 1
+fi
 scripts/cloud/check_training_image.sh \
-  --project cs-poc-kewg0kffb7uwobgq1rex2af --region us-east4 \
+  --project "$resolved_project_id" --region us-east4 \
   --repository feral-docker --image feral-vision-gcp
 ```
 
-The command is read-only. It lists every push of the image, compares the newest
-push with the last commit that touched a build input (`deploy/Dockerfile.gcp`,
-the Cloud Build file, `container_train.sh`, `src/`, `conf/`, `pyproject.toml`,
-`uv.lock`), and prints one of three results:
+The command is read-only. It lists every push of the image and prints the
+newest digest-pinned reference. It does not determine compatibility or whether
+a build is needed from image age or repository commit timestamps.
 
 | Result | Meaning | Action |
 | --- | --- | --- |
-| exit 1, `NO IMAGE FOUND` | No push exists. | Build. |
-| exit 0, `STALE` | An image exists but a build input changed after it. | Rebuild. |
-| exit 0, `CURRENT` | An image exists and no committed input changed. | Do not rebuild. Use the printed digest-pinned reference as `training_image`. |
+| exit 1, `NO IMAGE FOUND` | No push exists. | Obtain approval for a build. |
+| exit 0, `IMAGE EXISTS` | An image exists. | Verify the selected digest against the run requirements. |
 
-The check does not see uncommitted changes. Run `git status` before you trust
-`CURRENT`. Run the check again after every build.
+Run the check again after every build. An existing image is not a rebuild
+request merely because repository files changed later.
 
 Build the image only through
 [`scripts/cloud/build_training_image.sh`](../../scripts/cloud/build_training_image.sh),
@@ -130,7 +144,7 @@ Cloud Build image construction is distinct from GPU training. A successful
 push plus an immutable digest is a prerequisite; a mutable tag is never a
 Terraform training input.
 
-Dataset acquisition/publication images such as `Dockerfile.dvc` or
+Dataset acquisition/publication images such as `deploy/dataset-publisher/Dockerfile` or
 `Dockerfile.dataset-acquire` are separate upstream responsibilities. Do not use the
 GPU training image for those jobs, and do not infer that their DVC behavior
 belongs in the GPU runtime.
