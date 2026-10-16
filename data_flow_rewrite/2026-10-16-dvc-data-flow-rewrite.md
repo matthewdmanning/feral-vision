@@ -59,11 +59,11 @@ Implement this DVC-side lifecycle:
 4. Restore a selected Dataset to a new local destination, including on
    ephemeral GCE, with its original DVC record and file index.
 5. Verify that the staged filenames and contents match the selected record.
-6. Return the verified payload path and accompanying record paths for a future
+6. Return the verified dataset path and accompanying record paths for a future
    consumer.
 
 The completed handoff establishes which registered data were staged. A future
-training integration must pass that payload to its loader and preserve the
+training integration must pass that dataset to its loader and preserve the
 associated record in its Run Record. This implementation neither invokes that
 consumer nor claims to prove its behavior.
 
@@ -158,11 +158,11 @@ unknown fields in this initial contract so spelling mistakes cannot silently
 discard provenance. Preserve supplied reference strings exactly. Validate
 required fields and types locally; do not fetch external catalogues or invent
 their contents. The caller is responsible for those references' resolvability
-and correctness. A payload path existing only on a worker is not a durable
+and correctness. A dataset path existing only on a worker is not a durable
 source reference.
 
 Store the version, original Dataset ID, and provenance in the `.dvc` record's
-top-level `meta` field. Do not duplicate the payload membership in another
+top-level `meta` field. Do not duplicate the dataset membership in another
 project manifest. The `.dir` index already supplies individual relative paths
 and hashes. Confirm `meta` acceptance and round-trip preservation in the pinned
 DVC version as part of the first compatibility test.
@@ -170,31 +170,31 @@ DVC version as part of the first compatibility test.
 ## 5. Catalogue, records, and portable storage
 
 Use one directory `.dvc` record and native `.dir` index per Dataset ID. The
-record's output is a sibling directory named `payload`. Retain the exact record
+record's output is a sibling directory named `dataset`. Retain the exact record
 bytes once the identity and provenance have been added.
 
 The managed local workspace has separate areas for:
 
-- Per-registration isolated DVC repositories and their payload copies.
+- Per-registration isolated DVC repositories and their dataset copies.
 - A metadata catalogue containing one record and native index per ID.
 - Metadata archives and their DVC tracking descriptors.
 - Temporary work owned by the current operation.
 
 Each registration repository is independent and uses no SCM integration. Do
 not initialize DVC in the surrounding project or discover/inherit its stages,
-hooks, remotes, ignore files, or payload ownership. Set cache links to `copy`:
-the caller's source, managed cache, and staged payload must not share mutable
+hooks, remotes, ignore files, or dataset ownership. Set cache links to `copy`:
+the caller's source, managed cache, and staged dataset must not share mutable
 hardlinks.
 
 Package the catalogue metadata into a standard tar archive. It contains only
-the per-ID `.dvc` records and their native indexes, outside any payload. Using
+the per-ID `.dvc` records and their native indexes, outside any dataset. Using
 an archive prevents embedded tracking files from being discovered as active
 stages while publishing the catalogue. Archive names, ordering, permissions,
 and timestamps are normalized so identical metadata produces identical bytes.
 Do not include credentials, machine-specific DVC configuration, runtime logs,
-caches, or payload files in this archive.
+caches, or dataset files in this archive.
 
-Track and push this archive through DVC separately from Dataset payloads.
+Track and push this archive through DVC separately from the Dataset contents.
 Each successfully published archive is an immutable catalogue snapshot and
 contains all registrations known to that catalogue. Retain earlier snapshots;
 do not run remote garbage collection or remove historical data in this workflow.
@@ -219,8 +219,8 @@ The following are interface signatures, not ready-to-run operator commands:
 | Operation | Required inputs | Optional inputs | Success result |
 | --- | --- | --- | --- |
 | `register` | `--dataset`, `--id`, `--provenance`, `--workspace`, `--remote-url`, `--catalogue` | `--force`, `--new-catalogue` | ID, Dataset hash, published catalogue descriptor path |
-| `stage` | `--catalogue`, `--id`, `--destination`, `--remote-url` | None | ID, Dataset hash, payload path, record path, index path |
-| `verify` | `--staged` | None | ID, Dataset hash, payload path, record path, index path |
+| `stage` | `--catalogue`, `--id`, `--destination`, `--remote-url` | None | ID, Dataset hash, dataset path, record path, index path |
+| `verify` | `--staged` | None | ID, Dataset hash, dataset path, record path, index path |
 
 `--catalogue` names a local bootstrap descriptor. Registration requires it to
 exist unless `--new-catalogue` is explicitly supplied. That flag requires the
@@ -235,13 +235,13 @@ print credentials or authorization-bearing URLs.
 
 ### Register
 
-1. Validate inputs and supplied provenance. Reject empty payloads, symlinks,
+1. Validate inputs and supplied provenance. Reject empty datasets, symlinks,
    special files, and embedded DVC/Git control files that would alter traversal
    or hide files. Do not require particular image or annotation folder names.
 2. Lock the workspace. Restore and validate the supplied catalogue snapshot,
    unless an explicit new catalogue is being created.
 3. Copy the supplied Dataset into a fresh operation-owned registration
-   repository as `payload`. Hash and register the copy using native DVC.
+   repository as `dataset`. Hash and register the copy using native DVC.
    Do not edit the source or adopt the old repository's configuration.
 4. Apply the identity/duplicate matrix against the complete catalogue. On
    rejection, do not change the published descriptor or existing registrations.
@@ -273,8 +273,8 @@ make a second ID or replace metadata.
    traversal, links, duplicate entries, and malformed catalogue records. Resolve
    the selected ID and retain its exact `.dvc` record and native index.
 5. In a separate isolated retrieval repository, use that record to pull the
-   selected payload. Do not pull unrelated Dataset payloads from the catalogue.
-6. Copy the payload and selected metadata to the final handoff layout, verify
+   selected dataset. Do not pull unrelated Dataset contents from the catalogue.
+6. Copy the dataset and selected metadata to the final handoff layout, verify
    them, and atomically install the completed handoff at the destination.
 7. Emit success only after verification. Remove operation-owned temporary
    files on failure without modifying the destination's prior contents.
@@ -283,14 +283,14 @@ The handoff layout is fixed:
 
 ```text
 destination/
-  payload/
-  payload.dvc
-  payload.dir
+  dataset/
+  dataset.dvc
+  dataset.dir
 ```
 
-`payload.dvc` is the original registered record and resolves `payload/` by
-relative path. `payload.dir` is an exact copy of the native index whose digest
-is referenced by that record. It is outside the payload to avoid self-inclusion.
+`dataset.dvc` is the original registered record and resolves `dataset/` by
+relative path. `dataset.dir` is an exact copy of the native index whose digest
+is referenced by that record. It is outside the dataset to avoid self-inclusion.
 The handoff contains no credentials and does not depend on symlinks or a live
 retrieval repository. Moving the entire directory preserves verification.
 
@@ -300,7 +300,7 @@ retrieval repository. Moving the entire directory preserves verification.
    ID, provenance, single relative output path, algorithm, and directory digest.
 2. Hash the retained index bytes using the recorded algorithm and compare with
    the record's index digest, accounting for DVC's `.dir` suffix.
-3. Build a fresh native DVC directory tree from `payload/` and compare its
+3. Build a fresh native DVC directory tree from `dataset/` and compare its
    native directory digest with the record. Use a fresh hash state, include all
    regular files, and reject control files or links rather than allowing ignore
    rules to hide extra contents. Do not trust saved mtime-based hash state.
@@ -327,7 +327,7 @@ or hypothetical failures of ordinary comparisons.
   the source before registration; this workflow is not a snapshot service for
   concurrently written source directories.
 - Verification describes the staged bytes when it runs. Future consumers must
-  use that payload without modifying it; enforcing their behavior is excluded.
+  use that dataset without modifying it; enforcing their behavior is excluded.
 - Native DVC hashes are used for normal content identity and accidental-change
   detection. Do not introduce a second content-addressing system or claim that
   MD5 provides adversarial authenticity or provenance on its own.
@@ -342,9 +342,9 @@ or hypothetical failures of ordinary comparisons.
    specifications/source rather than existing project implementations.
 2. Implement and test record/provenance validation, immutable identity handling,
    and fresh directory/index verification.
-3. Implement registration and targeted payload publication, followed by the
+3. Implement registration and targeted dataset publication, followed by the
    deterministic catalogue archive and descriptor commit point.
-4. Implement isolated catalogue recovery, selected-payload staging, portable
+4. Implement isolated catalogue recovery, selected-dataset staging, portable
    handoff construction, and verification before destination installation.
 5. Add the full behavioral test matrix and operator documentation. Record
    actual passing evidence, remaining limits, and deferred Git backup.
@@ -367,7 +367,7 @@ Before any trial:
    purpose, creation, commands, and cleanup.
 3. Copy the complete `data/augmented/` into it. Use copies for trials and retain
    a source SHA-256 map to check the original remains unchanged.
-4. Keep repositories, remotes, test state, logs, and intermediate payloads within
+4. Keep repositories, remotes, test state, logs, and intermediate datasets within
    that temporary directory. Use bounded command timeouts.
 5. On completion or failure, verify the original source, remove the trial
    directory and its exact ignore entry, and retain a concise result summary
@@ -379,7 +379,7 @@ Test these externally visible outcomes:
 | --- | --- |
 | First registration and publication | Stable caller ID, native hash, retained provenance, recoverable descriptor. |
 | Recovery after removing all working data and caches | Restore using only the retained descriptor, remote locator, and remote objects. |
-| Stage one ID from a multi-Dataset catalogue | Retrieve its payload and records without restoring unrelated payloads. |
+| Stage one ID from a multi-Dataset catalogue | Retrieve its dataset and records without restoring unrelated datasets. |
 | Move the completed handoff | Verification still succeeds through relative paths. |
 | Repeat identical ID without/with force | Reject without force; preserve exact record and permit retry with force. |
 | Different ID with identical Dataset hash | Reject without force; retain separate IDs/provenance with force. |

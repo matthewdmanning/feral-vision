@@ -13,14 +13,14 @@ PASS 05 provenance object ordering does not alter identity
 PASS 06 changed provenance cannot replace an ID even with force
 PASS 07 derived lineage is retained in the original DVC record
 PASS 08 inference model catalogue reference is accepted and retained
-PASS 09 changed bytes cannot replace an ID; a different payload can register separately
-PASS 10 cache-free recovery selects one payload from a multi-Dataset catalogue
+PASS 09 changed bytes cannot replace an ID; a different dataset can register separately
+PASS 10 cache-free recovery selects one dataset from a multi-Dataset catalogue
 PASS 11 selected staging ignores missing unrelated objects; an unrelated record fails verification
 PASS 12 portable handoff verifies after being moved
 PASS 13 changed image and mask are rejected
 PASS 14 missing, extra, and renamed files are rejected
 PASS 15 damaged native index and escaping records fail without rewriting evidence
-PASS 16 symlinks, special files, and ignore controls cannot hide payload contents
+PASS 16 symlinks, special files, and ignore controls cannot hide dataset contents
 PASS 17 nonempty staging destination is preserved
 PASS 18 missing model/lineage, malformed references, unknown fields, and duplicate JSON keys are rejected
 PASS 19 shell rejects unknown operations, flags, duplicate and missing values

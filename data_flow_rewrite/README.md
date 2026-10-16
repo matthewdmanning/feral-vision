@@ -99,10 +99,10 @@ nonblocking lock. Operation-owned temporary directories are cleaned on failure.
 There is no distributed locking or latest-pointer service; callers must supply
 the current descriptor and coordinate writers across workspaces/machines.
 
-Each registration uses exactly one `payload.dvc` record and native `.dir`
+Each registration uses exactly one `dataset.dvc` record and native `.dir`
 index. Catalogue archives contain only those original record/index pairs under
 safe ID directories. Tar names, member order, permissions, ownership, and times
-are normalized. Identical metadata yields identical archive bytes. Payloads,
+are normalized. Identical metadata yields identical archive bytes. Datasets,
 credentials, local DVC settings, caches, and logs are excluded.
 
 Publication pushes only the selected Dataset, then a separately tracked
@@ -123,22 +123,22 @@ recover a lost catalogue pointer.
 
 Stage using the retained bootstrap descriptor, remote locator, caller ID, and
 an absent or empty destination. The workflow downloads and validates catalogue
-metadata, then retrieves only the selected payload. Bootstrap descriptors,
+metadata, then retrieves only the selected dataset. Bootstrap descriptors,
 archive members, ID associations, metadata fields, and native index paths are
 validated before they can control materialization. The validated retained index
-is seeded into the retrieval cache before DVC loads payload paths.
+is seeded into the retrieval cache before DVC loads dataset paths.
 
 The completed layout is:
 
 ```text
 destination/
-  payload/
-  payload.dvc
-  payload.dir
+  dataset/
+  dataset.dvc
+  dataset.dir
 ```
 
-The record and index retain their registered bytes. `payload.dvc` references
-the sibling `payload/`. `payload.dir` is outside the payload to avoid
+The record and index retain their registered bytes. `dataset.dvc` references
+the sibling `dataset/`. `dataset.dir` is outside the dataset to avoid
 self-inclusion. No credentials, retrieval repository, cache, or symlinks are
 needed after staging. Move the entire directory freely.
 
@@ -150,9 +150,9 @@ renamed file, damaged index, or unrelated record fails without rewriting
 expected evidence. Staging verifies in a sibling temporary directory before
 atomically installing the handoff. A nonempty destination is preserved.
 
-Returned JSON names `id`, `dataset_hash`, `payload`, `record`, and `index` for
+Returned JSON names `id`, `dataset_hash`, `dataset`, `record`, and `index` for
 stage/verify; registration returns `id`, `dataset_hash`, `catalogue`, and
-`remote_url`. A future consumer must load that verified payload unchanged and
+`remote_url`. A future consumer must load that verified dataset unchanged and
 retain its accompanying record in its Run Record. This package does not invoke
 training or MLflow, and verification does not prove future consumer behavior.
 
@@ -167,9 +167,9 @@ Local repositories from interrupted publication do not establish publication;
 the installed bootstrap descriptor is authoritative.
 
 Restoring after worker loss requires only the retained bootstrap descriptor,
-remote locator, remote objects, and external credentials. All selected payload
+remote locator, remote objects, and external credentials. All selected dataset
 objects and its native index must remain in the remote. Metadata recovery does
-not restore unrelated payloads.
+not restore unrelated datasets.
 
 ## Validation and limits
 

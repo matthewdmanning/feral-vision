@@ -71,6 +71,6 @@ if [[ -d $trial/audit-copy ]]; then
   rm -rf -- "$trial/audit-work"
   timeout 60 "$here/workflow.sh" stage --catalogue "$trial/audit.dvc" --id supplied-augmented-audit --destination "$trial/audit-staged" --remote-url "$trial/remote" > "$trial/audit-stage.json" 2>> "$trial/audit.stderr"
   timeout 60 "$here/workflow.sh" verify --staged "$trial/audit-staged" > "$trial/audit-verify.json" 2>> "$trial/audit.stderr"
-  diff -r -- "$trial/audit-copy" "$trial/audit-staged/payload" > "$trial/audit-diff.log"
+  diff -r -- "$trial/audit-copy" "$trial/audit-staged/dataset" > "$trial/audit-diff.log"
   audit='Full supplied-data copy registered, published, recovered without its workspace/cache, and verified; names and bytes matched. No mask pairings repaired.'
 fi

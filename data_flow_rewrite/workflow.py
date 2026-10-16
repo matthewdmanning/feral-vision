@@ -197,13 +197,13 @@ def safe_relative(value):
     return value
 
 
-def check_payload(root):
+def check_dataset_files(root):
     """Require a nonempty tree of regular files without control files or links.
 
     Returns
     -------
     list[Path]
-        Every regular payload file, with traversal independent of ignore rules.
+        Every regular dataset file, with traversal independent of ignore rules.
     """
     if root.is_symlink() or not root.is_dir():
         raise Invalid("Dataset must be a real directory")
@@ -243,7 +243,7 @@ def record(data, *, catalogue=False):
         expected.add("nfiles")
     if (
         set(out) != expected
-        or out["path"] != ("catalogue.tar" if catalogue else "payload")
+        or out["path"] != ("catalogue.tar" if catalogue else "dataset")
         or out["hash"] != "md5"
     ):
         raise Invalid("Unsupported output path, algorithm, or fields")
@@ -368,14 +368,14 @@ def publish(repo, target):
 
 
 def native_verify(root, selected):
-    """Hash every payload file using a fresh DVC tree and hash state.
+    """Hash every dataset file using a fresh DVC tree and hash state.
 
     Raises
     ------
     Mismatch
         If names, bytes, or recorded aggregate properties differ.
     """
-    check_payload(root)
+    check_dataset_files(root)
     with tempfile.TemporaryDirectory(prefix="hash-") as temp:
         fs = LocalFileSystem()
         odb = LocalHashFileDB(fs, temp)
@@ -387,7 +387,7 @@ def native_verify(root, selected):
         or meta.nfiles != out["nfiles"]
     ):
         raise Mismatch(
-            "Payload filenames or contents do not match the selected DVC record"
+            "Dataset filenames or contents do not match the selected DVC record"
         )
 
 
@@ -402,9 +402,9 @@ def handoff_result(root, selected):
     return {
         "id": selected["meta"]["id"],
         "dataset_hash": selected["outs"][0]["md5"],
-        "payload": str(root / "payload"),
-        "record": str(root / "payload.dvc"),
-        "index": str(root / "payload.dir"),
+        "dataset": str(root / "dataset"),
+        "record": str(root / "dataset.dvc"),
+        "index": str(root / "dataset.dir"),
     }
 
 
@@ -419,13 +419,13 @@ def verify(staged):
     root = Path(staged).absolute()
     if root.is_symlink() or not root.is_dir():
         raise Invalid("Staged handoff must be a real directory")
-    for name in ("payload.dvc", "payload.dir"):
+    for name in ("dataset.dvc", "dataset.dir"):
         path = root / name
         if path.is_symlink() or not path.is_file():
             raise Invalid("Handoff record and index must be regular files")
-    selected = record((root / "payload.dvc").read_bytes())
-    validate_index((root / "payload.dir").read_bytes(), selected)
-    native_verify(root / "payload", selected)
+    selected = record((root / "dataset.dvc").read_bytes())
+    validate_index((root / "dataset.dir").read_bytes(), selected)
+    native_verify(root / "dataset", selected)
     return handoff_result(root, selected)
 
 
@@ -442,7 +442,7 @@ def read_catalogue(archive):
         for item in bundle:
             if (
                 not item.isfile()
-                or not re.fullmatch(r"[0-9a-f]{64}/payload\.(dvc|dir)", item.name)
+                or not re.fullmatch(r"[0-9a-f]{64}/dataset\.(dvc|dir)", item.name)
                 or item.name in members
                 or item.pax_headers
             ):
@@ -453,10 +453,10 @@ def read_catalogue(archive):
     keys = {name.split("/")[0] for name in members}
     result = {}
     for key in keys:
-        if {f"{key}/payload.dvc", f"{key}/payload.dir"} - members.keys():
+        if {f"{key}/dataset.dvc", f"{key}/dataset.dir"} - members.keys():
             raise Invalid("Catalogue registration lacks a record or index")
-        raw = members[f"{key}/payload.dvc"]
-        index = members[f"{key}/payload.dir"]
+        raw = members[f"{key}/dataset.dvc"]
+        index = members[f"{key}/dataset.dir"]
         selected = record(raw)
         if identity_key(selected["meta"]["id"]) != key:
             raise Invalid("Catalogue ID does not match its internal directory")
@@ -495,13 +495,13 @@ def write_catalogue(path, entries):
     Parameters
     ----------
     path : Path
-        Output archive, separate from payloads and active DVC tracking files.
+        Output archive, separate from datasets and active DVC tracking files.
     entries : dict
         Complete catalogue metadata for this snapshot.
     """
     with tarfile.open(path, "w", format=tarfile.USTAR_FORMAT) as bundle:
         for key, pair in sorted(entries.items()):
-            for name, data in zip(("payload.dvc", "payload.dir"), pair, strict=True):
+            for name, data in zip(("dataset.dvc", "dataset.dir"), pair, strict=True):
                 info = tarfile.TarInfo(f"{key}/{name}")
                 info.size, info.mode, info.mtime = len(data), 0o644, 0
                 info.uid = info.gid = 0
@@ -576,7 +576,7 @@ def register(
     if provenance_file.is_symlink() or not provenance_file.is_file():
         raise Invalid("Provenance must be a regular JSON file")
     supplied = provenance(read_json(provenance_file.read_bytes()))
-    check_payload(source)
+    check_dataset_files(source)
     if not urlsplit(remote).scheme:
         remote_path = Path(remote).resolve()
         for local in (source.resolve(), work.resolve()):
@@ -609,11 +609,11 @@ def register(
             )
             registration = op / "registration"
             with isolated_repo(registration, remote) as repo:
-                payload = registration / "payload"
-                shutil.copytree(source, payload, symlinks=True)
-                check_payload(payload)
-                repo.add(str(payload))
-                target = registration / "payload.dvc"
+                data_dir = registration / "dataset"
+                shutil.copytree(source, data_dir, symlinks=True)
+                check_dataset_files(data_dir)
+                repo.add(str(data_dir))
+                target = registration / "dataset.dvc"
                 value = yaml.load(target.read_bytes(), Loader=UniqueLoader)
                 value["meta"] = {"version": 1, "id": dataset_id, "provenance": supplied}
                 raw = yaml.safe_dump(
@@ -650,7 +650,7 @@ def register(
                 target.write_bytes(raw)
                 index = Path(repo.cache.local.oid_to_path(digest)).read_bytes()
                 validate_index(index, selected)
-                native_verify(payload, selected)
+                native_verify(data_dir, selected)
                 publish(repo, target)
                 entries[key] = (raw, index)
             archive_root = op / "publication"
@@ -700,7 +700,7 @@ def stage(catalogue, dataset_id, destination, remote_url):
     Returns
     -------
     dict
-        Verified ID, hash, payload, record, and index paths.
+        Verified ID, hash, dataset, record, and index paths.
     """
     remote = remote_locator(remote_url)
     key = identity_key(dataset_id)
@@ -722,7 +722,7 @@ def stage(catalogue, dataset_id, destination, remote_url):
         raw, index = entries[key]
         retrieval = op / "retrieval"
         with isolated_repo(retrieval, remote) as repo:
-            target = retrieval / "payload.dvc"
+            target = retrieval / "dataset.dvc"
             target.write_bytes(raw)
             # Seed the validated original tree before DVC can use remote index paths.
             selected = record(raw)
@@ -732,9 +732,9 @@ def stage(catalogue, dataset_id, destination, remote_url):
             repo.pull(targets=[str(target)], remote="storage", jobs=2)
             handoff = op / "handoff"
             handoff.mkdir()
-            shutil.copytree(retrieval / "payload", handoff / "payload", symlinks=True)
-            (handoff / "payload.dvc").write_bytes(raw)
-            (handoff / "payload.dir").write_bytes(index)
+            shutil.copytree(retrieval / "dataset", handoff / "dataset", symlinks=True)
+            (handoff / "dataset.dvc").write_bytes(raw)
+            (handoff / "dataset.dir").write_bytes(index)
             verify(handoff)
         # rename replaces an empty directory atomically, and rejects a nonempty one.
         os.rename(handoff, dest)

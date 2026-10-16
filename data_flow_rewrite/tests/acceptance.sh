@@ -30,11 +30,11 @@ hash=$(jq -r .dataset_hash "$root/result.json")
 cp "$root/bootstrap.dvc" "$root/first.dvc"
 pass 'first native registration, metadata archive publication, and JSON result'
 run stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/staged" --remote-url "$root/remote"
-cmp "$root/source/images/original.pgm" "$root/staged/payload/images/original.pgm"
+cmp "$root/source/images/original.pgm" "$root/staged/dataset/images/original.pgm"
 [[ $(jq -r .dataset_hash "$root/result.json") == "$hash" ]]
-cp "$root/staged/payload.dvc" "$root/original-record.dvc"
-cp "$root/staged/payload.dir" "$root/original-index.dir"
-jq -e 'length == 4 and ([.[].relpath] | index("masks/brightness.pgm") != null)' "$root/staged/payload.dir" >/dev/null
+cp "$root/staged/dataset.dvc" "$root/original-record.dvc"
+cp "$root/staged/dataset.dir" "$root/original-index.dir"
+jq -e 'length == 4 and ([.[].relpath] | index("masks/brightness.pgm") != null)' "$root/staged/dataset.dir" >/dev/null
 pass 'native index preserves repeated bytes under distinct filenames'
 reject 2 "${register[@]}" --id 'dataset/α'
 run "${register[@]}" --id 'dataset/α' --force
@@ -53,7 +53,7 @@ cmp "$root/bootstrap.dvc" "$root/before-reject.dvc"
 pass 'changed provenance cannot replace an ID even with force'
 run "${register[@]}" --id derived --force
 run stage --catalogue "$root/bootstrap.dvc" --id derived --destination "$root/derived" --remote-url "$root/remote"
-[[ $(sed -n '/origin:/p' "$root/derived/payload.dvc") == *derived* ]]
+[[ $(sed -n '/origin:/p' "$root/derived/dataset.dvc") == *derived* ]]
 pass 'derived lineage is retained in the original DVC record'
 printf '%s\n' '{"origin":"inference","source_refs":["retained-store:inference"],"model_ref":"model-catalogue:version-123"}' > "$root/provenance.json"
 run "${register[@]}" --id inference --force
@@ -63,14 +63,14 @@ printf extra > "$root/source/extra.bin"
 reject 2 "${register[@]}" --id 'dataset/α' --force
 run "${register[@]}" --id unrelated
 rm "$root/source/extra.bin"
-pass 'changed bytes cannot replace an ID; a different payload can register separately'
+pass 'changed bytes cannot replace an ID; a different dataset can register separately'
 # Retain only the bootstrap and remote, deleting all registration repositories/caches.
 rm -rf "$root/work" "$root/staged" "$root/derived"
 run stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/recovered" --remote-url "$root/remote"
-cmp "$root/recovered/payload.dvc" "$root/original-record.dvc"
-cmp "$root/recovered/payload.dir" "$root/original-index.dir"
-[[ ! -e $root/recovered/payload/extra.bin ]]
-pass 'cache-free recovery selects one payload from a multi-Dataset catalogue'
+cmp "$root/recovered/dataset.dvc" "$root/original-record.dvc"
+cmp "$root/recovered/dataset.dir" "$root/original-index.dir"
+[[ ! -e $root/recovered/dataset/extra.bin ]]
+pass 'cache-free recovery selects one dataset from a multi-Dataset catalogue'
 # Remove the unrelated-only remote object: selection must still succeed.
 unrelated_hash=$(printf extra | md5sum | cut -d' ' -f1)
 unrelated_path="$root/remote/files/md5/${unrelated_hash:0:2}/${unrelated_hash:2}"
@@ -78,52 +78,52 @@ mv "$unrelated_path" "$root/held-unrelated"
 run stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/selected-only" --remote-url "$root/remote"
 mv "$root/held-unrelated" "$unrelated_path"
 run stage --catalogue "$root/bootstrap.dvc" --id unrelated --destination "$root/unrelated" --remote-url "$root/remote"
-cp "$root/unrelated/payload.dvc" "$root/recovered/payload.dvc"
+cp "$root/unrelated/dataset.dvc" "$root/recovered/dataset.dvc"
 reject 1 verify --staged "$root/recovered"
-cp "$root/original-record.dvc" "$root/recovered/payload.dvc"
+cp "$root/original-record.dvc" "$root/recovered/dataset.dvc"
 pass 'selected staging ignores missing unrelated objects; an unrelated record fails verification'
-# Verify that no unrelated payload object was retrieved (the handoff has no cache).
+# Verify that no unrelated dataset object was retrieved (the handoff has no cache).
 [[ $(find "$root/recovered" -type f | wc -l) == 6 ]]
 mv "$root/recovered" "$root/moved"
 run verify --staged "$root/moved"
 pass 'portable handoff verifies after being moved'
-cp "$root/moved/payload/images/original.pgm" "$root/saved-image"
-printf broken > "$root/moved/payload/images/original.pgm"
+cp "$root/moved/dataset/images/original.pgm" "$root/saved-image"
+printf broken > "$root/moved/dataset/images/original.pgm"
 reject 1 verify --staged "$root/moved"
-cp "$root/saved-image" "$root/moved/payload/images/original.pgm"
-cp "$root/moved/payload/masks/original.pgm" "$root/saved-mask"
-printf broken > "$root/moved/payload/masks/original.pgm"
+cp "$root/saved-image" "$root/moved/dataset/images/original.pgm"
+cp "$root/moved/dataset/masks/original.pgm" "$root/saved-mask"
+printf broken > "$root/moved/dataset/masks/original.pgm"
 reject 1 verify --staged "$root/moved"
-cp "$root/saved-mask" "$root/moved/payload/masks/original.pgm"
+cp "$root/saved-mask" "$root/moved/dataset/masks/original.pgm"
 pass 'changed image and mask are rejected'
-mv "$root/moved/payload/images/original.pgm" "$root/removed"
+mv "$root/moved/dataset/images/original.pgm" "$root/removed"
 reject 1 verify --staged "$root/moved"
-mv "$root/removed" "$root/moved/payload/images/original.pgm"
-printf extra > "$root/moved/payload/extra"
+mv "$root/removed" "$root/moved/dataset/images/original.pgm"
+printf extra > "$root/moved/dataset/extra"
 reject 1 verify --staged "$root/moved"
-rm "$root/moved/payload/extra"
-mv "$root/moved/payload/images/original.pgm" "$root/moved/payload/images/renamed.pgm"
+rm "$root/moved/dataset/extra"
+mv "$root/moved/dataset/images/original.pgm" "$root/moved/dataset/images/renamed.pgm"
 reject 1 verify --staged "$root/moved"
-mv "$root/moved/payload/images/renamed.pgm" "$root/moved/payload/images/original.pgm"
+mv "$root/moved/dataset/images/renamed.pgm" "$root/moved/dataset/images/original.pgm"
 pass 'missing, extra, and renamed files are rejected'
-printf ' ' >> "$root/moved/payload.dir"
+printf ' ' >> "$root/moved/dataset.dir"
 reject 1 verify --staged "$root/moved"
-cp "$root/original-index.dir" "$root/moved/payload.dir"
-sed 's/path: payload/path: ..\/escape/' "$root/original-record.dvc" > "$root/moved/payload.dvc"
+cp "$root/original-index.dir" "$root/moved/dataset.dir"
+sed 's/path: dataset/path: ..\/escape/' "$root/original-record.dvc" > "$root/moved/dataset.dvc"
 reject 2 verify --staged "$root/moved"
-cmp "$root/moved/payload.dvc" <(sed 's/path: payload/path: ..\/escape/' "$root/original-record.dvc")
-cp "$root/original-record.dvc" "$root/moved/payload.dvc"
+cmp "$root/moved/dataset.dvc" <(sed 's/path: dataset/path: ..\/escape/' "$root/original-record.dvc")
+cp "$root/original-record.dvc" "$root/moved/dataset.dvc"
 pass 'damaged native index and escaping records fail without rewriting evidence'
-ln -s "$root/saved-image" "$root/moved/payload/link"
+ln -s "$root/saved-image" "$root/moved/dataset/link"
 reject 2 verify --staged "$root/moved"
-rm "$root/moved/payload/link"
-mkfifo "$root/moved/payload/pipe"
+rm "$root/moved/dataset/link"
+mkfifo "$root/moved/dataset/pipe"
 reject 2 verify --staged "$root/moved"
-rm "$root/moved/payload/pipe"
-printf ignored > "$root/moved/payload/.dvcignore"
+rm "$root/moved/dataset/pipe"
+printf ignored > "$root/moved/dataset/.dvcignore"
 reject 2 verify --staged "$root/moved"
-rm "$root/moved/payload/.dvcignore"
-pass 'symlinks, special files, and ignore controls cannot hide payload contents'
+rm "$root/moved/dataset/.dvcignore"
+pass 'symlinks, special files, and ignore controls cannot hide dataset contents'
 reject 2 stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/moved" --remote-url "$root/remote"
 run verify --staged "$root/moved"
 pass 'nonempty staging destination is preserved'
@@ -151,7 +151,7 @@ printf not-a-directory > "$root/broken-remote"
 reject 1 register --dataset "$root/source" --id failure --provenance "$root/provenance.json" --workspace "$root/failure-work" --remote-url "$root/broken-remote" --catalogue "$root/failure.dvc" --new-catalogue
 [[ ! -e $root/failure.dvc ]]
 pass 'push failure produces no success JSON or bootstrap descriptor'
-# Make bootstrap installation fail after payload and archive pushes, then retry.
+# Make bootstrap installation fail after dataset and archive pushes, then retry.
 printf blocked > "$root/blocked-parent"
 reject 1 register --dataset "$root/source" --id retry --provenance "$root/provenance.json" --workspace "$root/retry-work" --remote-url "$root/remote" --catalogue "$root/blocked-parent/retry.dvc" --new-catalogue
 rm "$root/blocked-parent"
@@ -169,7 +169,7 @@ pass 'missing remote cache object stops staging and preserves empty destination'
 (cd "$root/source" && sha256sum -c "$root/source.sha256") > "$root/source-check.log"
 run verify --staged "$root/moved"
 pass 'original synthetic source unchanged; final handoff still verifies'
-# Fail only the metadata-archive push after payload publication.
+# Fail only the metadata-archive push after dataset publication.
 cp "$root/bootstrap.dvc" "$root/shadow.dvc"
 run register --dataset "$root/source" --id metadata-failure --provenance "$root/provenance.json" --workspace "$root/shadow-work" --remote-url "$root/remote" --catalogue "$root/shadow.dvc" --force
 archive_hash=$(sed -n 's/^- md5: //p' "$root/shadow.dvc")
@@ -210,7 +210,7 @@ for unsafe in symlink duplicate absolute malformed; do
       symlink) ln -sf "$root/saved-image" "$root/evil-input/link"; tar -cf catalogue.tar -C "$root/evil-input" link ;;
       duplicate) tar -cf catalogue.tar -C "$root/evil-input" file file ;;
       absolute) tar -cf catalogue.tar --transform='s|file|/absolute-escape|' -C "$root/evil-input" file ;;
-      malformed) mkdir -p "$root/evil-input/$(printf '%064d' 0)"; printf invalid > "$root/evil-input/$(printf '%064d' 0)/payload.dvc"; tar -cf catalogue.tar -C "$root/evil-input" "$(printf '%064d' 0)/payload.dvc" ;;
+      malformed) mkdir -p "$root/evil-input/$(printf '%064d' 0)"; printf invalid > "$root/evil-input/$(printf '%064d' 0)/dataset.dvc"; tar -cf catalogue.tar -C "$root/evil-input" "$(printf '%064d' 0)/dataset.dvc" ;;
     esac
     timeout 30 "$here/.venv/bin/dvc" add catalogue.tar >> "$root/evil.log" 2>&1
     timeout 30 "$here/.venv/bin/dvc" push catalogue.tar.dvc >> "$root/evil.log" 2>&1
@@ -245,11 +245,11 @@ run stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$ro
 pass 'verified staging atomically replaces an empty destination'
 (cd "$root/source" && sha256sum -c "$root/source.sha256") > "$root/source-check.log"
 # Changing bytes while preserving size and mtime must not bypass fresh hashing.
-cp -p "$root/moved/payload/images/original.pgm" "$root/mtime-original"
-sed 's/127/128/' "$root/mtime-original" > "$root/moved/payload/images/original.pgm"
-touch -r "$root/mtime-original" "$root/moved/payload/images/original.pgm"
+cp -p "$root/moved/dataset/images/original.pgm" "$root/mtime-original"
+sed 's/127/128/' "$root/mtime-original" > "$root/moved/dataset/images/original.pgm"
+touch -r "$root/mtime-original" "$root/moved/dataset/images/original.pgm"
 reject 1 verify --staged "$root/moved"
-cp -p "$root/mtime-original" "$root/moved/payload/images/original.pgm"
+cp -p "$root/mtime-original" "$root/moved/dataset/images/original.pgm"
 pass 'fresh DVC hashing detects changed bytes despite identical size and mtime'
 # An operation must never publish cache files into its caller source tree.
 reject 2 register --dataset "$root/source" --id overlap --provenance "$root/provenance.json" --workspace "$root/overlap-work" --remote-url "$root/source/nested-remote" --catalogue "$root/overlap.dvc" --new-catalogue
@@ -262,7 +262,7 @@ chmod u+w "$index_object"
 printf '[{"md5":"%s","relpath":"../escaped"}]' "$object_hash" > "$index_object"
 run stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/safe-index-stage" --remote-url "$root/remote"
 [[ ! -e $root/escaped ]]
-cmp "$root/original-index.dir" "$root/safe-index-stage/payload.dir"
+cmp "$root/original-index.dir" "$root/safe-index-stage/dataset.dir"
 cp "$root/saved-remote-index" "$index_object"
 chmod a-w "$index_object"
 pass 'validated retained index prevents unsafe remote index paths from controlling retrieval'
