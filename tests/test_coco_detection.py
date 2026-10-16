@@ -1,4 +1,4 @@
-"""Verify COCO animal annotations become the first-run binary YOLO contract."""
+"""Verify COCO animal annotations become the binary YOLO contract."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from pathlib import Path
 
 # project
 from feral_vision.data.coco_detection import convert_coco_cat_vs_not_cat_detections
-
 
 # ---------------------------------------------------------------------------
 # Helpers / local fixtures

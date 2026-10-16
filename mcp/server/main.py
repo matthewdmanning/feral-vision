@@ -16,14 +16,15 @@ import os
 import sys
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", ".")).resolve()
 SOURCES_DIR = PROJECT_ROOT / "src" / "feral_vision" / "models" / "sources"
 
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-mcp = FastMCP("model-inspector")
+mcp = MCPServer("model-inspector")
 
 
 # ---------------------------------------------------------------------------
@@ -71,16 +72,15 @@ def _resolve_adapter(source: str):
 
     Raises
     ------
-    KeyError
-        If no adapter file declares ``SOURCE_KEY = source``.
-    RuntimeError
-        If the adapter file is found but contains no ``SourceAdapter`` subclass.
+    ToolError
+        If no adapter file declares ``SOURCE_KEY = source``, or the adapter
+        contains no ``SourceAdapter`` subclass.
     """
     from feral_vision.models.sources.SourceAdapter import SourceAdapter
 
     adapters = _load_adapters()
     if source not in adapters:
-        raise KeyError(f"no adapter for {source!r}; available: {sorted(adapters)}")
+        raise ToolError(f"no adapter for {source!r}; available: {sorted(adapters)}")
 
     path = adapters[source]
     spec = importlib.util.spec_from_file_location(path.stem, path)
@@ -98,7 +98,7 @@ def _resolve_adapter(source: str):
                 return obj()
         except Exception:
             continue
-    raise RuntimeError(f"no SourceAdapter subclass found in {path}")
+    raise ToolError(f"no SourceAdapter subclass found in {path}")
 
 
 def _build_cfg(
@@ -225,12 +225,14 @@ def read_adapter(source_key: str) -> str:
 
     Raises
     ------
-    KeyError
+    ToolError
         If no adapter declares the given ``source_key``.
     """
     adapters = _load_adapters()
     if source_key not in adapters:
-        raise KeyError(f"unknown adapter {source_key!r}; available: {sorted(adapters)}")
+        raise ToolError(
+            f"unknown adapter {source_key!r}; available: {sorted(adapters)}"
+        )
     return adapters[source_key].read_text(encoding="utf-8")
 
 

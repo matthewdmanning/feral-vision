@@ -17,14 +17,19 @@ user confirmation.
 
 #### General
 
-A DVC `dvc.lock` record that identifies a Dataset folder and its structured
-provenance, including source Datasets and applicable operations, parameters,
-image order, and random seeds. It is Data Lineage.
+A DVC metadata record identifying a Dataset folder version: a `.dvc` file for
+an added Dataset or a `dvc.lock` record for a pipeline output, together with
+structured provenance including source Datasets and applicable operations,
+parameters, image order, and random seeds. It is Data Lineage. `dvc add` records
+contents; the workflow must retain the associated provenance.
 
 #### Feral Vision backend
 
-The record is published as `dvc.lock`; DVC manages the Dataset folder in its
-remote.
+The published Cloud Storage prefix `datasets/<source>/<split>/<artifact>/`. It
+holds `payload/` and `dataset-artifact.json`, the provenance manifest that GPU
+training consumes and hashes. Each prepared Dataset is registered independently through `dvc add` and
+`dvc push`. The cloud publisher still needs to link its published input to that
+DVC version; GPU training does not use DVC metadata.
 
 _Avoid_: Dataset, Model Artifact
 
@@ -57,8 +62,12 @@ Make a Dataset or Dataset Variant available through the DVC Registry.
 
 #### Feral Vision backend
 
-Publication records the immutable Dataset folder with DVC, pushes its managed
-data, and writes `dvc.lock` to a reviewed Dataset Artifact prefix.
+The implemented cloud publisher uploads a retained `payload/` and
+`dataset-artifact.json` to a reviewed Dataset Artifact prefix. It does not
+call the separate Dataset registration script or link its manifest to a DVC
+version yet; connecting those steps is outstanding upstream work. Standalone
+Dataset registration uses `.dvc` metadata and does not require `dvc.lock`. See the
+[Dataset guide](../guide/dataset.rst).
 
 _Avoid_: Assuming that acquisition and publishing are interchangeable
 
@@ -71,8 +80,12 @@ metadata. It is distinct from a DVC remote, which stores DVC-managed data.
 
 #### Feral Vision backend
 
-The dataset-only bucket is the Dataset Artifact catalog and DVC remote.
-`dvc.lock` identifies the selected Dataset folder version.
+The dataset-only bucket holds the Dataset Artifact catalog; its `/dvc` prefix
+is the intended DVC remote. These storage locations alone do not establish a
+versioned DVC Registry. A DVC-recorded Dataset version and its connection to the
+published training input remain required for the integrated cloud publication
+workflow. Registration is per Dataset; no fixed preparation pipeline owns
+entire raw/processed/augmented directories.
 
 _Avoid_: DVC remote, general operational storage
 

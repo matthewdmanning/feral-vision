@@ -37,6 +37,8 @@ jobs:
         python-version: ${{ fromJSON(inputs.python-versions) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -51,7 +53,7 @@ jobs:
             BASE_SHA="HEAD^"
             HEAD_SHA="HEAD"
           fi
-          mapfile -t PYTHON_FILES < <(git diff --name-only "$BASE_SHA...$HEAD_SHA" -- '*.py')
+          mapfile -t PYTHON_FILES < <(git diff --name-only --diff-filter=ACMRT "$BASE_SHA...$HEAD_SHA" -- '*.py')
           if [ "${#PYTHON_FILES[@]}" -eq 0 ]; then
             echo "No changed Python files to lint or format-check."
             exit 0

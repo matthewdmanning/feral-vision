@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-# third-party
 import pytest
 import torch
 from hydra import compose, initialize
@@ -10,13 +9,8 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig
 from torch import nn
 
-# project
 from feral_vision.config.store import register_configs
 from feral_vision.models.register_model import model_builder
-
-# ---------------------------------------------------------------------------
-# Helpers / local fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(autouse=True)
@@ -32,7 +26,7 @@ def _registered_and_isolated_hydra() -> None:
 def local_model_cfg() -> DictConfig:
     """Compose the canonical recipe with the local in-repository model."""
     with initialize(version_base=None, config_path="../conf"):
-        return compose(config_name="runs/baseline", overrides=["model=net"]).model
+        return compose(config_name="runs/detection", overrides=["model=net"]).model
 
 
 @pytest.fixture
@@ -50,11 +44,6 @@ def built_local_model(local_model_cfg: DictConfig) -> nn.Module:
 def local_model_input(request: pytest.FixtureRequest) -> torch.Tensor:
     """Provide supported 32x32 RGB batches across representative batch sizes."""
     return torch.ones(request.param, 3, 32, 32)
-
-
-# ---------------------------------------------------------------------------
-# Local model construction
-# ---------------------------------------------------------------------------
 
 
 def test_model_builder_builds_local_model_with_batched_logits(

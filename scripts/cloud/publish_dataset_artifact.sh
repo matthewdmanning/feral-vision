@@ -1,48 +1,32 @@
 #!/bin/sh
+# Publish a Dataset Artifact: plain payload/ and dataset-artifact.json, which
+# lists every payload file with its SHA-256 and Cloud Storage generation.
 set -eu
 
-: "${GCS_BUCKET:?GCS_BUCKET must be set}"
+: "${GCS_URI_PREFIX:?GCS_URI_PREFIX must be set}"
+
+: "${TRAINING_DATA_BUCKET_URI:?TRAINING_DATA_BUCKET_URI must be set}"
 : "${DATASET_ARTIFACT_PREFIX:?DATASET_ARTIFACT_PREFIX must be set}"
 
 payload_dir="${DATASET_PAYLOAD_DIR:-/workspace/payload}"
-workspace_dir="${DVC_WORKSPACE_DIR:-/workspace}"
+input_path="${DATASET_INPUT_PATH:-/workspace/dataset-input.json}"
+retention_days="${DATASET_RETENTION_DAYS:-365}"
 
-case "$payload_dir" in
-  "$workspace_dir"/*) ;;
-  *)
-    echo "DATASET_PAYLOAD_DIR must be inside DVC_WORKSPACE_DIR" >&2
-    exit 1
-    ;;
-esac
-
-cd "$workspace_dir"
-dvc init --no-scm
-dvc remote add --default dataset "gs://${GCS_BUCKET}/${DATASET_ARTIFACT_PREFIX}"
-
-lock_path="$(python3 - "$payload_dir" "$workspace_dir" <<'PY'
-import sys
-from pathlib import Path
-
-from feral_vision.data.dataset_artifact import version_dataset
-
-print(version_dataset(Path(sys.argv[1]), workspace=Path(sys.argv[2])))
-PY
-)"
-
-dvc push
-
-python3 - "$lock_path" <<'PY'
+python3 - "$payload_dir" "$input_path" "$retention_days" <<'PY'
 import os
 import sys
 from pathlib import Path
 
 from google.cloud import storage
-from feral_vision.data.dataset_artifact import publish_dataset_lock
 
-print(publish_dataset_lock(
+from feral_vision.data.dataset_artifact import publish_dataset_artifact
+
+print(publish_dataset_artifact(
     storage.Client(),
-    bucket_name=os.environ["GCS_BUCKET"],
+    bucket_name=os.environ["TRAINING_DATA_BUCKET_URI"].removeprefix(os.environ["GCS_URI_PREFIX"]).rstrip("/"),
     artifact_prefix=os.environ["DATASET_ARTIFACT_PREFIX"],
-    lock_path=Path(sys.argv[1]),
+    payload_root=Path(sys.argv[1]),
+    input_path=Path(sys.argv[2]),
+    retention_days=int(sys.argv[3]),
 ))
 PY

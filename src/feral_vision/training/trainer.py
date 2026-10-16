@@ -13,7 +13,6 @@ import copy
 import hashlib
 import math
 import os
-import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator
@@ -30,8 +29,6 @@ logger = get_logger(__name__)
 
 DEFAULT_BEST_MODEL_PATH: str = "models/registry/best.pt"
 INITIAL_BEST_LOSS: float = math.inf
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_DVC_PIPELINE_PATH = _PROJECT_ROOT / "dvc.yaml"
 
 LossFn = Callable[[Any, Any], torch.Tensor]
 
@@ -92,46 +89,46 @@ def _try_log_metric(name: str, value: float, step: int) -> None:
         pass
 
 
-def _dvc_data_version(tracker_path: Path) -> str:
-    """Identify a staged DVC tracker without running DVC."""
-    if tracker_path.name in {"data.dvc", "dvc.lock", "dataset-artifact.dvc"}:
-        digest = hashlib.sha256(tracker_path.read_bytes()).hexdigest()
-        return f"{tracker_path.name}@sha256:{digest}"
+def _dataset_artifact_manifest_path(cfg: Any) -> Path | None:
+    """Resolve the upstream Dataset Artifact manifest consumed by training."""
+    configured_path = os.environ.get("DATASET_ARTIFACT_MANIFEST")
+    if configured_path:
+        return Path(configured_path)
 
-    try:
-        commit = subprocess.check_output(
-            ["git", "-C", str(_PROJECT_ROOT), "rev-parse", "HEAD"],
-            text=True,
-        ).strip()
-        return f"dvc.yaml@{commit}"
-    except (OSError, subprocess.CalledProcessError):
-        digest = hashlib.sha256(_DVC_PIPELINE_PATH.read_bytes()).hexdigest()
-        return f"dvc.yaml@sha256:{digest}"
+    data_root = getattr(getattr(cfg, "data", None), "root", None)
+    if data_root:
+        return Path(str(data_root)) / "dataset-artifact.json"
+    return None
 
 
-def _try_log_dvc_lineage(cfg: Any) -> None:
-    """Record the DVC pipeline metadata and tracker file in an active MLflow run."""
+def _try_log_dataset_lineage(cfg: Any) -> None:
+    """Record the exact upstream Dataset Artifact manifest in an active MLflow run."""
     try:
         import mlflow
 
-        data_root = getattr(getattr(cfg, "data", None), "root", None)
-        staged_trackers = (
-            [
-                Path(str(data_root)) / name
-                for name in ("dataset-artifact.dvc", "dvc.lock", "data.dvc")
-            ]
-            if data_root
-            else []
-        )
-        tracker_path = next(
-            (candidate for candidate in staged_trackers if candidate.exists()),
-            _DVC_PIPELINE_PATH,
-        )
-        if mlflow.active_run() is not None and tracker_path.exists():
-            mlflow.log_param("dvc_data_version", _dvc_data_version(tracker_path))
-            mlflow.log_artifact(str(tracker_path), artifact_path="data_lineage")
+        manifest_path = _dataset_artifact_manifest_path(cfg)
+        if (
+            mlflow.active_run() is None
+            or manifest_path is None
+            or not manifest_path.is_file()
+        ):
+            return
+
+        digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        expected_digest = os.environ.get("DATASET_ARTIFACT_SHA256")
+        if expected_digest and digest != expected_digest:
+            raise ValueError(
+                "dataset-artifact.json changed after deployment validation: "
+                f"expected {expected_digest}, got {digest}"
+            )
+
+        mlflow.log_param("dataset_artifact_sha256", digest)
+        dataset_artifact_uri = os.environ.get("DATASET_ARTIFACT_URI")
+        if dataset_artifact_uri:
+            mlflow.log_param("dataset_artifact_uri", dataset_artifact_uri)
+        mlflow.log_artifact(str(manifest_path), artifact_path="data_lineage")
     except Exception:  # pragma: no cover - logging must never break training
-        pass
+        logger.exception("Failed to record Dataset Artifact lineage")
 
 
 @contextmanager
@@ -327,7 +324,7 @@ class Trainer:
         """Train while recording the configured MLflow run when available."""
         with _active_mlflow_run(self.cfg):
             _try_log_resolved_config(self.cfg)
-            _try_log_dvc_lineage(self.cfg)
+            _try_log_dataset_lineage(self.cfg)
             history = self._fit(dataloader, val_dataset)
             self._try_log_model()
             return history
@@ -450,7 +447,7 @@ def main() -> None:
     register_configs()
 
     @hydra.main(
-        version_base=None, config_path="../../../conf", config_name="runs/baseline"
+        version_base=None, config_path="../../../conf", config_name="runs/detection"
     )
     def _run(cfg: Any) -> None:
         from torch.utils.data import DataLoader

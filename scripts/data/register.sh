@@ -1,20 +1,27 @@
 #!/usr/bin/env bash
-# Register prepared data in DVC's GCS remote and publish its cloud-side tracker.
-
+# Register exactly one prepared Dataset; workflow scripts own its production.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=common.sh
-source "${SCRIPT_DIR}/common.sh"
+if [[ $# -ne 1 ]]; then
+    echo "usage: scripts/data/register.sh DATASET_ROOT" >&2
+    exit 2
+fi
 
-DATA_ROOT="${DATA_ROOT:-${DATA_SCRIPTS_ROOT}/data}"
-DATA_URI="$(gcs_data_uri)"
+dataset_root="$(realpath -e -- "$1")"
+repo_root="$(realpath -e -- "$(dvc root)")"
+case "$dataset_root/" in
+    "$repo_root/"?*) ;;
+    *) echo "Dataset must be inside the DVC repository: $dataset_root" >&2; exit 1 ;;
+esac
 
-require_command gcloud
+for directory in images annotations; do
+    if [[ ! -d "$dataset_root/$directory" ]]; then
+        echo "Dataset must contain $directory/: $dataset_root" >&2
+        exit 1
+    fi
+done
 
-cd "$DATA_SCRIPTS_ROOT"
-configure_dvc_remote
-uv run dvc push "$@"
-
-gcloud storage rsync --recursive "$DATA_ROOT" "$DATA_URI"
-gcloud storage cp dvc.lock "${DATA_URI%/}/dvc.lock"
+cd "$repo_root"
+dvc config core.remote >/dev/null
+dvc add "$dataset_root"
+dvc push "${dataset_root}.dvc"
