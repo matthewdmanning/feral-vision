@@ -1,0 +1,99 @@
+# Gitleaks config for feral-vision. Gitleaks reads it from the repo root.
+title = "feral-vision gitleaks config"
+
+[extend]
+# Keep built-in rules (GCP API keys, Hugging Face tokens, generic keys).
+useDefault = true
+
+# Path-only rules: block these files from any commit, whatever they contain.
+[[rules]]
+id = "env-file"
+description = "Environment file"
+path = '''(^|/)\.env(\.[A-Za-z0-9_-]+)?$'''
+
+[[rules]]
+id = "terraform-tfvars"
+description = "Terraform variable file (may hold project or bucket values)"
+path = '''\.tfvars(\.json)?$'''
+
+# Content rules.
+[[rules]]
+id = "gcp-service-account-key"
+description = "GCP service account key file"
+path = '''\.json$'''
+regex = '''"type"\s*:\s*"service_account"'''
+keywords = ["service_account"]
+
+[[rules]]
+id = "dvc-remote-credentials"
+description = "Credentials in DVC config"
+path = '''(^|/)\.dvc/config(\.local)?$'''
+regex = '''(?i)(secret_access_key|access_key_id|credentialpath|password|token)\s*=\s*\S+'''
+keywords = ["secret_access_key", "access_key_id", "credentialpath", "password", "token"]
+
+# Blocked strings (broad on purpose).
+[[rules]]
+id = "blocked-gcs-uri"
+description = "GCS bucket URI"
+regex = '''gs://'''
+keywords = ["gs://"]
+
+[[rules]]
+id = "blocked-github-token"
+description = "GitHub token"
+regex = '''gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{80,}'''
+keywords = ["ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_"]
+
+[[rules]]
+id = "blocked-hf-token"
+description = "Hugging Face token"
+regex = '''hf_[A-Za-z0-9]{34}'''
+keywords = ["hf_"]
+
+[[rules]]
+id = "blocked-anthropic-key"
+description = "Anthropic API or admin key"
+regex = '''sk-ant-(api03|admin01)-[A-Za-z0-9_-]{80,}'''
+keywords = ["sk-ant-"]
+
+[[rules]]
+id = "blocked-gcp-api-key"
+description = "GCP API key"
+regex = '''AIza[0-9A-Za-z_-]{35}'''
+keywords = ["aiza"]
+
+[[rules]]
+id = "blocked-gcp-oauth-client-secret"
+description = "GCP OAuth client secret"
+regex = '''GOCSPX-[A-Za-z0-9_-]{28}'''
+keywords = ["gocspx-"]
+
+[[rules]]
+id = "blocked-gcp-oauth-access-token"
+description = "GCP OAuth access token"
+regex = '''ya29\.[0-9A-Za-z_-]{20,}'''
+keywords = ["ya29."]
+
+[[rules]]
+id = "blocked-private-key-block"
+description = "Private key block"
+regex = '''-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'''
+keywords = ["private key-----"]
+
+[[rules]]
+id = "blocked-service-account-email"
+description = "GCP service account email"
+regex = '''[a-z0-9-]+@[a-z0-9-]+\.iam\.gserviceaccount\.com'''
+keywords = ["iam.gserviceaccount.com"]
+
+[[rules]]
+id = "blocked-secret-manager-path"
+description = "GCP Secret Manager resource path"
+regex = '''projects/[0-9]+/secrets/[A-Za-z0-9_-]+'''
+keywords = ["/secrets/"]
+
+# Safe template files.
+[[allowlists]]
+description = "Example files hold placeholders only"
+targetRules = ["env-file", "terraform-tfvars"]
+paths = ['''\.example$''', '''\.tfvars\.example$''']

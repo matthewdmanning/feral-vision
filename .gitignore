@@ -18,11 +18,16 @@ mlflow.db
 mlruns/
 mlflow.db
 
-*local*
+*.local*
+.local/
+!locals.tf
 
 # DVC-tracked data and model artifacts
 /data/**
+!/data/**/
 !/data/**/.gitkeep
+!/data/**/*.dvc
+!/data/**/.gitignore
 /models/**
 !/models/**/.gitkeep
 .dvc/tmp/
@@ -33,18 +38,25 @@ mlflow.db
 .codex/config.toml
 .codex/hooks/github_auth.py
 
-# Terraform local working state and plan artifacts
+# Terraform local working state, plans, and generated preflight reports
 terraform/.terraform/
 **/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/*.tfplan
+terraform/preflight/reports/
+# Run inputs name the project, service account, buckets, and image digest.
+*.tfvars
+
+# Private inventory of sensitive values and where they live.
+.agents/secrets.md
+
 CLAUDE.md
 bash.exe.stackdump
 .coverage
 coverage.xml
 example_augment.txt
-yolo11n-seg.pt
+*.pt
 docs/_build
 docs/external_refs/mlflow_examples.md
 .vscode/tasks.json
@@ -56,4 +68,4 @@ docs/external_refs/mlflow_examples.md
 aug_preview/
 
 # Ephemeral first augmented detection-run evidence
-artifacts/detection_first_run_augmented/
+artifacts/*/

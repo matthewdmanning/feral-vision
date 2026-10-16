@@ -12,6 +12,7 @@
       "command": "uv",
       "args": [
         "run",
+        "--frozen",
         "--project",
         "${user_config.projectDir}",
         "python",

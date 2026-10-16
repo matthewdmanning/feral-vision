@@ -6,8 +6,8 @@ if [[ $# -ne 1 ]]; then
   exit 2
 fi
 
-if [[ -z "${GCS_BUCKET:-}" ]]; then
-  echo "GCS_BUCKET must name the destination bucket." >&2
+if [[ -z "${TRAINING_DATA_BUCKET_URI:-}" ]]; then
+  echo "TRAINING_DATA_BUCKET_URI must name the destination bucket." >&2
   exit 2
 fi
 
@@ -57,10 +57,6 @@ if [[ ! -f "$model_path" ]]; then
   exit 1
 fi
 
-bucket="${GCS_BUCKET%/}"
-if [[ "$bucket" != gs://* ]]; then
-  bucket="gs://$bucket"
-fi
-destination="$bucket/models/pretrained/$(basename "$model_path")"
+destination="${TRAINING_DATA_BUCKET_URI%/}/models/pretrained/$(basename "$model_path")"
 gcloud storage cp "$model_path" "$destination"
 echo "staged $model_path to $destination"

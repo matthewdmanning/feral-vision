@@ -1,5 +1,13 @@
 # Agent-instructions overlap audit
 
+## Status
+
+Historical assessment of the 2026-08-01 guide layout. Several cited guides have
+since been removed or consolidated; the findings and line numbers below are
+not a current instruction map. Use
+[the canonical project instructions](../agents/project_instructions.md) for
+current routing. This note does not revalidate the original findings.
+
 ## Scope and method
 
 Reviewed every tracked Markdown guide under `docs/agents/` as present on

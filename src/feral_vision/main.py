@@ -23,7 +23,7 @@ def _flatten_params(obj, prefix: str = "") -> dict[str, object]:
     return flat
 
 
-@hydra.main(version_base=None, config_path="../../conf", config_name="runs/baseline")
+@hydra.main(version_base=None, config_path="../../conf", config_name="runs/detection")
 def main(cfg: DictConfig) -> None:
     register_configs()
 

@@ -6,7 +6,7 @@ from importlib import import_module
 from pathlib import Path
 
 import pytest
-from hydra import compose, initialize, initialize_config_dir
+from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from hydra.errors import ConfigCompositionException
 from omegaconf import DictConfig, OmegaConf
@@ -20,13 +20,14 @@ from feral_vision.models.register_model import get_adapter
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 _CONF_ROOT = _REPOSITORY_ROOT / "conf"
+_CANONICAL_RECIPE = _CONF_ROOT / "runs" / "detection.yaml"
 _REQUIRED_CONCERNS = frozenset(
     {"data", "model", "train", "inference", "tracking", "augmentation"}
 )
 
 
 def _recipe_paths() -> tuple[Path, ...]:
-    """Return every executable or test-only recipe path in the configuration tree."""
+    """Return every complete executable or test-only recipe path."""
     paths: list[Path] = []
     for directory in ("runs", "testing"):
         recipe_dir = _CONF_ROOT / directory
@@ -49,12 +50,6 @@ def _compose_recipe(path: Path, overrides: list[str] | None = None) -> DictConfi
     """Compose one complete recipe after registering the structured schemas."""
     with initialize(version_base=None, config_path="../conf"):
         return compose(config_name=_config_name(path), overrides=overrides or [])
-
-
-def _compose_deploy(overrides: list[str] | None = None) -> DictConfig:
-    """Compose the root-level deployment configuration and its schema."""
-    with initialize_config_dir(version_base=None, config_dir=str(_REPOSITORY_ROOT)):
-        return compose(config_name="deploy/cloudbuild", overrides=overrides or [])
 
 
 def _resolve_dotted_name(dotted_name: str) -> object:
@@ -107,37 +102,11 @@ def test_test_recipe_is_cpu_safe(recipe_path: Path) -> None:
 
 
 def test_recipe_rejects_unknown_structured_override() -> None:
-    """Run Recipes reject fields outside their registered structured schemas."""
+    """The canonical Run Recipe rejects fields outside registered schemas."""
     with pytest.raises(
         ConfigCompositionException, match="Could not override 'train.nope'"
     ):
-        _compose_recipe(_CONF_ROOT / "runs" / "baseline.yaml", ["train.nope=1"])
-
-
-# ---------------------------------------------------------------------------
-# Deployment inputs — typed, declarative configuration
-# ---------------------------------------------------------------------------
-
-
-def test_cloudbuild_config_composes_against_its_deploy_schema() -> None:
-    """Deployment inputs are declarative values, not an embedded workflow."""
-    cfg = _compose_deploy()
-
-    assert cfg.deploy.substitutions._REGION
-    assert cfg.deploy.substitutions._REPO
-    assert cfg.deploy.substitutions._GCP_PROJECT
-    assert cfg.deploy.substitutions._BASE_IMAGE_NAME
-    assert cfg.deploy.substitutions._IMAGE_NAME
-    assert cfg.deploy.substitutions._IMAGE_TAG
-
-
-def test_cloudbuild_config_rejects_unknown_structured_override() -> None:
-    """Deployment inputs reject fields that no deployment script consumes."""
-    with pytest.raises(
-        ConfigCompositionException,
-        match="Could not override 'deploy.substitutions._NOT_A_PARAMETER'",
-    ):
-        _compose_deploy(["deploy.substitutions._NOT_A_PARAMETER=1"])
+        _compose_recipe(_CANONICAL_RECIPE, ["train.nope=1"])
 
 
 # ---------------------------------------------------------------------------
@@ -154,9 +123,7 @@ def test_model_variant_has_a_resolvable_source_location_and_schema(
     model_path: Path,
 ) -> None:
     """Each selectable model declares a source, identifier, and importable location."""
-    cfg = _compose_recipe(
-        _CONF_ROOT / "runs" / "baseline.yaml", [f"model={model_path.stem}"]
-    )
+    cfg = _compose_recipe(_CANONICAL_RECIPE, [f"model={model_path.stem}"])
     architecture = cfg.model.architecture
 
     assert architecture.source
