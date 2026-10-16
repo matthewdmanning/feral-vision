@@ -52,8 +52,11 @@ def describe_role(
     ).strip()
     if output:
       return json.loads(output)
-  except (subprocess.SubprocessError, OSError, json.JSONDecodeError):
-    pass
+  except (subprocess.SubprocessError, OSError, json.JSONDecodeError) as exc:
+    print(
+        f"Warning: Failed to describe role '{role_id}': {exc}",
+        file=sys.stderr,
+    )
   return None
 
 
