@@ -123,8 +123,12 @@ def main() -> None:
           text=True,
           stderr=subprocess.DEVNULL,
       ).strip()
-    except (subprocess.SubprocessError, OSError):
-      pass
+    except (subprocess.SubprocessError, OSError) as e:
+      print(
+          "Warning: unable to determine gcloud project from local config; "
+          f"continuing without TARGET_PROJECT_ID ({e})",
+          file=sys.stderr,
+      )
 
   enable_service(target_project_id)
   token = get_access_token()
