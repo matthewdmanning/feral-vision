@@ -59,8 +59,8 @@ of the existing stem-matched payload. Their default output is a CHW image tensor
 plus loaded Annotation objects. TorchVision decoding preserves channel count
 and supported source bit depth, including grayscale/RGBA and uint16 PNG; RGB
 conversion, scaling, and normalization require the selected processor. `target_transform` selects an existing
-conversion when a consumer needs tensors. `FeralDataset` has separate legacy
-task-keyed annotation semantics; its names do not define native provider tasks.
+conversion when a consumer needs tensors. These are the retained project
+dataset implementations; native library datasets remain selectable through Hydra.
 
 Labeled inference uses `Predictor.predict_dataset`: it yields native
 predictions alongside original targets without forwarding labels into the
