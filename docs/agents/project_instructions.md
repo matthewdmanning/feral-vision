@@ -24,9 +24,9 @@ do not use this naming convention.
 ## Code location
 
 [Module layout](../domain/modules.md) is authoritative for the released library,
-templates, production implementation, and development tools. The current
-`src/feral_vision/` tree has not yet been migrated to that layout; its location
-alone does not establish whether a responsibility belongs in the release.
+templates, production implementation, and development tools. The released
+`src/sightkit_learn/` package contains reusable behavior; concrete recipes,
+cloud resources, and acquisition scripts live in `feral-vision/`.
 
 The library includes the training loop and reusable training orchestration.
 Executable control flow is not evidence that code is production-specific.
@@ -74,7 +74,7 @@ the action.
 
 The one sanctioned live read is the training-image check. Before you say that
 the training image is missing, or build it, run
-[`scripts/cloud/check_training_image.sh`](../../scripts/cloud/check_training_image.sh).
+[`feral-vision/scripts/cloud/check_training_image.sh`](../../feral-vision/scripts/cloud/check_training_image.sh).
 See [Check for an existing image first](cloudops.md#check-for-an-existing-image-first).
 
 ## Agent references
@@ -93,7 +93,7 @@ See [Check for an existing image first](cloudops.md#check-for-an-existing-image-
 | locating a Hydra configuration concern | [Hydra configuration index](hydra.md) | Configuration README index by concern. Tool ownership: **Hydra**. |
 | Terraform modules, state, plans, or Cloud Resource lifecycle | [Terraform](terraform.md) | Terraform ownership, file map, state, and plan safety. Tool ownership: **Terraform**. |
 | cloud identity, image builds, VMs, or cloud training | [Cloud Operations](cloudops.md) | Cloud-service credentials and operational entrypoints. Tool ownership: **Scripts and source code**. |
-| **a claim that the training image is or is not built, or a decision to build it** | [Check for an existing image first](cloudops.md#check-for-an-existing-image-first) | **Run `scripts/cloud/check_training_image.sh` first.** Earlier agents built the image, forgot, and said it did not exist. |
+| **a claim that the training image is or is not built, or a decision to build it** | [Check for an existing image first](cloudops.md#check-for-an-existing-image-first) | **Run `feral-vision/scripts/cloud/check_training_image.sh` first.** Earlier agents built the image, forgot, and said it did not exist. |
 | Git, GitHub Issues, pull requests, or publishing | [GitHub workflow](github.md) | Session checks, authentication, issue tracking, and branch/PR hygiene. |
 | domain terminology or an architectural decision | [Domain Docs](domain.md) | Glossary and ADR discovery. |
 | an agent reached for the wrong tool or source despite these routing instructions | [Pointer failures](pointer_failures.md) | Log of wrong-tool and wrong-source selections, with the agent's stated reason. |

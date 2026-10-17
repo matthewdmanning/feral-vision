@@ -1,26 +1,23 @@
 Data
 ====
 
-.. automodule:: feral_vision.data.loading
+.. automodule:: sightkit_learn.data.loading
    :members:
 
-.. automodule:: feral_vision.data.batching
+.. automodule:: sightkit_learn.data.batching
    :members:
 
-.. automodule:: feral_vision.data.dataset
+.. automodule:: sightkit_learn.data.dataset
    :members:
 
-.. automodule:: feral_vision.data.augmentations
+.. automodule:: sightkit_learn.data.augmentations
    :members:
 
-.. automodule:: feral_vision.data.annotations
+.. automodule:: sightkit_learn.data.annotations
    :members:
 
-.. automodule:: feral_vision.data.transforms
+.. automodule:: sightkit_learn.data.transforms
    :members:
 
-.. automodule:: feral_vision.data.fetch
-   :members:
-
-.. automodule:: feral_vision.data.coco_to_yolo
+.. automodule:: sightkit_learn.data.coco_to_yolo
    :members:

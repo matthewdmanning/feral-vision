@@ -72,10 +72,10 @@ command records and uploads it:
 
    bash -euc '
    : "${DATASET_ROOT:?Export the selected prepared Dataset directory}"
-   uv tool run --from "dvc[gs]==3.67.1" bash scripts/data/register.sh "$DATASET_ROOT"
+   uv tool run --from "dvc[gs]==3.67.1" bash feral-vision/scripts/data/register.sh "$DATASET_ROOT"
    '
 
-``scripts/data/register.sh`` verifies the directory, requires a default remote,
+``feral-vision/scripts/data/register.sh`` verifies the directory, requires a default remote,
 then runs these operations for exactly that root:
 
 .. code-block:: bash
@@ -132,11 +132,11 @@ The implemented producers have different contracts:
   ``annotations/coco_train2017/instances_train2017_animals.json`` under its
   configured root. It reuses existing files and skips failed image downloads
   after logging warnings. Completion alone does not prove a complete Dataset.
-* ``export_coco_train2017`` in ``scripts/pull_coco_train2017.py`` uses FiftyOne's
+* ``export_coco_train2017`` in ``feral-vision/scripts/pull_coco_train2017.py`` uses FiftyOne's
   COCO 2017 train detection zoo and the ten animal classes, with a sample limit
   of ``max_epochs * batch_size``. It writes flat ``images/`` and
   ``annotations/instances.json`` and refuses an existing export directory.
-* ``preprocess`` in ``data/transforms.py`` transforms one image in memory; it
+* ``preprocess`` in ``src/sightkit_learn/data/transforms.py`` transforms one image in memory; it
   is not a Dataset-producing stage. The older image-only ``run_augment_stage``
   does not preserve detection annotations and is not the registration workflow.
 * ``materialize_detection_variant`` co-transforms YOLO boxes and images using
@@ -184,18 +184,18 @@ and :doc:`training` for task-specific training batch contracts.
 Cloud publication: existing implementation
 ------------------------------------------
 
-``deploy/cloudbuild.prepare.yaml`` runs two images sharing ``/workspace``:
+``feral-vision/deploy/cloudbuild.prepare.yaml`` runs two images sharing ``/workspace``:
 
-1. ``_ACQUISITION_IMAGE`` runs ``scripts/cloud/acquire_data_subset.sh`` with
+1. ``_ACQUISITION_IMAGE`` runs ``feral-vision/scripts/cloud/acquire_data_subset.sh`` with
    ``MAX_EPOCHS`` and ``BATCH_SIZE`` (build defaults 50 and 16). It writes
    ``payload/images/``, ``payload/annotations/instances.json``, and
    ``dataset-input.json``. Metadata contains ``dataset``, ``source``, and
    ``provenance`` with classes, sample limit, and ``random_seed: null``.
-2. ``_DVC_IMAGE`` runs ``scripts/cloud/publish_dataset_artifact.sh`` and calls
+2. ``_DVC_IMAGE`` runs ``feral-vision/scripts/cloud/publish_dataset_artifact.sh`` and calls
    ``publish_dataset_artifact``. Despite the image substitution name, it runs
    no DVC commands. Its Dockerfile is now
-   ``deploy/dataset-publisher/Dockerfile``, selected by
-   ``deploy/cloudbuild.dvc-image.yaml``.
+   ``feral-vision/deploy/dataset-publisher/Dockerfile``, selected by
+   ``feral-vision/deploy/cloudbuild.dvc-image.yaml``.
 
 Required substitutions are ``_ACQUISITION_IMAGE``, ``_DVC_IMAGE``,
 ``_TRAINING_DATA_BUCKET_URI``, ``_DATASET_ARTIFACT_PREFIX``, and
@@ -231,7 +231,7 @@ needs integration with the exact registered DVC Dataset version.
 Remaining training seam
 -----------------------
 
-``scripts/cloud/materialize_detection_variant.sh`` ends by importing the absent
+``feral-vision/scripts/cloud/materialize_detection_variant.sh`` ends by importing the absent
 ``publish_dataset_variant_artifact``. Its per-image YOLO output also conflicts
 with preflight/startup's requirement for a pinned
 ``payload/annotations/instances.json`` generation. Resolve these gaps before

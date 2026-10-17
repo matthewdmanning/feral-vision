@@ -24,21 +24,21 @@ an identity credential for Terraform or Compute Engine.
 There is one supported GPU training path:
 
 ~~~text
-conf/runs/detection.yaml
+feral-vision/conf/runs/detection.yaml
         |
-deploy/Dockerfile.gcp
+feral-vision/deploy/Dockerfile.gcp
         |
-deploy/cloudbuild.training-image.yaml
+feral-vision/deploy/cloudbuild.training-image.yaml
         |
-scripts/cloud/build_training_image.sh
+feral-vision/scripts/cloud/build_training_image.sh
         |
 digest-pinned Artifact Registry image
         |
-terraform/preflight/preflight.py
+feral-vision/terraform/preflight/preflight.py
         |
-terraform/runs/detection/
+feral-vision/terraform/runs/detection/
         |
-scripts/runs/detection.sh
+feral-vision/scripts/runs/detection.sh
 ~~~
 
 Do not add a run-specific training Dockerfile, duplicate Run Recipe, alternate
@@ -79,12 +79,12 @@ artifact, a changed manifest hash, or a missing pinned object generation.
 
 ## Training image
 
-The canonical image is [`deploy/Dockerfile.gcp`](../../deploy/Dockerfile.gcp).
+The canonical image is [`feral-vision/deploy/Dockerfile.gcp`](../../feral-vision/deploy/Dockerfile.gcp).
 It starts from a digest-pinned NVIDIA CUDA 13 base and installs the locked
 project environment. The lock currently pins PyTorch 2.12.1 with CUDA 13
 user-space dependencies, including cuDNN; do not add a second cuDNN runtime to
 the base image. The image also contains `gcloud` and uses
-[`scripts/runs/container_train.sh`](../../scripts/runs/container_train.sh) as
+[`feral-vision/scripts/runs/container_train.sh`](../../feral-vision/scripts/runs/container_train.sh) as
 its entrypoint.
 
 The CUDA major in the Dockerfile and the CUDA major in the PyTorch lock must
@@ -116,7 +116,7 @@ if [[ -z "$resolved_project_id" || "$resolved_project_id" == *$'\n'* ]]; then
   echo 'PROJECT_NAME must resolve to exactly one accessible project.' >&2
   exit 1
 fi
-scripts/cloud/check_training_image.sh \
+feral-vision/scripts/cloud/check_training_image.sh \
   --project "$resolved_project_id" --region us-east4 \
   --repository feral-docker --image feral-vision-gcp
 ```
@@ -134,8 +134,8 @@ Run the check again after every build. An existing image is not a rebuild
 request merely because repository files changed later.
 
 Build the image only through
-[`scripts/cloud/build_training_image.sh`](../../scripts/cloud/build_training_image.sh),
-which submits [`deploy/cloudbuild.training-image.yaml`](../../deploy/cloudbuild.training-image.yaml).
+[`feral-vision/scripts/cloud/build_training_image.sh`](../../feral-vision/scripts/cloud/build_training_image.sh),
+which submits [`feral-vision/deploy/cloudbuild.training-image.yaml`](../../feral-vision/deploy/cloudbuild.training-image.yaml).
 Cloud Build must complete the image check before the image is pushed.
 The build script resolves the pushed image digest and prints the digest-pinned
 reference consumed by Terraform.
@@ -144,7 +144,7 @@ Cloud Build image construction is distinct from GPU training. A successful
 push plus an immutable digest is a prerequisite; a mutable tag is never a
 Terraform training input.
 
-Dataset acquisition/publication images such as `deploy/dataset-publisher/Dockerfile` or
+Dataset acquisition/publication images such as `feral-vision/deploy/dataset-publisher/Dockerfile` or
 `Dockerfile.dataset-acquire` are separate upstream responsibilities. Do not use the
 GPU training image for those jobs, and do not infer that their DVC behavior
 belongs in the GPU runtime.
@@ -163,13 +163,13 @@ client presents those short-lived credentials.
 
 ## Deployment and runtime checkpoints
 
-Run [`terraform/preflight/preflight.py`](../../terraform/preflight/preflight.py)
+Run [`feral-vision/terraform/preflight/preflight.py`](../../feral-vision/terraform/preflight/preflight.py)
 before every GPU apply. It validates the canonical repository path, Terraform,
 the saved plan, GCP prerequisites, Dataset Artifact manifest/hash, quotas, and
 run-artifact writeability. A passing run emits `deployment-manifest.json` with
 the SHA-256 of the exact saved plan.
 
-Apply through [`scripts/runs/detection.sh`](../../scripts/runs/detection.sh).
+Apply through [`feral-vision/scripts/runs/detection.sh`](../../feral-vision/scripts/runs/detection.sh).
 The launcher rejects a modified plan, records Terraform outputs, confirms the
 instance reached `RUNNING`, collects serial output, and waits for terminal
 `training-evidence.json`.
@@ -183,7 +183,7 @@ success.
 The VM remains Terraform-owned after container exit. Removal requires a
 separately reviewed Terraform destroy plan.
 
-[`scripts/cloud_preflight.py`](../../scripts/cloud_preflight.py) is a
+[`feral-vision/scripts/cloud_preflight.py`](../../feral-vision/scripts/cloud_preflight.py) is a
 diagnostic tool for an already-running VM. It is not a second required gate in
 the automatic startup path, because the startup script owns the pre-training
 runtime gates.

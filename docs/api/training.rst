@@ -1,23 +1,23 @@
 Training
 ========
 
-.. automodule:: feral_vision.training.trainer
+.. automodule:: sightkit_learn.training.trainer
    :members:
 
-.. automodule:: feral_vision.training.losses
+.. automodule:: sightkit_learn.training.losses
    :members:
 
-.. automodule:: feral_vision.training.optim
+.. automodule:: sightkit_learn.training.optim
    :members:
 
-.. automodule:: feral_vision.training.execution
+.. automodule:: sightkit_learn.training.execution
    :members:
 
-.. automodule:: feral_vision.training.detection
+.. automodule:: sightkit_learn.training.detection
    :members:
 
-.. automodule:: feral_vision.training.tracking
+.. automodule:: sightkit_learn.training.tracking
    :members:
 
-.. automodule:: feral_vision.training.batching
+.. automodule:: sightkit_learn.training.batching
    :members:

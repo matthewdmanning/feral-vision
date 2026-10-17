@@ -132,7 +132,7 @@ workflow.
 
 #### Feral Vision backend
 
-Complete named recipes live under `conf/runs/`. Input acquisition is a Cloud
+Complete named recipes live under `feral-vision/conf/runs/`. Input acquisition is a Cloud
 Job concern, not a Run Recipe responsibility.
 
 _Avoid_: Configuration Variant, executing workflow, source defaults

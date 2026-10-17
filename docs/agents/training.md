@@ -102,7 +102,7 @@ it; do not classify the entire training workflow as implementation code.
 | `models.register_model.model_builder(cfg)` | Reads `cfg.architecture.source`; constructs the configured local class or calls the selected source adapter. | The configured source selects an implementation; a supported source adapter can legitimately contain source-specific code. |
 | `training.optim` builders | Use `hydra.utils.instantiate`; bind model parameters to the optimizer and the optimizer to the scheduler. | These short functions preserve the Hydra construction contract. Their size alone does not justify removing them. |
 | `config.store.register_configs()` | Registers named data, model, training, optimizer, scheduler, loss, inference, tracking, and augmentation schemas. | Declares supported configuration contracts; registration does not select a particular experiment. |
-| `training.trainer.main()` | Retains the existing default recipe path, then calls `build_trainer` and `build_dataloader`. | Recipe selection remains a concrete default; dataset/loader construction is Hydra-selectable, with the legacy AnnotationDataset fallback preserved. |
+| `training.trainer.main()` | Accepts the caller's explicit Hydra config directory and recipe, then calls `build_trainer` and `build_dataloader`. | Production entrypoints select the recipe; dataset/loader construction is Hydra-selectable, with the legacy AnnotationDataset fallback preserved. |
 | `io_utils._load_annotation(path)` | Selects a mask reader from an image suffix and a YOLO box reader from `.txt`; has no separate task/format selection argument. | Current reader selection assumes that suffix identifies annotation meaning. Supporting several standard formats must not be confused with choosing one for every caller. |
 
 The current recipe and Terraform files are evidence of concrete selections,
@@ -209,7 +209,7 @@ steps, and checkpoint selection.
 | --- | --- |
 | `trainer.py` | Shared epoch/update loop, monitoring, checkpoint selection, and existing entrypoint/construction compatibility. |
 | `execution.py` | External-criterion, TorchVision native, Hugging Face native, and Ultralytics native loss callables. |
-| `batching.py` | Compatibility re-exports; shared native-vision and HF collation is implemented in `data/batching.py`. |
+| `batching.py` | Compatibility re-exports; shared native-vision and HF collation is implemented in `src/sightkit_learn/data/batching.py`. |
 | `detection.py` | Independent `collate_detection` and `detection_loss` functions; preserves existing native assignment and classification plus GIoU scaling. |
 | `losses.py` | Existing Dice, cross-entropy combination, and supplied-teacher-logit distillation computation. |
 | `optim.py` | Existing Hydra construction helpers; training still receives ordinary PyTorch optimizer/scheduler objects. |

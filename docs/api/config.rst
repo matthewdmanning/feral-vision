@@ -1,8 +1,8 @@
 Config
 ======
 
-.. automodule:: feral_vision.config.schema
+.. automodule:: sightkit_learn.config.schema
    :members:
 
-.. automodule:: feral_vision.config.store
+.. automodule:: sightkit_learn.config.store
    :members:

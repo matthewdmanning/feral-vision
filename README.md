@@ -9,6 +9,18 @@ and trap-neuter-return work.
 - [Program flow and tooling ownership](docs/agents/program-flow.md)
 - [User and API documentation](docs/index.rst)
 
+## Layout
+
+- `src/sightkit_learn/`: reusable library, distributed as `sightkit-learn`.
+- `src/templates/`: packaged starter workflow assets.
+- `feral-vision/`: project recipes, scripts, deployment files, Terraform, data, and models; excluded from the release.
+- `tools/`, `tests/`, and `docs/`: development tooling and documentation.
+
+The module authority is [Modules](docs/domain/modules.md). Imports previously
+using `feral_vision` now use `sightkit_learn`. Run project workflow commands from
+`feral-vision/`; image builds retain the repository root as their build context.
+Existing MLflow metadata keys remain unchanged for persisted-run compatibility.
+
 ## Development
 
 ```bash

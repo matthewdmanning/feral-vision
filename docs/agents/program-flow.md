@@ -38,17 +38,17 @@ Dataset/collator and loss/metric choices define annotation interpretation.
 flowchart TB
     upstream["Upstream dataset publication / versioning"]
     dataset["Published Dataset Artifact\npayload + dataset-artifact.json"]
-    recipe["conf/runs/detection.yaml"]
-    dockerfile["deploy/Dockerfile.gcp\nNVIDIA CUDA 13 base"]
-    cloudbuild["deploy/cloudbuild.training-image.yaml"]
+    recipe["feral-vision/conf/runs/detection.yaml"]
+    dockerfile["feral-vision/deploy/Dockerfile.gcp\nNVIDIA CUDA 13 base"]
+    cloudbuild["feral-vision/deploy/cloudbuild.training-image.yaml"]
     registry["Artifact Registry\ndigest-pinned training image"]
-    preflight["terraform/preflight/preflight.py"]
+    preflight["feral-vision/terraform/preflight/preflight.py"]
     plan["Reviewed saved Terraform plan\n+ deployment-manifest.json"]
-    terraform["terraform/runs/detection/"]
+    terraform["feral-vision/terraform/runs/detection/"]
     vm["Single T4 VM + NVMe Local SSD\nNVIDIA driver 580"]
     auth["Docker runtime + Artifact Registry auth"]
     staged["Staged Dataset Artifact\nmanifest SHA verified"]
-    train["scripts/runs/container_train.sh\nCUDA visibility verified"]
+    train["feral-vision/scripts/runs/container_train.sh\nCUDA visibility verified"]
     mlflow["MLflow run + Dataset Artifact lineage"]
     evidence["training-evidence.json\n+ exact dataset-artifact.json"]
 
@@ -70,7 +70,7 @@ flowchart TB
 
 Scripts acquire or modify a Dataset only when the requested input is absent.
 DVC registers each selected prepared Dataset independently through
-`scripts/data/register.sh`: `dvc add` creates its sibling metadata file and a
+`feral-vision/scripts/data/register.sh`: `dvc add` creates its sibling metadata file and a
 targeted `dvc push` stores its contents. There is no fixed DVC preparation DAG
 or broad ownership of raw/processed/augmented parent directories.
 
@@ -81,15 +81,15 @@ gaps. The GPU VM consumes the already-published Dataset Artifact and does not
 run DVC or generate a replacement lockfile. `dataset-artifact.json` is the
 provenance record across that seam.
 
-The training image has one build path: `deploy/Dockerfile.gcp` through
-`deploy/cloudbuild.training-image.yaml`. The digest-pinned NVIDIA CUDA 13 base
+The training image has one build path: `feral-vision/deploy/Dockerfile.gcp` through
+`feral-vision/deploy/cloudbuild.training-image.yaml`. The digest-pinned NVIDIA CUDA 13 base
 matches the CUDA major used by the locked PyTorch runtime; PyTorch supplies its
 own locked CUDA/cuDNN user-space dependencies. There is no intermediate Feral
 Vision base image and no run-specific training image.
 
 Terraform owns the disposable VM lifecycle. Preflight validates the exact
 saved plan and records its SHA-256 together with the training-image digest and
-Dataset Artifact manifest SHA-256. `scripts/runs/detection.sh` applies only that
+Dataset Artifact manifest SHA-256. `feral-vision/scripts/runs/detection.sh` applies only that
 reviewed plan and waits for terminal training evidence.
 
 After VM creation, startup proves host Docker/NVIDIA tooling, configures Docker

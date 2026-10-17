@@ -2,11 +2,11 @@
 Inference
 =========
 
-.. automodule:: feral_vision.inference.loading
+.. automodule:: sightkit_learn.inference.loading
    :members:
 
-.. automodule:: feral_vision.inference.predictor
+.. automodule:: sightkit_learn.inference.predictor
    :members:
 
-.. automodule:: feral_vision.inference.postprocess
+.. automodule:: sightkit_learn.inference.postprocess
    :members:
