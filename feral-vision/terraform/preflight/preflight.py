@@ -20,7 +20,7 @@ import time
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from uuid import uuid4
 
@@ -109,6 +109,7 @@ class Reporter:
         *,
         cwd: Path | None = None,
         required: bool = True,
+        input_text: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         start = time.monotonic()
         completed = subprocess.run(
@@ -116,6 +117,7 @@ class Reporter:
             cwd=cwd,
             text=True,
             capture_output=True,
+            input=input_text,
             check=False,
         )
         duration = time.monotonic() - start
@@ -228,9 +230,9 @@ def _repository_checks(repository_root: Path, reporter: Reporter) -> None:
         str(startup_template),
     )
 
-    runtime = "\n".join(
-        (startup_template.read_text(), canonical_entrypoint.read_text())
-    ).lower()
+    runtime = (
+        f"{startup_template.read_text()}\n{canonical_entrypoint.read_text()}".lower()
+    )
     forbidden = [
         token
         for token in ("dvc init", "dvc add", "dvc repro", "dvc.lock")
@@ -266,6 +268,132 @@ def _output(plan: dict[str, Any], name: str) -> Any:
             f"Terraform plan did not produce required output {name!r}"
         )
     return value
+
+
+def _training_setup_checks(image: str, script: Path, reporter: Reporter) -> None:
+    """Use this function to test only cached training assets without downloading them.
+
+    Parameters
+    ----------
+    image : str
+        Reviewed digest-pinned image that must already exist locally.
+    script : Path
+        GPU E2E suite streamed into the cached image.
+    reporter : Reporter
+        Blocking deployment checkpoint recorder.
+    """
+    docker = shutil.which("docker.exe") or "docker"
+    reporter.command("TRAINING_SETUP", "docker_engine", [docker, "version"])
+    cached = reporter.command(
+        "TRAINING_SETUP",
+        "selected_image_cached",
+        [docker, "image", "inspect", image],
+        required=False,
+    )
+    reporter.assertion(
+        "TRAINING_SETUP",
+        "no_implicit_image_download",
+        cached.returncode == 0,
+        "Exact image digest must already be cached. Check disk space and preload it once explicitly; no download was attempted.",
+    )
+    details = json.loads(cached.stdout)[0]
+    reporter.assertion(
+        "TRAINING_SETUP",
+        "deployment_image_specs",
+        details["Os"] == "linux"
+        and details["Architecture"] == "amd64"
+        and details["Config"]["Entrypoint"]
+        == ["bash", "/workspace/feral-vision/scripts/runs/container_train.sh"],
+        "Cached image must match the deployed Linux/amd64 image and canonical entrypoint",
+    )
+    reporter.command(
+        "TRAINING_SETUP",
+        "canonical_e2e_training",
+        [
+            "timeout",
+            "600",
+            docker,
+            "run",
+            "--pull=never",
+            "--network=none",
+            "--gpus=all",
+            "--memory=2g",
+            "--cpus=2",
+            "--rm",
+            "-i",
+            "--entrypoint",
+            "bash",
+            image,
+            "-s",
+        ],
+        input_text=script.read_text(),
+    )
+
+
+def _startup_checks(script: str, inputs: dict[str, Any], reporter: Reporter) -> None:
+    """Use this function to reject startup syntax and path errors before VM creation.
+
+    Parameters
+    ----------
+    script : str
+        Rendered startup script from the saved Terraform plan.
+    inputs : dict[str, Any]
+        Resolved input values from that plan.
+    reporter : Reporter
+        Blocking preflight checkpoint recorder.
+    """
+    syntax = subprocess.run(
+        ["bash", "-n"], input=script, text=True, capture_output=True, check=False
+    )
+    reporter.assertion(
+        "PLAN_CHECKS",
+        "startup_bash_syntax",
+        syntax.returncode == 0,
+        syntax.stderr.strip() or "rendered startup parses with bash -n",
+    )
+    paths = {}
+    for name in (
+        "local_ssd_mount_dir",
+        "dataset_host_mount_dir",
+        "dataset_container_mount_dir",
+    ):
+        value = str(inputs[name])
+        path = PurePosixPath(value)
+        reporter.assertion(
+            "PLAN_CHECKS",
+            f"safe_{name}",
+            path.is_absolute()
+            and ".." not in path.parts
+            and re.fullmatch(r"/[A-Za-z0-9_./-]+", value) is not None,
+            f"{name} must be an absolute shell-safe path without parent traversal",
+        )
+        reporter.assertion(
+            "PLAN_CHECKS",
+            f"rendered_{name}",
+            f'readonly {name}="{value}"' in script,
+            f"rendered {name} must match the reviewed input",
+        )
+        paths[name] = path
+    local = paths["local_ssd_mount_dir"]
+    host = paths["dataset_host_mount_dir"]
+    container = paths["dataset_container_mount_dir"]
+    reporter.assertion(
+        "PLAN_CHECKS",
+        "dataset_mount_mapping",
+        local.is_relative_to("/mnt")
+        and local != PurePosixPath("/mnt")
+        and host.is_relative_to(local)
+        and host != local
+        and container == PurePosixPath("/data") / host.relative_to(local),
+        "dataset host path must be inside the SSD and map to the same /data path",
+    )
+    tracking = str(inputs["mlflow_tracking_uri"])
+    reporter.assertion(
+        "PLAN_CHECKS",
+        "shell_safe_tracking_uri",
+        not any(character in tracking for character in '$`"\\\n\r'),
+        "tracking URI must percent-encode shell metacharacters",
+    )
 
 
 def _plan_checks(plan: dict[str, Any], reporter: Reporter) -> dict[str, Any]:
@@ -412,6 +540,12 @@ def _plan_checks(plan: dict[str, Any], reporter: Reporter) -> dict[str, Any]:
             and "dvc.lock" not in startup_script.lower()
         ),
         "rendered startup must use runs/detection + dataset-artifact.json and contain no GPU-side DVC",
+    )
+
+    _startup_checks(
+        startup_script,
+        {name: record["value"] for name, record in plan["variables"].items()},
+        reporter,
     )
 
     training_image = str(_output(plan, "training_image"))
@@ -940,6 +1074,12 @@ def main() -> int:
 
         _cloud_checks(facts, reporter, report_dir)
         metadata.update(facts)
+
+        _training_setup_checks(
+            str(facts["training_image"]),
+            repository_root / "scripts/runs/check_training_e2e.sh",
+            reporter,
+        )
 
         if args.skip_write_probe:
             reporter.warning(

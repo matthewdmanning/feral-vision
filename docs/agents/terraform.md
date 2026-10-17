@@ -3,6 +3,13 @@
 Use this guide for Terraform state, plans, tests, and Cloud Resource lifecycle.
 Use [Cloud Operations](cloudops.md) for image builds and GPU runtime behavior.
 
+## Toolchain
+
+Use Terraform 1.16 or later within 1.x and Google provider 8.x. The current
+validated toolchain is Terraform 1.16.6 and Google provider 8.7.0; the provider
+version and checksums are locked independently in all three roots. Initialize
+with `-backend=false` for local validation without accessing GCS state.
+
 ## Never in CI
 
 Terraform is deployment tooling. It is not source code and not part of the
@@ -64,7 +71,7 @@ Follow the HashiCorp Terraform style guide for layout and naming.
 | `feral-vision/terraform/tests/` | Mocked-provider tests (see below) |
 | `feral-vision/terraform/preflight/` | Deployment gate (see below) |
 
-Commit both `.terraform.lock.hcl` files. A `terraform init` on another
+Commit all three `.terraform.lock.hcl` files. A `terraform init` on another
 operating system can add platform hashes to them; review and commit that change
 on purpose, not as a side effect.
 
@@ -82,10 +89,18 @@ TF_VAR_test_gcs_uri_prefix="${GCS_URI_PREFIX:?Set GCS_URI_PREFIX first}" terrafo
 Run these tests by hand before a Terraform change. Never run them in CI, a git
 hook, or `tools/validate_ci.sh`.
 
-The tests cover the fixed VM shape, URI resolution, and negative tests for the
-main variable validations. Some validations, such as the mount-directory
-prefixes, have no negative test yet. Those tests are necessary but not sufficient for deployment
-because they do not prove live GCP prerequisites.
+Production and starter-template suites each contain 20 mocked plan scenarios.
+They cover the fixed VM shape, resolved boot-image wiring, URI resolution,
+invalid inputs, lifetime boundaries, custom identity/tags, and rendered startup
+assignments. Bucket tests check caller-selected identity/location, uniform IAM,
+public-access prevention, Object Retention Lock support, disabled versioning,
+STANDARD storage, and seven-day soft delete. Mock defaults do not supply the
+policy values being asserted.
+
+Run both suites after changing shared Terraform behavior; the template suite is
+under `src/templates/terraform/tests/`. Neither suite proves provider defaults,
+IAM, backend access, startup execution, or live GCP prerequisites. The bucket's
+`prevent_destroy` lifecycle rule is not exercised by these plan-only tests.
 
 ## Required GPU deployment gate
 
@@ -100,6 +115,9 @@ The preflight must pass before apply. It checks:
 - the repository still has one canonical training recipe/image/entrypoint;
 - GPU runtime has not reintroduced DVC commands or a `dvc.lock` gate;
 - Terraform formatting, initialization, and validation;
+- rendered startup Bash syntax, shell-safe inputs, and SSD/container path mapping;
+- exact locally cached deployment image, its entrypoint, and GPU
+  E2E training with checkpoint/MLflow assertions; no automatic downloads;
 - a saved plan contains only the disposable training VM and no unexpected
   update/replacement/destroy action;
 - the fixed machine, T4, NVMe Local SSD, on-demand scheduling, network, and

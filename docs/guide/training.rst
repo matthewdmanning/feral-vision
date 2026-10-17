@@ -173,6 +173,15 @@ timestamps do not determine whether a build is needed.
 GPU deployment
 --------------
 
+Preflight runs a GPU E2E suite inside the exact cached deployment image, using
+the deployed entrypoint and recipe. It checks Dataset loading, training, a
+checkpoint, and MLflow completion. It uses local safety limits
+and never downloads missing images or weights. It also parses the rendered
+startup script and checks SSD path containment and container mappings.
+
+Use Terraform 1.16 or later within 1.x and the locked Google provider 8.x.
+The validated toolchain is Terraform 1.16.6 with Google provider 8.7.0.
+
 Run ``feral-vision/terraform/preflight/preflight.py`` with the exact intended Terraform
 inputs before every apply. A passing preflight produces a saved Terraform plan
 and ``deployment-manifest.json`` containing the plan SHA-256, digest-pinned

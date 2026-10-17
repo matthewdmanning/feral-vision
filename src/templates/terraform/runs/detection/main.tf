@@ -35,6 +35,26 @@ resource "google_compute_instance" "trainer" {
   tags         = var.instance_tags
   labels       = local.labels
 
+  # The selected Deep Learning VM image includes NVIDIA driver 580. Do not run
+  # Google's first-boot driver installer here: it can reboot while startup is
+  # staging data or launching the training container.
+  metadata = {
+    enable-oslogin = "TRUE"
+  }
+
+  metadata_startup_script = templatefile("${path.module}/templates/trainer_startup.sh.tftpl", {
+    run_id                       = var.run_id
+    training_image               = var.training_image
+    dataset_base_uri             = local.dataset_base_uri
+    source_annotation_generation = var.source_annotation_generation
+    run_artifact_uri             = local.run_artifact_uri
+    local_ssd_mount_dir          = var.local_ssd_mount_dir
+    dataset_host_mount_dir       = var.dataset_host_mount_dir
+    dataset_container_mount_dir  = var.dataset_container_mount_dir
+    mlflow_tracking_uri          = var.mlflow_tracking_uri
+    run_config_name              = local.run_config_name
+  })
+
   scheduling {
     on_host_maintenance         = "TERMINATE"
     automatic_restart           = false
@@ -75,26 +95,6 @@ resource "google_compute_instance" "trainer" {
     email  = var.service_account_email
     scopes = ["cloud-platform"]
   }
-
-  # The selected Deep Learning VM image includes NVIDIA driver 580. Do not run
-  # Google's first-boot driver installer here: it can reboot while startup is
-  # staging data or launching the training container.
-  metadata = {
-    enable-oslogin = "TRUE"
-  }
-
-  metadata_startup_script = templatefile("${path.module}/templates/trainer_startup.sh.tftpl", {
-    run_id                       = var.run_id
-    training_image               = var.training_image
-    dataset_base_uri             = local.dataset_base_uri
-    source_annotation_generation = var.source_annotation_generation
-    run_artifact_uri             = local.run_artifact_uri
-    local_ssd_mount_dir          = var.local_ssd_mount_dir
-    dataset_host_mount_dir       = var.dataset_host_mount_dir
-    dataset_container_mount_dir  = var.dataset_container_mount_dir
-    mlflow_tracking_uri          = var.mlflow_tracking_uri
-    run_config_name              = local.run_config_name
-  })
 
   lifecycle {
     precondition {

@@ -1,7 +1,8 @@
 # Terraform GPU deployment preflight
 
 This directory contains the **pre-deployment** gate for the canonical single-VM
-GPU training job. It runs before `terraform apply` and never launches training.
+GPU training job. It runs before `terraform apply`, including a local GPU E2E
+training check in the selected image. It never creates a GPU VM.
 
 ## What it catches
 
@@ -11,6 +12,8 @@ The harness fails before apply for repository or deployment drift including:
   training entrypoint;
 - GPU startup paths that reintroduce DVC commands or `dvc.lock` gates;
 - malformed or unformatted Terraform;
+- rendered startup Bash syntax errors, unsafe input quoting, and Dataset mounts
+  that escape the SSD or disagree with the container bind mount;
 - provider initialization or schema validation failures;
 - plans that unexpectedly update, replace, or destroy infrastructure;
 - plans that manage anything other than the single disposable training VM;
@@ -22,7 +25,11 @@ The harness fails before apply for repository or deployment drift including:
 - unreadable or malformed `dataset-artifact.json`;
 - missing dataset image prefix or pinned annotation generation;
 - insufficient observable CPU/GPU/external-IP/Local-SSD quota;
-- inability to write durable run evidence.
+- inability to write durable run evidence;
+- a selected image that cannot load the published COCO layout and execute the canonical
+  CUDA entrypoint and record the configured epochs, checkpoint, and MLflow run. Docker must be available and the reviewed image digest must already be cached.
+  Preflight never pulls images or model weights. Missing assets block deployment;
+  stage them once explicitly after checking disk capacity.
 
 Cloud capacity can still disappear between preflight and apply. Passing
 preflight establishes that the reviewed deployment is internally coherent and
@@ -82,9 +89,10 @@ Major checkpoints are:
 4. `TERRAFORM_PLAN`
 5. `PLAN_CHECKS`
 6. `GCP_PREREQUISITES`
-7. `ARTIFACT_WRITE_PROBE`
-8. `DEPLOYMENT_MANIFEST`
-9. `SUMMARY`
+7. `TRAINING_SETUP` (Docker engine, exact cached image lookup, CUDA E2E; ten-minute limit)
+8. `ARTIFACT_WRITE_PROBE`
+9. `DEPLOYMENT_MANIFEST`
+10. `SUMMARY`
 
 A `FAIL` is blocking. A `WARN` records reduced certainty only where Google Cloud
 does not expose a dependable blocking signal. Do not downgrade a failed
@@ -114,3 +122,29 @@ the VM matches the hash recorded during preflight.
 Do not rerun `terraform plan` between review and apply. Do not call
 `terraform apply` directly for this GPU workflow unless diagnosing the launcher
 itself under explicit operator control.
+
+## Local startup regression checks
+
+Run `bash terraform/tests/check_startup.sh` from this production folder. It uses
+Terraform to render the real startup template and checks valid default/custom
+paths plus broken syntax, traversal, mismatched mounts, and shell substitution.
+It executes no startup commands and creates no resources.
+
+Preflight streams `scripts/runs/check_training_e2e.sh` into the exact cached
+digest selected in the saved plan. It checks the Linux/amd64 image entrypoint,
+runs with GPU access and local safety limits; it does not require a cloud-sized host.
+The suite uses the deployed container entrypoint and unchanged recipe, with
+only temporary Dataset/tracking destinations. It requires CUDA visibility, T4
+kernel support, successful COCO loading, a checkpoint, finite losses for every
+configured epoch, and a completed MLflow run. It does not mount checkout code
+over the installed image. Build-time import/config checks remain separate
+because the standard Cloud Build worker has no GPU.
+
+There is no CPU fallback. This is a container correctness check, not a cloud
+capacity simulation. Local GPU hardware is reported with results; failures
+caused by local resource limits must be distinguished from application errors.
+
+Download safety: checks inspect the exact local image digest first, use
+`--pull=never` and `--network=none`, and stop on a cache miss. Model weights
+must already exist in the image working directory or Ultralytics weights cache.
+The smoke container is limited to 2 GiB RAM and two CPUs for local safety. No cache is pruned.
