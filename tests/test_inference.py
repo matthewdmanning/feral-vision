@@ -120,7 +120,8 @@ def test_prepared_input_calling_conventions(
     model.assert_called_once()
     torch.testing.assert_close(model.call_args.args, expected_args)
     actual_keywords = model.call_args.kwargs.copy()
-    assert actual_keywords.pop("return_dict") is True
+    return_dict_value = actual_keywords.pop("return_dict")
+    assert return_dict_value is True
     torch.testing.assert_close(actual_keywords, expected_kwargs)
 
 
