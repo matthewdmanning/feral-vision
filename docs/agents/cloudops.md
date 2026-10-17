@@ -5,6 +5,53 @@ image builds, VM operations, and GPU training operations. For Terraform state,
 plans, and lifecycle ownership, see [Terraform](terraform.md). See
 [Data and ingestion](data.md) for dataset publication details.
 
+## Training script scope
+
+- **Assume the user's files have already been created in the storage bucket.**
+  This includes data, model files, DVC files and configs. DVC is simple data
+  versioning, like Git for data. Do not shoehorn DVC commands or functions into
+  training: download the selected existing files using Google SDKs or `gcloud`,
+  then use the library's training functions with the user's Hydra configuration.
+- Start at the existing VM/container beachhead. Terraform and Docker setup are
+  separate reference material, not steps to redesign for the training script.
+- The script template must accept the user's files and configuration choices;
+  do not fix a bucket, filename, dataset, model, task or historical run recipe.
+  `feral-vision/conf/` contains configurations previously tried. The contracts
+  are defined in `src/sightkit_learn/config/` and loaded as OmegaConf `DictConfig`.
+- Use the selected Hydra configuration as written. The training script does
+  not supply overrides or forward extra arguments to change its values.
+- The training VM disappears at the end of the job. Checkpoints, logs, MLflow
+  tracking metadata and model/config artifacts must survive outside it. If
+  MLflow is local, export a consistent backend snapshot and its artifact files;
+  a local tracking URI alone is not durable storage. Verify required exports
+  before success and normal VM cleanup, and preserve diagnostics on failure.
+
+The generic runner is
+[`cloud_train.sh`](../../feral-vision/scripts/runs/cloud_train.sh), mirrored in
+starter assets. Use the [training guide](../guide/training.rst) for the operator
+workflow, or the [runner reference](../google_cloud_review/2026-10-17-google-cloud-review.md)
+for the full output inventory and validation evidence.
+
+It captures stdout/stderr and exports outputs using the Storage SDK, with a
+30-second pause between periodic exports and a verified final export after
+success or failure. The destination is
+`<TRAINING_DATA_BUCKET_URI>/instances/<numeric-instance-id>/<attempt-id>/`.
+Relative output paths resolve in `RUN_OUTPUT_DIR`; configured absolute
+checkpoint/local tracking paths are collected under `external/`, with their
+original locations retained in `output-sources.json`.
+
+`output-status.json` is uploaded after the other final outputs verify. Successful
+training requires runner exit code zero and `training_exit_code: 0` in the
+terminal record. Failed training still preserves diagnostics and available
+outputs. Export failure requires keeping the VM and local files for recovery;
+normal cleanup must wait for verified preservation. Forced VM destruction is
+an accepted data-loss case.
+
+This runner is invoked explicitly. It does not replace the existing detection
+Terraform startup or rebuild an existing image. The sections below describe
+that existing deployment as setup reference; its fixed recipe and artifact
+assumptions do not constrain the generic template.
+
 ## Cloud identity
 
 `PROJECT_NAME` in `.env.local` is the project's display name. Resolve it to

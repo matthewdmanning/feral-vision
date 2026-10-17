@@ -2,13 +2,17 @@
 
 Use this guide when changing Hydra or model configuration.
 
-## Training recipe policy
+## Training configuration selection
 
-`feral-vision/conf/runs/detection.yaml` is the only complete training Run Recipe. Local
-training, image validation, and GPU deployment must compose it. Do not create a
-second Run Recipe for a deployment, experiment, environment, or one-off run.
-Use Hydra overrides or change the canonical component configuration when a
-value genuinely needs to vary.
+The generic container runner accepts the user's config directory and config
+name and uses that Hydra configuration as written. It supplies no overrides.
+`feral-vision/conf/` is a library of configurations previously tried, not a
+single mandatory experiment. Use `src/sightkit_learn/config/` as the contract;
+Hydra composition produces an OmegaConf `DictConfig`.
+
+The existing detection deployment selects `runs/detection`; that describes its
+current wiring and does not constrain the generic training template. See the
+[training guide](../guide/training.rst) for configuration and output handling.
 
 Component YAML files under `data/`, `model/`, `train/`, `inference/`,
 `tracking/`, and `augmentation/` own concern-specific values; they are not
@@ -46,6 +50,7 @@ belong in Hydra. GPU infrastructure is owned by `feral-vision/terraform/runs/det
 the training image is owned by `feral-vision/deploy/Dockerfile.gcp` plus
 `feral-vision/deploy/cloudbuild.training-image.yaml`.
 
-The selected Dataset Artifact is also not re-versioned by Hydra or the GPU
-runtime. Its upstream `dataset-artifact.json` crosses into training as the
-provenance record.
+Assume the selected data, model, DVC and config files already exist in Cloud
+Storage. The generic training script does not version or publish inputs. The
+existing detection deployment separately consumes its upstream
+`dataset-artifact.json` provenance record.

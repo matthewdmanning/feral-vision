@@ -1,9 +1,103 @@
 Training
 ========
 
-Feral Vision has one complete training Run Recipe:
-``feral-vision/conf/runs/detection.yaml``. Local execution, image validation, and the GPU
-training deployment all compose that same recipe.
+Select a Hydra configuration that follows the library contracts in
+``src/sightkit_learn/config/``. The files in ``feral-vision/conf/`` are a
+collection of configurations previously tried; no single recipe is required
+by the generic training runner.
+
+Run in a temporary VM
+---------------------
+
+Start inside a prepared Compute Engine container with ``sightkit_learn`` and
+the runner files installed. Assume the selected data, model, DVC files and
+configs already exist in Cloud Storage. Download them using Google SDKs or
+``gcloud`` before invoking the runner. DVC files remain unchanged inputs; the
+runner does not perform DVC operations or download inputs itself.
+
+Export these environment variables:
+
+.. list-table:: Runner inputs
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Variable
+     - Value
+   * - ``CONFIG_DIR``
+     - Absolute local directory containing the selected Hydra configs.
+   * - ``CONFIG_NAME``
+     - Selected config name, without ``.yaml``.
+   * - ``RUN_OUTPUT_DIR``
+     - Local output workspace for this attempt; keep inputs separate.
+   * - ``TRAINING_DATA_BUCKET_URI``
+     - Existing bucket or bucket prefix that will receive run outputs.
+
+From the repository root, run:
+
+.. code-block:: bash
+
+   bash feral-vision/scripts/runs/cloud_train.sh
+
+The runner uses the selected Hydra configuration as written, with no overrides.
+Relative paths resolve from ``RUN_OUTPUT_DIR``. Configured absolute checkpoint
+and local tracking paths are also collected, under
+``external/<absolute-path-without-leading-slash>/``. Their original locations
+are recorded in ``output-sources.json``.
+
+Find your outputs
+~~~~~~~~~~~~~~~~~
+
+The runner prints the destination and saves it in ``console.log``:
+
+``<TRAINING_DATA_BUCKET_URI>/instances/<numeric-instance-id>/<attempt-id>/``
+
+Each attempt has a new folder. It contains:
+
+* ``console.log``: combined stdout/stderr, including library logs and tracebacks.
+* ``resolved-config.yaml`` and, after successful training, ``history.json``.
+* The checkpoint at its configured relative path, or under ``external/``.
+* Local MLflow files, with SQLite databases exported through consistent backups.
+* ``mlflow-export/``: run metadata, metric histories, run artifacts, native model
+  packages and registered model version metadata when available.
+* Other regular files created in the output workspace.
+* ``output-status.json``: the terminal training status, published after the
+  other final uploads verify.
+
+The VM identity needs permission to write outputs and read object metadata for
+verification. Checkpoint files are replaced atomically: a failed save preserves
+the previous best weights. These checkpoints do not contain full
+optimizer/scheduler state for resuming training.
+
+Handle completion and failure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The runner pauses 30 seconds between periodic exports and makes a final export
+when training ends. It drains the captured logs, verifies cloud sizes and
+checksums, then publishes terminal status. Local originals are retained.
+
+A zero runner exit code and ``training_exit_code: 0`` in the terminal record
+mean training and export succeeded. A failed training run still exports its
+available outputs and logs and retains a nonzero status. Inspect those archived
+diagnostics before cleanup or another attempt.
+
+If export fails, keep the VM and local files. Inspect ``console.log`` and local
+``export-errors.log`` and recover the export before cleanup. Starting the runner
+again starts another training attempt; it is not an export-only retry.
+
+SIGTERM and SIGINT stop the training process group before final export. Allow
+enough shutdown grace for that export. Forced VM destruction is an accepted
+data-loss case: only completed cloud uploads are assumed to survive.
+
+The runner never deletes the VM. Its caller owns cleanup and must wait for
+verified output preservation, including for a failed training run.
+
+Availability
+~~~~~~~~~~~~
+
+The scripts are mirrored in ``src/templates/scripts/runs/`` and included by
+the training Dockerfile when an image is built. The existing detection
+Terraform deployment does not select this runner automatically. No new VM/GPU
+deployment or image rebuild has been validated as part of this change.
 
 Training and tracking errors
 ----------------------------
@@ -143,8 +237,8 @@ can cause MLflow to execute its own signature inference or serving validation.
 Examples and signatures must match that native MLflow contract; they do not
 impose tensor-only outputs on native model publication.
 
-Dataset boundary
-----------------
+Dataset boundary in the detection deployment
+--------------------------------------------
 
 Dataset versioning and publication happen upstream of GPU training. The
 published Dataset Artifact is the handoff boundary. Training requires its
@@ -156,8 +250,8 @@ the dataset. Deployment preflight parses the published manifest and records its
 SHA-256; VM startup stages and re-hashes the exact manifest before training.
 The container verifies the same SHA-256 again before starting the trainer.
 
-Training image
---------------
+Detection training image
+------------------------
 
 The only supported GPU training image is ``feral-vision/deploy/Dockerfile.gcp``. Build it
 through ``feral-vision/scripts/cloud/build_training_image.sh``, which uses
@@ -170,8 +264,8 @@ Check Artifact Registry for an existing image before requesting a build.
 Verify the selected digest against the run requirements; image age and commit
 timestamps do not determine whether a build is needed.
 
-GPU deployment
---------------
+Existing detection deployment
+-----------------------------
 
 Preflight runs a GPU E2E suite inside the exact cached deployment image, using
 the deployed entrypoint and recipe. It checks Dataset loading, training, a
