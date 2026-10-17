@@ -1,5 +1,5 @@
 Data types and execution precision
-=================================
+==================================
 
 Choose precision for the actual model, device, runtime, and task. Keep four
 choices distinct: Dataset storage dtype, model weights, execution/accumulation

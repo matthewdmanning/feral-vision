@@ -6,7 +6,7 @@ Feral Vision has one complete training Run Recipe:
 training deployment all compose that same recipe.
 
 Training and tracking errors
----------------------------
+----------------------------
 
 The trainer no longer suppresses errors in configuration resolution, Dataset
 lineage verification, MLflow setup/logging, or best-model publication. A
