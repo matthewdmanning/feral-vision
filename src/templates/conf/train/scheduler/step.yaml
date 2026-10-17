@@ -1,0 +1,13 @@
+defaults:
+  - step_schema
+  - _self_
+
+# conf/train/scheduler/step.yaml
+# StepLR — partial; call sched_factory(optimizer).
+# Source: https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.StepLR.html
+
+_target_: torch.optim.lr_scheduler.StepLR
+_partial_: true
+step_size: 10
+gamma: 0.1
+last_epoch: -1

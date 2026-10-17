@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 # project
-from feral_vision.data import fetch
+from scripts import fetch
 
 
 # ---------------------------------------------------------------------------

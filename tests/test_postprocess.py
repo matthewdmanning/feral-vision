@@ -7,7 +7,7 @@ import pytest
 import torch
 
 # project
-from feral_vision.inference.postprocess import clean_mask, masks_to_boxes
+from sightkit_learn.inference.postprocess import clean_mask, masks_to_boxes
 
 
 # ---------------------------------------------------------------------------

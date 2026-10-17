@@ -1,0 +1,6 @@
+defaults:
+  - tracking_schema
+  - _self_
+
+tracking_uri: sqlite:///mlflow.db
+experiment_name: vision-training

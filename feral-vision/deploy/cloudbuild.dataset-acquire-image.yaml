@@ -1,0 +1,15 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file=feral-vision/deploy/Dockerfile.dataset-acquire
+      - --tag=${_ACQUISITION_IMAGE}
+      - .
+
+images:
+  - ${_ACQUISITION_IMAGE}
+
+serviceAccount: projects/cs-poc-kewg0kffb7uwobgq1rex2af/serviceAccounts/feral-vision-ai@cs-poc-kewg0kffb7uwobgq1rex2af.iam.gserviceaccount.com
+
+options:
+  logging: CLOUD_LOGGING_ONLY

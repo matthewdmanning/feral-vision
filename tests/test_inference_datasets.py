@@ -13,12 +13,14 @@ from torch import nn
 from torchvision.io import write_png
 from torch.utils.data import DataLoader, TensorDataset
 
-from feral_vision.config.schema import InferenceConfig, TrainConfig
-from feral_vision.inference import build_dataloader, build_predictor
-from feral_vision.data.batching import collate_huggingface
-from feral_vision.training.trainer import Trainer
-from feral_vision.training.execution import prediction_loss
-from feral_vision.training.trainer import build_dataloader as build_training_dataloader
+from sightkit_learn.config.schema import InferenceConfig, TrainConfig
+from sightkit_learn.inference import build_dataloader, build_predictor
+from sightkit_learn.data.batching import collate_huggingface
+from sightkit_learn.training.trainer import Trainer
+from sightkit_learn.training.execution import prediction_loss
+from sightkit_learn.training.trainer import (
+    build_dataloader as build_training_dataloader,
+)
 
 
 @pytest.fixture
@@ -59,9 +61,9 @@ def test_existing_paired_dataset_trains_and_predicts_with_ground_truth(
         "_convert_": "all",
         "batch_size": 2,
         "dataset": {
-            "_target_": f"feral_vision.data.dataset.{dataset_class}",
+            "_target_": f"sightkit_learn.data.dataset.{dataset_class}",
             "source": {
-                "_target_": "feral_vision.io_utils.DatasetSource",
+                "_target_": "sightkit_learn.io_utils.DatasetSource",
                 "root": str(paired_payload),
             },
             "transform": {
@@ -148,14 +150,14 @@ def test_labeled_ragged_batches_keep_annotations_and_explicit_collator(
             "_target_": "torch.utils.data.DataLoader",
             "batch_size": 3,
             "dataset": {
-                "_target_": "feral_vision.data.dataset.AnnotationDataset",
+                "_target_": "sightkit_learn.data.dataset.AnnotationDataset",
                 "source": {
-                    "_target_": "feral_vision.io_utils.DatasetSource",
+                    "_target_": "sightkit_learn.io_utils.DatasetSource",
                     "root": str(paired_payload),
                 },
             },
             "collate_fn": {
-                "_target_": "feral_vision.data.batching.collate_vision",
+                "_target_": "sightkit_learn.data.batching.collate_vision",
                 "_partial_": True,
             },
         },
@@ -211,7 +213,7 @@ def test_hydra_selectors_reuse_existing_detection_batch(paired_payload, model_lo
                         "scale": True,
                     },
                     collate_fn={
-                        "_target_": "feral_vision.training.detection.collate_detection",
+                        "_target_": "sightkit_learn.training.detection.collate_detection",
                         "_partial_": True,
                         "num_classes": 2,
                     },
@@ -219,9 +221,9 @@ def test_hydra_selectors_reuse_existing_detection_batch(paired_payload, model_lo
                         "_target_": "torch.utils.data.DataLoader",
                         "batch_size": 2,
                         "dataset": {
-                            "_target_": "feral_vision.data.dataset.AnnotationDataset",
+                            "_target_": "sightkit_learn.data.dataset.AnnotationDataset",
                             "source": {
-                                "_target_": "feral_vision.io_utils.DatasetSource",
+                                "_target_": "sightkit_learn.io_utils.DatasetSource",
                                 "root": str(paired_payload),
                             },
                         },
@@ -545,7 +547,7 @@ def test_native_torchvision_coco_boxes_and_masks_share_training_inference_loader
                     model_uri="models:/vision/1",
                     dataloader=specification,
                     collate_fn={
-                        "_target_": "feral_vision.data.batching.collate_vision",
+                        "_target_": "sightkit_learn.data.batching.collate_vision",
                         "_partial_": True,
                     },
                 )

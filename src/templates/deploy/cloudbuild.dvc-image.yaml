@@ -1,0 +1,17 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-dvc-image
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        docker build --tag "${_DVC_IMAGE}" --file=feral-vision/deploy/dataset-publisher/Dockerfile .
+        docker push "${_DVC_IMAGE}"
+
+images:
+  - ${_DVC_IMAGE}
+
+serviceAccount: projects/YOUR_PROJECT_ID/serviceAccounts/training-service-account@YOUR_PROJECT_ID.iam.gserviceaccount.com
+
+options:
+  logging: CLOUD_LOGGING_ONLY

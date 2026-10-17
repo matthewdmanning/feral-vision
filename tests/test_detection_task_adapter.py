@@ -17,10 +17,10 @@ from ultralytics.nn.tasks import DetectionModel
 from ultralytics.utils.loss import v8DetectionLoss
 
 # project
-from feral_vision.data.annotations import BBoxAnnotation
-from feral_vision.training.detection import collate_detection, detection_loss
-from feral_vision.training.task_adapters.detection import DetectionTaskAdapter
-from feral_vision.training.trainer import Trainer
+from sightkit_learn.data.annotations import BBoxAnnotation
+from sightkit_learn.training.detection import collate_detection, detection_loss
+from sightkit_learn.training.task_adapters.detection import DetectionTaskAdapter
+from sightkit_learn.training.trainer import Trainer
 
 
 # ---------------------------------------------------------------------------

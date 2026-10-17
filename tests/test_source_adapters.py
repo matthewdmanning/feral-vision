@@ -17,11 +17,11 @@ from omegaconf import OmegaConf
 from torch import nn
 
 # project
-from feral_vision.models.sources.HFAdapter import HFAdapter
-from feral_vision.models.sources.SourceAdapter import SourceAdapter
-from feral_vision.models.sources.TorchHubAdapter import TorchHubAdapter
-from feral_vision.models.sources.UltralyticsAdapter import UltralyticsAdapter
-from feral_vision.tasks import CVTask
+from sightkit_learn.models.sources.HFAdapter import HFAdapter
+from sightkit_learn.models.sources.SourceAdapter import SourceAdapter
+from sightkit_learn.models.sources.TorchHubAdapter import TorchHubAdapter
+from sightkit_learn.models.sources.UltralyticsAdapter import UltralyticsAdapter
+from sightkit_learn.tasks import CVTask
 
 # ---------------------------------------------------------------------------
 # Helpers / local fixtures
@@ -57,7 +57,7 @@ def _make_cfg(
 @pytest.fixture
 def unregistered_model(monkeypatch):
     """Keep metadata inspection independent of external MLflow registry state."""
-    from feral_vision.models import register_model
+    from sightkit_learn.models import register_model
 
     lookup = create_autospec(
         register_model.load_model_registry, side_effect=KeyError("unregistered")
@@ -78,7 +78,7 @@ def unregistered_model(monkeypatch):
 def test_hf_adapter_maps_hub_metadata_to_project_tasks(
     monkeypatch, unregistered_model, pipeline_tag, expected_outputs
 ):
-    hub = importlib.import_module("feral_vision.models.sources.HFAdapter")
+    hub = importlib.import_module("sightkit_learn.models.sources.HFAdapter")
     info = ModelInfo(
         id="test/vision-model",
         pipeline_tag=pipeline_tag,
@@ -102,7 +102,7 @@ def test_hf_adapter_maps_hub_metadata_to_project_tasks(
 def test_hf_adapter_requests_only_weight_files_missing_from_destination(
     tmp_path, monkeypatch
 ):
-    hub = importlib.import_module("feral_vision.models.sources.HFAdapter")
+    hub = importlib.import_module("sightkit_learn.models.sources.HFAdapter")
     destination = tmp_path / "weights"
     destination.mkdir()
     (destination / "config.json").write_bytes(b"cached")
@@ -136,7 +136,7 @@ def test_hf_adapter_requests_only_weight_files_missing_from_destination(
 def test_hf_adapter_explains_how_to_recover_when_the_hub_is_unreachable(
     monkeypatch, unregistered_model
 ):
-    hub = importlib.import_module("feral_vision.models.sources.HFAdapter")
+    hub = importlib.import_module("sightkit_learn.models.sources.HFAdapter")
     info = create_autospec(hub.model_info, side_effect=OfflineModeIsEnabled("offline"))
     monkeypatch.setattr(hub, "model_info", info)
 
@@ -330,7 +330,7 @@ def test_ultralytics_classifier_uses_native_head_adjustment(monkeypatch):
     ],
 )
 def test_get_adapter_discovers_each_declared_source_adapter(source, adapter_name):
-    from feral_vision.models.register_model import get_adapter
+    from sightkit_learn.models.register_model import get_adapter
 
     adapter = get_adapter(source)
 
@@ -339,14 +339,14 @@ def test_get_adapter_discovers_each_declared_source_adapter(source, adapter_name
 
 
 def test_get_adapter_explains_how_to_add_an_unknown_source_adapter():
-    from feral_vision.models.register_model import get_adapter
+    from sightkit_learn.models.register_model import get_adapter
 
     with pytest.raises(KeyError, match="no adapter for source 'unknown_source'"):
         get_adapter("unknown_source")
 
 
 def test_model_builder_delegates_remote_architecture_to_selected_adapter(monkeypatch):
-    from feral_vision.models import register_model
+    from sightkit_learn.models import register_model
 
     expected_model = nn.Identity()
     adapter = create_autospec(SourceAdapter, instance=True, spec_set=True)

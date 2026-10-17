@@ -1,0 +1,10 @@
+defaults:
+  - model_schema
+  - _self_
+
+architecture:
+  source: ultralytics
+  id: yolo11n-seg.pt
+  location: ultralytics.YOLO
+
+weights: null

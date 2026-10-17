@@ -12,7 +12,7 @@ import pytest
 import yaml
 from google.cloud import storage
 
-from feral_vision.data.dataset_artifact import publish_dataset_artifact
+from sightkit_learn.data.dataset_artifact import publish_dataset_artifact
 
 
 @pytest.fixture
@@ -169,7 +169,9 @@ def test_publish_dataset_artifact_rejects_zero_retention(
 def test_publication_script_publishes_without_dvc() -> None:
     """The Cloud Job publishes the payload and manifest with no DVC command."""
     repository_root = Path(__file__).resolve().parents[1]
-    script = (repository_root / "scripts/cloud/publish_dataset_artifact.sh").read_text()
+    script = (
+        repository_root / "feral-vision/scripts/cloud/publish_dataset_artifact.sh"
+    ).read_text()
 
     assert "publish_dataset_artifact(" in script
     assert "dvc" not in script
@@ -179,10 +181,12 @@ def test_preparation_config_requires_separate_immutable_images() -> None:
     """Acquisition and DVC publication remain separate Cloud Build steps."""
     repository_root = Path(__file__).resolve().parents[1]
     config = yaml.safe_load(
-        (repository_root / "deploy/cloudbuild.prepare.yaml").read_text()
+        (repository_root / "feral-vision/deploy/cloudbuild.prepare.yaml").read_text()
     )
     dvc_dockerfile = (
-        (repository_root / "deploy/dataset-publisher/Dockerfile").read_text().lower()
+        (repository_root / "feral-vision/deploy/dataset-publisher/Dockerfile")
+        .read_text()
+        .lower()
     )
 
     assert [step["id"] for step in config["steps"]] == [

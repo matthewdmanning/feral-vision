@@ -22,10 +22,10 @@ from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from feral_vision.data.annotations import BBoxAnnotation
-from feral_vision.training.optim import build_loss_fn, build_optimizer
-from feral_vision.training.trainer import Trainer
-from feral_vision.training.tracking import active_mlflow_run
+from sightkit_learn.data.annotations import BBoxAnnotation
+from sightkit_learn.training.optim import build_loss_fn, build_optimizer
+from sightkit_learn.training.trainer import Trainer
+from sightkit_learn.training.tracking import active_mlflow_run
 
 
 def test_active_run_keeps_its_tracking_store_and_experiment(tmp_path, tracking_uri):

@@ -23,13 +23,13 @@ mlflow.db
 !locals.tf
 
 # DVC-tracked data and model artifacts
-/data/**
-!/data/**/
-!/data/**/.gitkeep
-!/data/**/*.dvc
-!/data/**/.gitignore
-/models/**
-!/models/**/.gitkeep
+/feral-vision/data/**
+!/feral-vision/data/**/
+!/feral-vision/data/**/.gitkeep
+!/feral-vision/data/**/*.dvc
+!/feral-vision/data/**/.gitignore
+/feral-vision/models/**
+!/feral-vision/models/**/.gitkeep
 .dvc/tmp/
 .dvc/cache/
 
@@ -41,10 +41,10 @@ mlflow.db
 # Terraform local working state, plans, and generated preflight reports
 terraform/.terraform/
 **/.terraform/
-terraform/*.tfstate
-terraform/*.tfstate.*
-terraform/*.tfplan
-terraform/preflight/reports/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+feral-vision/terraform/preflight/reports/
 # Run inputs name the project, service account, buckets, and image digest.
 *.tfvars
 
@@ -67,6 +67,6 @@ docs/external_refs/mlflow_examples.md
 # Local augmentation-preview renders
 aug_preview/
 
-terraform/runs/detection/run.tfvars
+feral-vision/terraform/runs/detection/run.tfvars
 # Ephemeral first augmented detection-run evidence
 artifacts/*/

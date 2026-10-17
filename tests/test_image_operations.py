@@ -11,7 +11,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BUILD_SCRIPT = ROOT / "scripts" / "cloud" / "build_training_image.sh"
+BUILD_SCRIPT = ROOT / "feral-vision" / "scripts" / "cloud" / "build_training_image.sh"
 VALID_DIGEST = "sha256:" + "a" * 64
 
 
@@ -102,7 +102,7 @@ def test_build_training_image_submits_canonical_build_and_returns_digest(
     )
     assert any(
         call.startswith("builds submit . ")
-        and "--config=deploy/cloudbuild.training-image.yaml" in call
+        and "--config=feral-vision/deploy/cloudbuild.training-image.yaml" in call
         and (
             "--substitutions=_TRAINING_IMAGE="
             "us-east4-docker.pkg.dev/fixture-project/feral-docker/trainer:candidate"

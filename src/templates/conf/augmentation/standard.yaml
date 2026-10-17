@@ -1,0 +1,7 @@
+defaults:
+  - augmentation_schema
+  - _self_
+
+name: standard
+seed: 0
+ops: []

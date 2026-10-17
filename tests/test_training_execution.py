@@ -7,8 +7,8 @@ import torch
 from torch import nn
 from torchvision.models.detection import FasterRCNN, MaskRCNN
 
-from feral_vision.training.execution import model_loss, prediction_loss
-from feral_vision.training.batching import collate_huggingface, collate_vision
+from sightkit_learn.training.execution import model_loss, prediction_loss
+from sightkit_learn.training.batching import collate_huggingface, collate_vision
 
 
 @pytest.mark.parametrize("task", ["classification", "semantic-segmentation"])

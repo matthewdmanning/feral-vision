@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+ROOT = REPOSITORY_ROOT / "feral-vision"
 
 
 def test_only_one_complete_training_recipe_exists() -> None:
@@ -41,7 +42,7 @@ def test_gpu_runtime_uses_dataset_manifest_and_not_dvc() -> None:
 
 def test_training_image_matches_locked_torch_cuda_generation() -> None:
     dockerfile = (ROOT / "deploy" / "Dockerfile.gcp").read_text()
-    lockfile = (ROOT / "uv.lock").read_text()
+    lockfile = (REPOSITORY_ROOT / "uv.lock").read_text()
 
     # PyTorch 2.12.1 in this lock uses CUDA 13 user-space dependencies. Keep
     # the container's NVIDIA CUDA major aligned so an environment update cannot
@@ -60,7 +61,7 @@ def test_training_image_is_reproducible_and_smoke_checked() -> None:
     assert "uv sync --frozen --no-dev --no-editable" in dockerfile
     assert "--config-name runs/detection --cfg job" in dockerfile
     assert (
-        'ENTRYPOINT ["bash", "/workspace/scripts/runs/container_train.sh"]'
+        'ENTRYPOINT ["bash", "/workspace/feral-vision/scripts/runs/container_train.sh"]'
         in dockerfile
     )
 

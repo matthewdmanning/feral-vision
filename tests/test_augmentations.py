@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 # project
-from feral_vision.data.augmentations import (
+from sightkit_learn.data.augmentations import (
     AugmentationSweep,
     _instantiate_transform,
     build_augmentation_previews,
