@@ -43,7 +43,7 @@ variables {
   training_image               = "us-east4-docker.pkg.dev/test-project/feral-docker/trainer@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   dataset_artifact_prefix      = "datasets/coco/train2017/variant-a"
   source_annotation_generation = "1756000000000001"
-  artifact_prefix              = "${var.gcs_uri_prefix}YOUR_OPERATIONS_BUCKET/runs/detection"
+  artifact_prefix              = "${var.gcs_uri_prefix}test-operations-bucket/runs/detection"
 }
 
 run "single_gpu_trainer_shape_is_fixed" {
@@ -53,11 +53,6 @@ run "single_gpu_trainer_shape_is_fixed" {
   assert {
     condition     = output.trainer_instance_name == "feral-vision-detection-run-20260921-abc"
     error_message = "Trainer instance name must derive from run_id."
-  }
-
-  assert {
-    condition     = length(output.trainer_instance_name) <= 63
-    error_message = "Generated trainer name must fit the Compute Engine 63-character limit."
   }
 
   assert {
@@ -106,7 +101,7 @@ run "single_gpu_trainer_shape_is_fixed" {
   }
 
   assert {
-    condition     = output.boot_image == "https://www.googleapis.com/compute/v1/projects/deeplearning-platform-release/global/images/pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260901"
+    condition     = google_compute_instance.trainer.boot_disk[0].initialize_params[0].image == "https://www.googleapis.com/compute/v1/projects/deeplearning-platform-release/global/images/pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260901"
     error_message = "The plan must pin the concrete DLVM image resolved from the NVIDIA-580 family."
   }
 
@@ -116,7 +111,7 @@ run "single_gpu_trainer_shape_is_fixed" {
   }
 
   assert {
-    condition     = output.run_artifact_uri == "${var.gcs_uri_prefix}YOUR_OPERATIONS_BUCKET/runs/detection/run-20260921-abc"
+    condition     = output.run_artifact_uri == "${var.gcs_uri_prefix}test-operations-bucket/runs/detection/run-20260921-abc"
     error_message = "Run artifact URI must be scoped to run_id."
   }
 
@@ -269,4 +264,84 @@ run "rejects_a_run_duration_above_the_maximum" {
   }
 
   expect_failures = [var.max_run_duration_seconds]
+}
+
+run "rejects_an_artifact_uri_without_a_bucket" {
+  command = plan
+  module { source = "../runs/detection" }
+  variables { artifact_prefix = "${var.test_gcs_uri_prefix}/runs/detection" }
+  expect_failures = [var.artifact_prefix]
+}
+
+run "rejects_a_trailing_dataset_slash" {
+  command = plan
+  module { source = "../runs/detection" }
+  variables { dataset_artifact_prefix = "datasets/coco/variant/" }
+  expect_failures = [var.dataset_artifact_prefix]
+}
+
+run "rejects_an_ssd_mount_outside_mnt" {
+  command = plan
+  module { source = "../runs/detection" }
+  variables {
+    local_ssd_mount_dir         = "/srv/ssd"
+    dataset_host_mount_dir      = "/srv/ssd/dataset"
+    dataset_container_mount_dir = "/data/dataset"
+  }
+  expect_failures = [var.local_ssd_mount_dir]
+}
+
+run "rejects_a_dataset_at_the_ssd_root" {
+  command = plan
+  module { source = "../runs/detection" }
+  variables {
+    dataset_host_mount_dir      = "/mnt/disks/ssd"
+    dataset_container_mount_dir = "/data"
+  }
+  expect_failures = [var.dataset_host_mount_dir]
+}
+
+run "custom_inputs_reach_the_vm_and_startup" {
+  command = plan
+  module { source = "../runs/detection" }
+  variables {
+    local_ssd_mount_dir          = "/mnt/custom-ssd"
+    dataset_host_mount_dir       = "/mnt/custom-ssd/nested/dataset"
+    dataset_container_mount_dir  = "/data/nested/dataset"
+    service_account_email        = "alternate@test-project.iam.gserviceaccount.com" # gitleaks:allow -- fictional mocked service account
+    instance_tags                = ["custom-training"]
+    source_annotation_generation = "1756000000000999"
+    mlflow_tracking_uri          = "https://tracking.example.invalid"
+    max_run_duration_seconds     = 600
+  }
+  assert {
+    condition = (
+      google_compute_instance.trainer.service_account[0].email == "alternate@test-project.iam.gserviceaccount.com" && # gitleaks:allow -- fictional mocked service account
+      toset(google_compute_instance.trainer.tags) == toset(["custom-training"]) &&
+      google_compute_instance.trainer.scheduling[0].max_run_duration[0].seconds == 600
+    )
+    error_message = "Caller identity, firewall tags, and minimum lifetime must reach the VM."
+  }
+  assert {
+    condition = alltrue([
+      for assignment in [
+        "readonly local_ssd_mount_dir=\"/mnt/custom-ssd\"",
+        "readonly dataset_host_mount_dir=\"/mnt/custom-ssd/nested/dataset\"",
+        "readonly dataset_container_mount_dir=\"/data/nested/dataset\"",
+        "readonly mlflow_tracking_uri=\"https://tracking.example.invalid\"",
+        "annotations/instances.json#1756000000000999\""
+      ] : strcontains(google_compute_instance.trainer.metadata_startup_script, assignment)
+    ])
+    error_message = "The rendered startup assignments must retain custom mounts, tracking URI, and annotation generation."
+  }
+}
+
+run "accepts_the_maximum_run_duration" {
+  command = plan
+  module { source = "../runs/detection" }
+  variables { max_run_duration_seconds = 604800 }
+  assert {
+    condition     = google_compute_instance.trainer.scheduling[0].max_run_duration[0].seconds == 604800
+    error_message = "The maximum supported lifetime must be accepted and passed to Compute Engine."
+  }
 }

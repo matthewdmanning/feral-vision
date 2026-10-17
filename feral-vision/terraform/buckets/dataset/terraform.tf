@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 1.15"
+  required_version = "~> 1.16"
 
   backend "gcs" {
     bucket = "feral-vision-operations-us-east4"
@@ -9,7 +9,7 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "~> 6.0"
+      version = "~> 8.0"
     }
   }
 }
