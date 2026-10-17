@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import json
 import math
 from pathlib import Path
-from typing import Any
 
 import torch
 from torchvision.io import read_image
@@ -16,68 +14,6 @@ from feral_vision.data.annotations import (
 
 _IMAGES_DIR = "images"
 _ANNOTATIONS_DIR = "annotations"
-
-
-def load_image(path: str | Path):
-    """Use this function to load an image from disk as an unchanged NumPy array (BGR, any depth).
-
-    Parameters
-    ----------
-    path : str or Path
-        Path to the image file.
-
-    Returns
-    -------
-    numpy.ndarray
-        Image array as read by OpenCV (BGR channel order, native bit depth).
-    """
-    import cv2
-
-    return cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
-
-
-def save_image(image, path: str | Path) -> None:
-    """Use this function to write a NumPy image array to disk.
-
-    Parameters
-    ----------
-    image : numpy.ndarray
-        Image array in BGR channel order.
-    path : str or Path
-        Destination file path. Extension determines the format.
-    """
-    import cv2
-
-    cv2.imwrite(str(path), image)
-
-
-def read_json(path: str | Path) -> Any:
-    """Use this function to load a JSON file and return its contents as a Python object.
-
-    Parameters
-    ----------
-    path : str or Path
-        Path to the JSON file.
-
-    Returns
-    -------
-    Any
-        Parsed JSON content.
-    """
-    return json.loads(Path(path).read_text())
-
-
-def write_json(data: Any, path: str | Path) -> None:
-    """Use this function to serialise a Python object to a pretty-printed JSON file.
-
-    Parameters
-    ----------
-    data : Any
-        JSON-serialisable object.
-    path : str or Path
-        Destination file path.
-    """
-    Path(path).write_text(json.dumps(data, indent=2))
 
 
 def _build_index(root: Path) -> list[tuple[Path, list[Path]]]:

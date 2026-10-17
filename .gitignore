@@ -67,5 +67,6 @@ docs/external_refs/mlflow_examples.md
 # Local augmentation-preview renders
 aug_preview/
 
+terraform/runs/detection/run.tfvars
 # Ephemeral first augmented detection-run evidence
 artifacts/*/
