@@ -32,7 +32,20 @@ separates model inputs from labels and yields predictions with original targets
 for accuracy scoring; input-only streams retain `predict_batches` semantics.
 Dataset/collator and loss/metric choices define annotation interpretation.
 
-## Training deployment
+## Generic container training
+
+Start with the prepared VM/container and already-created cloud inputs. Download
+those inputs, then invoke `scripts/runs/cloud_train.sh` with the selected Hydra
+config. It calls the library builders and `Trainer.fit`, captures logs, saves
+history and exports run outputs to an instance/attempt prefix in the existing
+bucket. No DVC operations or Hydra overrides are added. Terminal status is
+published after final output verification, including when training fails.
+
+See the [training guide](../guide/training.rst) for inputs, output locations and
+recovery. The generic runner does not select or replace the existing detection
+deployment below.
+
+## Existing detection deployment
 
 ```mermaid
 flowchart TB

@@ -6,6 +6,13 @@ split is [modules.md](../domain/modules.md).
 
 ## The training loop belongs in the library
 
+Best-checkpoint writes use a temporary file and atomic replacement. A failed
+save preserves the previous checkpoint, and concurrent output exports can read
+the previous complete checkpoint. The container's generic
+`scripts/runs/cloud_train.sh` retains the returned history, logs and MLflow
+outputs in an instance-specific bucket prefix; this deployment behavior stays
+outside the library training loop. See [Cloud Operations](cloudops.md).
+
 A vision-learning library must implement training. Epoch and batch iteration,
 forward passes, loss calculation, backward passes, optimizer and scheduler
 steps, validation, checkpoint selection, and experiment tracking are legitimate

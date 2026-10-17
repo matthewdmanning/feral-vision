@@ -10,8 +10,11 @@ run metadata and asynchronous metrics live in :mod:`.tracking`.
 from __future__ import annotations
 
 import math
+import os
+import tempfile
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from mlflow.utils.async_logging.run_operations import RunOperations
@@ -175,7 +178,13 @@ class Trainer:
 
     def _save_best(self) -> None:
         self.best_model_path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save(self.model.state_dict(), self.best_model_path)
+        # Keep the previous checkpoint readable during exports or a failed save.
+        with tempfile.TemporaryDirectory(
+            prefix=".checkpoint-", dir=self.best_model_path.parent
+        ) as temporary:
+            checkpoint = Path(temporary) / "weights"
+            torch.save(self.model.state_dict(), checkpoint)
+            os.replace(checkpoint, self.best_model_path)
 
     def fit(
         self,
@@ -304,18 +313,18 @@ def build_trainer(cfg: Any) -> Trainer:
     Trainer
         Fully wired trainer ready to call :meth:`~Trainer.fit`.
     """
-    from sightkit_learn.models.register_model import model_builder
-    from sightkit_learn.training.optim import (
-        build_loss_fn,
-        build_optimizer,
-        build_scheduler,
-    )
-
     from functools import partial
+
+    from sightkit_learn.models.register_model import model_builder
     from sightkit_learn.training.execution import (
         huggingface_loss,
         model_loss,
         ultralytics_loss,
+    )
+    from sightkit_learn.training.optim import (
+        build_loss_fn,
+        build_optimizer,
+        build_scheduler,
     )
 
     task = TRAINING_TASKS[getattr(cfg.train, "task", "generic")]
@@ -405,8 +414,10 @@ def build_dataloader(cfg: Any):
         Loader for the selected provider's prepared batch contract.
     """
     from functools import partial
+
     from hydra.utils import instantiate, to_absolute_path
     from torch.utils.data import DataLoader, default_collate
+
     from sightkit_learn.data.batching import collate_huggingface, collate_vision
     from sightkit_learn.data.loading import instantiate_dataloader
     from sightkit_learn.training.detection import collate_detection
@@ -448,6 +459,7 @@ def build_dataloader(cfg: Any):
 def main() -> None:
     """Execute the canonical Hydra-configured training entrypoint."""
     import hydra
+
     from sightkit_learn.config.store import register_configs
 
     register_configs()
