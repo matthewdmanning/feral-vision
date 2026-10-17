@@ -3,6 +3,15 @@
 This is the canonical shared guidance for agents working in Feral Vision.
 Platform entrypoints link here instead of maintaining copies.
 
+## Correctness and error handling
+
+Write good code. Test it effectively and efficiently instead of catching errors
+that won't reasonably occur given the codebase.
+
+An exception to this rule requires identifying a concrete case where the catch
+is demonstrably useful and establishing that catching the error is the best
+way to handle that case. Keeping execution running is not sufficient by itself.
+
 ## File Format
 
 Dated project documents use `YYYY-MM-DD-{activity_name}`. The `activity_name`
@@ -14,13 +23,18 @@ do not use this naming convention.
 
 ## Code location
 
-Place code that is agnostic to a particular model, data source, bucket, or
-server in `src/feral_vision/`. Place code specific to a configuration, model,
-augmentation composition, data source, bucket, or server in an appropriate
-subfolder of `scripts/`.
+[Module layout](../domain/modules.md) is authoritative for the released library,
+templates, production implementation, and development tools. The current
+`src/feral_vision/` tree has not yet been migrated to that layout; its location
+alone does not establish whether a responsibility belongs in the release.
 
-Code under `src/` must **never** import from a project file or subfolder outside
-`src/`.
+The library includes the training loop and reusable training orchestration.
+Executable control flow is not evidence that code is production-specific.
+Before reviewing training code or classifying it for release, read
+[Training architecture](training.md).
+
+The generic library must not import production scripts, configuration files,
+or other project code outside its library package.
 
 ## Routing
 
@@ -68,9 +82,12 @@ See [Check for an existing image first](cloudops.md#check-for-an-existing-image-
 | If your task involves… | Reference | File contents |
 | --- | --- | --- |
 | project architecture or system integration | [Program flow](program-flow.md) | Data, model-sourcing, and cloud-training flows. Tool ownership: **DVC**. |
+| training code, training contracts, or deciding whether training code belongs in the release | [Training architecture](training.md) | Library training behavior versus concrete Hydra/Terraform choices; brownfield review constraints. |
+| inference, MLflow model reloading, or prediction input/output contracts | [Inference](inference.md) | Native MLflow loading, Hydra configuration, prepared inputs, and preserved model outputs. |
+| tensor dtypes, mixed precision, quantization, or device precision support | [Data types and execution precision](../guide/precision.rst) | Hardware/runtime choices, target dtype preservation, and current AMP limitations. |
 | project code or authored documentation | [Coding standards](coding-standards.md) | Documentation and code-quality requirements. |
 | user-facing chat, summaries, or an operator command | [User interactions](user-interactions.md) | User-facing collaboration preferences, CLI ownership, and copy-pasteable command requirements. Tool ownership: **Scripts and source code**. |
-| Python tests, fixtures, or model examples | [Test writing and review](testing.md) | Required testing skill and test-data rules. |
+| Python tests, fixtures, or model examples | [Test writing and review](testing.md) | Pytest best practices, mocking scope, and test-data rules. |
 | data ingestion, dataset layout, or publication | [Data and ingestion](data.md) | Dataset layout, publication, lineage, and acquisition. Tool ownership: **DVC**. |
 | Hydra or model configuration | [Configuration](configuration.md) | Recipe and reproducibility requirements. Tool ownership: **Hydra**. |
 | locating a Hydra configuration concern | [Hydra configuration index](hydra.md) | Configuration README index by concern. Tool ownership: **Hydra**. |

@@ -1,5 +1,37 @@
 # Program Flow
 
+For the distinction between reusable training behavior and concrete
+Hydra/Terraform choices, read [Training architecture](training.md). The
+training loop belongs in the library; this deployment flow does not make it
+production-specific.
+
+The library uses one loss-computation callable and one optimizer loop. Run-level
+MLflow metadata, asynchronous epoch metric submission/completion, and selected
+model publication are separated into `training/tracking.py`. Detection batching
+and native-assigned loss computation are independent functions. See
+[Training architecture](training.md#training-execution-contracts) for the
+current call contracts; these changes do not alter deployment or Dataset
+publication ownership.
+
+Hydra selects common task execution and prepared DataLoaders. Built-in loss
+functions preserve tensor/semantic outputs and native TorchVision, Hugging
+Face, and Ultralytics training contracts. MLflow publication serializes the
+selected native model without a project inference pass or tensor-only output
+conversion; its format and optional examples/signatures are Hydra settings.
+
+Inference consumes the published model through an MLflow URI (including
+registered versions and aliases), loads it once with `build_predictor`, and
+runs prepared batches through native PyTorch inference. Hydra selects device,
+calling convention, forward options, and optional processors. Outputs keep
+their provider's structure. See [Inference](inference.md) for the contract.
+
+Training and inference share Hydra DataLoader construction in `data.loading`.
+Native library datasets and custom human-annotation/distillation sources can
+retain their own target structures. `Predictor.predict_dataset` explicitly
+separates model inputs from labels and yields predictions with original targets
+for accuracy scoring; input-only streams retain `predict_batches` semantics.
+Dataset/collator and loss/metric choices define annotation interpretation.
+
 ## Training deployment
 
 ```mermaid

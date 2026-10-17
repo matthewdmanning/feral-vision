@@ -62,7 +62,7 @@ def _build_index(root: Path) -> list[tuple[Path, list[Path]]]:
 
 
 def _read_image_tensor(path: Path) -> torch.Tensor:
-    """Use this function to load an image as a ``(C, H, W)`` uint8 tensor for use in PyTorch datasets.
+    """Use this function to load an image as a ``(C, H, W)`` tensor using TorchVision's unchanged decoding.
 
     Parameters
     ----------
@@ -72,7 +72,8 @@ def _read_image_tensor(path: Path) -> torch.Tensor:
     Returns
     -------
     torch.Tensor
-        Image tensor of shape ``(C, H, W)`` with dtype ``uint8``.
+        Image tensor of shape ``(C, H, W)`` retaining the decoded channel
+        count and supported source bit depth, such as uint8 or uint16 PNG.
     """
     return read_image(str(path))
 
@@ -137,7 +138,8 @@ class DatasetSource:
         Returns
         -------
         tuple[torch.Tensor, list[Annotation]]
-            ``(image, annotations)`` where image is ``(C, H, W)`` uint8.
+            ``(image, annotations)`` where the image is a ``(C, H, W)`` tensor
+            with the decoder's channel count and dtype.
         """
         img_path, ann_paths = self._index[index]
         return _read_image_tensor(img_path), [_load_annotation(p) for p in ann_paths]

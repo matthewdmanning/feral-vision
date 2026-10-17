@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from huggingface_hub import hf_hub_download, model_info
+from hydra.utils import instantiate
 from omegaconf import DictConfig
 from torch import nn
 
@@ -27,7 +29,26 @@ _TAG_TO_OUTPUTS: dict[str, list[CVTask]] = {
 
 
 class HFAdapter(SourceAdapter):
-    def fetch(self, cfg: DictConfig) -> nn.Module:
+    """Inspect Hub metadata and load the Hydra-selected Transformers task head."""
+
+    def fetch(self, cfg: DictConfig, *, task: str | None = None) -> nn.Module:
+        """Load configured weights with native options and the selected task-head class.
+
+        Parameters
+        ----------
+        cfg : DictConfig
+            Model source, optional weight destination, and constructor options.
+        task : str, optional
+            Training task selected by Hydra; omitted for legacy generic loading.
+
+        Returns
+        -------
+        nn.Module
+            Native PyTorch module with the selected task implementation.
+        """
+        options = instantiate(cfg.architecture.get("kwargs", {}), _convert_="all")
+        if cfg.architecture.get("num_classes") is not None:
+            options["num_labels"] = cfg.architecture.num_classes
         weights = getattr(cfg, "weights", None)
         location = getattr(weights, "location", None) if weights else None
 
@@ -40,9 +61,9 @@ class HFAdapter(SourceAdapter):
                     hf_hub_download(
                         repo_id=cfg.architecture.id, filename=filename, local_dir=dest
                     )
-            return _load_local(dest, list(weights.id))
+            return _load_local(dest, list(weights.id), task=task, **options)
 
-        return _load_direct(cfg.architecture.id)
+        return _load_direct(cfg.architecture.id, task=task, **options)
 
     def inspect(
         self, cfg: DictConfig, *, fetch_if_needed: bool = False
@@ -77,25 +98,36 @@ class HFAdapter(SourceAdapter):
         return _inspect_loaded(self.fetch(cfg))
 
 
-def _load_local(dest: Path, filenames: list[str]) -> nn.Module:
-    import torch
+def _auto_model(task: str | None):
+    """Select the upstream Transformers task-head auto class without fetching a model."""
+    import transformers
+    from feral_vision.tasks import TRAINING_TASKS
 
-    try:
-        from transformers import AutoModel
+    classes = {
+        "generic": "AutoModel",
+        "classification": "AutoModelForImageClassification",
+        "detection": "AutoModelForObjectDetection",
+        "semantic_segmentation": "AutoModelForSemanticSegmentation",
+        "instance_segmentation": "AutoModelForInstanceSegmentation",
+        "panoptic_segmentation": "AutoModelForUniversalSegmentation",
+        "pose": "AutoModelForPoseEstimation",
+    }
+    return getattr(transformers, classes[TRAINING_TASKS[task or "generic"]])
 
-        return AutoModel.from_pretrained(str(dest), local_files_only=True)
-    except Exception:
-        pass
-    return torch.load(dest / filenames[0], map_location="cpu", weights_only=False)
 
+def _load_local(
+    dest: Path, filenames: list[str], *, task: str | None = None, **options: Any
+) -> nn.Module:
+    """Load an explicit serialized module or a local Transformers task model."""
+    if len(filenames) == 1 and Path(filenames[0]).suffix in {".pt", ".pth"}:
+        import torch
 
-def _load_direct(repo_id: str) -> nn.Module:
-    try:
-        from transformers import AutoModel
-
-        return AutoModel.from_pretrained(repo_id)
-    except Exception:
-        pass
-    raise RuntimeError(
-        f"cannot load {repo_id!r} directly into memory; provide cfg.weights.location"
+        return torch.load(dest / filenames[0], map_location="cpu", weights_only=False)
+    return _auto_model(task).from_pretrained(
+        str(dest), local_files_only=True, **options
     )
+
+
+def _load_direct(repo_id: str, *, task: str | None = None, **options: Any) -> nn.Module:
+    """Load the selected upstream task class using the configured provider options."""
+    return _auto_model(task).from_pretrained(repo_id, **options)

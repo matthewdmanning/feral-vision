@@ -15,13 +15,59 @@ publication. Data operation entrypoints live in
 A Dataset Variant is a Dataset. The `dataset-artifact.json` manifest owns the
 file list of a Dataset Artifact.
 
-Every dataset root has `images/` and `annotations/` directories. Annotation
-files match image stems: masks use `.png` or `.jpg`, YOLO boxes use `.txt`, and
-`names.yaml` records class indices. The runtime loader does not support
-classification JSON or raw COCO JSON and scans only immediate children of these
-directories. Raw COCO acquisition therefore needs conversion before training.
-The data source dispatch in `data/fetch.py` must resolve every source to the
-required training layout; the current COCO fetch output does not yet meet it.
+The existing publication workspace has `images/` and `annotations/` directories.
+The selected format determines annotation packaging; COCO can use a shared
+`annotations/instances.json`. The legacy `DatasetSource` reader instead matches
+annotation files to image stems: masks use `.png` or `.jpg`, YOLO boxes use
+`.txt`, and `names.yaml` records class indices. That reader does not
+support classification JSON or raw COCO JSON and scans only immediate children
+of these directories. Its limitations are not requirements on other dataset
+readers: Hydra can instantiate native PyTorch/TorchVision datasets directly.
+For example, `ImageFolder` reads class directories and `CocoDetection` reads
+COCO JSON; neither requires project Annotation objects or a format conversion.
+The COCO output from `data/fetch.py` is incompatible with the legacy reader;
+select a compatible native reader when consuming that format.
+
+## Runtime packaging for training and inference
+
+`data.loading.instantiate_dataloader` shares Hydra construction between the
+training and inference builders. A collator inside the DataLoader specification
+takes precedence over the builder's collator. `data.batching` contains the
+existing native-vision and Hugging Face collators; their former
+`training.batching` paths remain compatibility imports. PyTorch default
+collation remains suitable for fixed tensors and class/mask targets.
+
+Dataset readers and transforms establish the native sample contract. For COCO
+boxes/masks, TorchVision's `wrap_dataset_for_transforms_v2` wraps `CocoDetection`
+and supplies per-image `boxes`, `labels`, and `masks`; v2 transforms operate
+jointly on the image and typed targets. This reader/wrapper path is tested
+without downloading data. Retain native dataset structures whenever they fit.
+
+Custom sources are also valid, including human annotation and distillation.
+Their targets can be soft distributions, masks, keypoints, embeddings, polygons,
+or other structures accepted by the configured consumer. The examples above
+are not an annotation whitelist. Select a Dataset/IterableDataset and collator
+that retain the required structure; the loss or accuracy metric determines its
+meaning. Shared loader construction and labeled inference do not infer labels,
+convert teacher targets to hard classes, or require Annotation subclasses.
+Device transfer preserves target dtypes. Read the
+[precision guide](../guide/precision.rst) before changing image scaling,
+floating precision, or annotation dtypes.
+
+`AnnotationDataset` and `StreamingAnnotationDataset` remain optional consumers
+of the existing stem-matched payload. Their default output is a CHW image tensor
+plus loaded Annotation objects. TorchVision decoding preserves channel count
+and supported source bit depth, including grayscale/RGBA and uint16 PNG; RGB
+conversion, scaling, and normalization require the selected processor. `target_transform` selects an existing
+conversion when a consumer needs tensors. These are the retained project
+dataset implementations; native library datasets remain selectable through Hydra.
+
+Labeled inference uses `Predictor.predict_dataset`: it yields native
+predictions alongside original targets without forwarding labels into the
+model. Pair batches use indices zero and one. Other batch containers select
+inputs/targets explicitly through Hydra-instantiated standard callables, such
+as `operator.itemgetter` or `operator.attrgetter`. Input-only streams continue
+using `predict_batches`. See [Inference](inference.md).
 
 ~~~folder
 datasets/<dataset>/<artifact>/

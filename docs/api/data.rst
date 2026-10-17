@@ -1,6 +1,12 @@
 Data
 ====
 
+.. automodule:: feral_vision.data.loading
+   :members:
+
+.. automodule:: feral_vision.data.batching
+   :members:
+
 .. automodule:: feral_vision.data.dataset
    :members:
 

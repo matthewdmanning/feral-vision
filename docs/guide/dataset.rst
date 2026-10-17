@@ -116,11 +116,15 @@ A fresh checkout with no registered Dataset can also report ``{}``.
 Dataset formats and producer responsibilities
 ---------------------------------------------
 
-The training loader scans immediate children of ``images/`` and
+The legacy ``DatasetSource`` reader scans immediate children of ``images/`` and
 ``annotations/`` and matches filenames by stem. YOLO ``.txt`` rows contain class
 index and normalized ``x_center y_center width height``. Masks use ``.png``,
 ``.jpg``, ``.jpeg``, or ``.bmp``. ``names.yaml`` is excluded from matching.
-There is no on-disk classification JSON or COCO JSON loader.
+That reader has no classification JSON or COCO JSON support. Other dataset
+readers are selectable through Hydra: native ``torchvision.datasets.ImageFolder``
+and ``CocoDetection`` require neither custom Annotation objects nor conversion
+to the legacy reader's format. Dataset publication layout and the selected
+runtime reader's sample contract are separate concerns.
 
 The implemented producers have different contracts:
 
@@ -139,9 +143,43 @@ The implemented producers have different contracts:
   the configured operations and ``seed + image_index``. Its producer must retain
   the source Artifact link, operations, seed, and ordering as lineage.
 
-COCO acquisition therefore requires conversion before the per-image annotation
-loader can train on it. Registering raw COCO with DVC is valid; registration
-alone does not make it compatible with the Training Script.
+COCO acquisition requires either a compatible native reader or conversion for
+the legacy per-image annotation reader. Registering raw COCO with DVC is valid;
+the Training Script must select a reader and transforms matching its format.
+
+Runtime batches
+---------------
+
+Training and inference use PyTorch DataLoaders constructed by Hydra through
+the shared ``data.loading.instantiate_dataloader`` function. Native fixed
+tensor/label samples use PyTorch's default collation. The existing
+``data.batching.collate_vision`` retains variable-size image lists and per-image
+target dictionaries; ``collate_huggingface`` retains ragged processor labels.
+The former ``training.batching`` import paths remain available.
+
+For native COCO boxes and masks, select ``torchvision.datasets.CocoDetection``
+inside ``torchvision.datasets.wrap_dataset_for_transforms_v2`` with
+``target_keys: [boxes, labels, masks]``. Configure joint v2 transforms on the
+underlying dataset and ``collate_vision`` on its DataLoader. TorchVision supplies
+the typed XYXY boxes and masks; no project annotation class is required. See
+the `official v2 example <https://docs.pytorch.org/vision/stable/auto_examples/transforms/plot_transforms_e2e.html>`_.
+
+Existing ``AnnotationDataset`` and ``StreamingAnnotationDataset`` remain
+supported for stem-matched payloads. They yield CHW image tensors with decoded channel count/bit depth and loaded
+Annotation objects; their optional ``target_transform`` can select a tensor
+representation. These custom datasets are compatibility options, not a
+required representation for training or inference.
+
+Custom sources may yield arbitrary annotation structures from human annotation,
+distillation, or other upstream processes. Configure the dataset and collator
+to retain the structure expected by the chosen model/loss/metric. Soft teacher
+distributions do not become hard labels automatically. The configured external
+training criterion can receive nested targets with tensors moved to the model's
+device; non-tensor metadata is retained.
+
+Labeled inference keeps targets outside the model call and yields them beside
+native predictions for accuracy scoring. See :doc:`inference` for configuration
+and :doc:`training` for task-specific training batch contracts.
 
 Cloud publication: existing implementation
 ------------------------------------------

@@ -38,6 +38,7 @@ class SourceConfig:
     id: str = MISSING  # hub repo ID, model name, dotted class path, or URL
     location: str = MISSING  # stable source location or dotted local class path
     num_classes: Optional[int] = None  # task head size when the source supports it
+    kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -222,15 +223,35 @@ class TrainConfig:
     num_workers: int = 0
     device: str = "cuda"
     task: str = "generic"
+    loss_mode: str = "auto"
+    aux_weight: float = 0.5
+    best_model_path: str = "models/registry/best.pt"
+    dataloader: Any = None
+    collate_fn: Any = None
+    monitor: Optional[str] = None
+    mode: str = "min"
+    scheduler_monitor: Optional[str] = None
     num_classes: int = 0
     optim: OptimConfig = MISSING
-    loss_fn: LossFnConfig = MISSING
-    scheduler: SchedulerConfig = MISSING
+    loss_fn: Optional[LossFnConfig] = None
+    scheduler: Optional[SchedulerConfig] = None
 
 
 # --- Inference --------------------------------------------------------------
 @dataclass
 class InferenceConfig:
+    """Native MLflow inference and optional task-specific processing settings."""
+
+    model_uri: Optional[str] = None
+    call_mode: str = "auto"
+    load_kwargs: dict[str, Any] = field(default_factory=dict)
+    forward_kwargs: dict[str, Any] = field(default_factory=dict)
+    preprocess: Any = None
+    postprocess: Any = None
+    dataloader: Any = None
+    collate_fn: Any = None
+    input_selector: Any = None
+    target_selector: Any = None
     threshold: float = 0.5
     device: str = "cpu"
     tta: bool = False
@@ -242,6 +263,10 @@ class InferenceConfig:
 class TrackingConfig:
     tracking_uri: str = MISSING
     experiment_name: str = MISSING
+    model_name: str = "pytorch_model"
+    serialization_format: str = "pickle"
+    input_example: Any = None
+    signature: Any = None
 
 
 # --- Augmentation -----------------------------------------------------------

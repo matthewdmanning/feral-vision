@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from unittest.mock import create_autospec
+
 import numpy as np
 import pytest
 import torch
+from torchvision.transforms.v2 import ToDtype
 
 from feral_vision.data.annotations import MaskAnnotation
 from feral_vision.data.dataset import AnnotationDataset, StreamingAnnotationDataset
@@ -15,20 +18,20 @@ from feral_vision.io_utils import DatasetSource
 # ---------------------------------------------------------------------------
 
 
-class _MockSource:
-    """In-memory stand-in for DatasetSource — no filesystem needed."""
+@pytest.fixture
+def source_factory():
+    """Build API-checked sources for tests of dataset delegation and transforms."""
 
-    def __init__(self, n: int = 4, h: int = 8, w: int = 8):
-        self._n = n
-        self._h = h
-        self._w = w
+    def factory(n: int = 4):
+        source = create_autospec(DatasetSource, instance=True, spec_set=True)
+        source.__len__.return_value = n
+        source.load.side_effect = lambda index: (
+            torch.full((3, 8, 8), index, dtype=torch.uint8),
+            [],
+        )
+        return source
 
-    def __len__(self) -> int:
-        return self._n
-
-    def load(self, index: int) -> tuple[torch.Tensor, list]:
-        img = torch.full((3, self._h, self._w), index, dtype=torch.uint8)
-        return img, []
+    return factory
 
 
 def _write_sample_pair(root, stem, img_size=(32, 32)):
@@ -124,37 +127,36 @@ def test_source_partition_is_loadable(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_dataset_len_delegates_to_source():
-    ds = AnnotationDataset(_MockSource(n=7))
+def test_dataset_len_delegates_to_source(source_factory):
+    ds = AnnotationDataset(source_factory(n=7))
     assert len(ds) == 7
 
 
-def test_dataset_getitem_returns_source_image():
-    source = _MockSource(n=3)
+def test_dataset_getitem_returns_source_image(source_factory):
+    source = source_factory(n=3)
     ds = AnnotationDataset(source)
     img, _ = ds[2]
-    # MockSource fills pixel value = index, so index 2 → all pixels == 2
+    source.load.assert_called_once_with(2)
     assert img.shape == (3, 8, 8)
     assert img.unique().item() == 2
 
 
-def test_dataset_target_transform_applied():
-    ds = AnnotationDataset(_MockSource(), target_transform=lambda anns: "converted")
+def test_dataset_target_transform_applied(source_factory):
+    ds = AnnotationDataset(source_factory(), target_transform=lambda anns: "converted")
     _, result = ds[0]
     assert result == "converted"
 
 
-def test_dataset_image_transform_applied():
-    def transform(img):
-        return img.float() / 255.0
-
-    ds = AnnotationDataset(_MockSource(), transform=transform)
+def test_dataset_image_transform_applied(source_factory):
+    ds = AnnotationDataset(
+        source_factory(), transform=ToDtype(torch.float32, scale=True)
+    )
     img, _ = ds[0]
     assert img.dtype == torch.float32
 
 
-def test_dataset_no_transform_returns_raw_annotations():
-    ds = AnnotationDataset(_MockSource())
+def test_dataset_no_transform_returns_raw_annotations(source_factory):
+    ds = AnnotationDataset(source_factory())
     _, annotations = ds[0]
     assert annotations == []
 
@@ -164,15 +166,15 @@ def test_dataset_no_transform_returns_raw_annotations():
 # ---------------------------------------------------------------------------
 
 
-def test_streaming_dataset_yields_all_samples():
-    source = _MockSource(n=5)
+def test_streaming_dataset_yields_all_samples(source_factory):
+    source = source_factory(n=5)
     ds = StreamingAnnotationDataset(source)
     samples = list(ds)
     assert len(samples) == 5
 
 
-def test_streaming_dataset_applies_target_transform():
-    ds = StreamingAnnotationDataset(_MockSource(n=3), target_transform=lambda a: "t")
+def test_streaming_dataset_applies_target_transform(source_factory):
+    ds = StreamingAnnotationDataset(source_factory(n=3), target_transform=lambda a: "t")
     results = [target for _, target in ds]
     assert results == ["t", "t", "t"]
 

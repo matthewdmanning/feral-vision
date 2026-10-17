@@ -1,6 +1,11 @@
 import logging
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+if TYPE_CHECKING:
+    import torch
 
 # Maps (source_dtype, target_dtype) to the scale factor applied before casting.
 # Covers the standard uint8 ↔ float conversions used across training, augmentation,
@@ -13,6 +18,34 @@ _DTYPE_SCALE: dict[tuple[np.dtype, np.dtype], float] = {
     (np.dtype("float32"), np.dtype("float64")): 1.0,
     (np.dtype("float64"), np.dtype("float32")): 1.0,
 }
+
+
+def to_device(value: Any, device: "torch.device | str") -> Any:
+    """Move tensors in native input containers without changing non-tensor values.
+
+    Parameters
+    ----------
+    value : Any
+        Tensor, mapping, tuple, list, or non-tensor metadata.
+    device : torch.device or str
+        Destination for every nested tensor.
+
+    Returns
+    -------
+    Any
+        Inputs with tensors on the selected device and ordinary containers preserved.
+    """
+    import torch
+
+    if isinstance(value, torch.Tensor):
+        return value.to(device)
+    if isinstance(value, Mapping):
+        return {key: to_device(item, device) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return tuple(to_device(item, device) for item in value)
+    if isinstance(value, list):
+        return [to_device(item, device) for item in value]
+    return value
 
 
 def to_dtype(image: np.ndarray, target_dtype: "np.dtype | type") -> np.ndarray:

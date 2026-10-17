@@ -3,64 +3,22 @@
 from __future__ import annotations
 
 import hashlib
-import itertools
 import json
 import os
-from collections.abc import Iterator
 from pathlib import Path
-from types import SimpleNamespace
+from unittest.mock import Mock, call, create_autospec
 
 import pytest
 import yaml
+from google.cloud import storage
 
 from feral_vision.data.dataset_artifact import publish_dataset_artifact
 
 
-class _MemoryBlob:
-    """In-memory stand-in for a Cloud Storage object upload."""
-
-    def __init__(self, generations: Iterator[int]) -> None:
-        self._generations = generations
-        self.filename: str | None = None
-        self.data: str | None = None
-        self.generation: int | None = None
-        self.options: dict[str, object] = {}
-        self.retention = SimpleNamespace(mode=None, retain_until_time=None)
-
-    def upload_from_filename(self, filename: str, **kwargs: object) -> None:
-        """Use this method to record a file upload without Cloud Storage."""
-        self.filename = filename
-        self.generation = next(self._generations)
-        self.options = kwargs
-
-    def upload_from_string(self, data: str, **kwargs: object) -> None:
-        """Use this method to record a string upload without Cloud Storage."""
-        self.data = data
-        self.generation = next(self._generations)
-        self.options = kwargs
-
-
-class _MemoryBucket:
-    """In-memory collection of Cloud Storage objects."""
-
-    def __init__(self) -> None:
-        self.blobs: dict[str, _MemoryBlob] = {}
-        self._generations = itertools.count(1)
-
-    def blob(self, blob_name: str) -> _MemoryBlob:
-        """Use this method to retrieve one in-memory Cloud Storage object."""
-        return self.blobs.setdefault(blob_name, _MemoryBlob(self._generations))
-
-
-class _MemoryStorageClient:
-    """In-memory Cloud Storage client for Dataset Artifact tests."""
-
-    def __init__(self) -> None:
-        self.buckets: dict[str, _MemoryBucket] = {}
-
-    def bucket(self, bucket_name: str) -> _MemoryBucket:
-        """Use this method to retrieve one in-memory Cloud Storage bucket."""
-        return self.buckets.setdefault(bucket_name, _MemoryBucket())
+@pytest.fixture
+def storage_client():
+    """Provide an API-checked Cloud Storage client without credentials or network I/O."""
+    return create_autospec(storage.Client, instance=True, spec_set=True)
 
 
 @pytest.fixture(autouse=True)
@@ -79,17 +37,30 @@ def dataset_root(tmp_path: Path) -> Path:
 
 
 def test_publish_dataset_artifact_uploads_payload_then_manifest(
-    dataset_root: Path, tmp_path: Path
+    dataset_root: Path, tmp_path: Path, storage_client
 ) -> None:
     """Every payload file is published, and the manifest is published last."""
     (dataset_root / "images" / "a.jpg").write_bytes(b"jpg")
     (dataset_root / "annotations" / "instances.json").write_text("{}")
     input_path = tmp_path / "dataset-input.json"
     input_path.write_text(json.dumps({"dataset": "example", "source": "test"}))
-    client = _MemoryStorageClient()
+    bucket = create_autospec(storage.Bucket, instance=True, spec_set=True)
+    blobs = [
+        create_autospec(storage.Blob, instance=True, spec_set=True) for _ in range(3)
+    ]
+    for generation, blob in enumerate(blobs, start=1):
+        blob.generation = generation
+        blob.retention.mode = None
+        blob.retention.retain_until_time = None
+    bucket.blob.side_effect = blobs
+    storage_client.bucket.return_value = bucket
+    uploads = Mock()
+    uploads.attach_mock(blobs[0].upload_from_filename, "annotation")
+    uploads.attach_mock(blobs[1].upload_from_filename, "image")
+    uploads.attach_mock(blobs[2].upload_from_string, "manifest")
 
     uri = publish_dataset_artifact(
-        client,
+        storage_client,
         bucket_name="dataset-bucket",
         artifact_prefix="/datasets/example/v1/",
         payload_root=dataset_root,
@@ -98,18 +69,27 @@ def test_publish_dataset_artifact_uploads_payload_then_manifest(
     )
 
     assert uri == f"{os.environ['GCS_URI_PREFIX']}dataset-bucket/datasets/example/v1"
-    blobs = client.bucket("dataset-bucket").blobs
-    assert list(blobs) == [
-        "datasets/example/v1/payload/annotations/instances.json",
-        "datasets/example/v1/payload/images/a.jpg",
-        "datasets/example/v1/dataset-artifact.json",
+    storage_client.bucket.assert_called_once_with("dataset-bucket")
+    assert bucket.blob.call_args_list == [
+        call("datasets/example/v1/payload/annotations/instances.json"),
+        call("datasets/example/v1/payload/images/a.jpg"),
+        call("datasets/example/v1/dataset-artifact.json"),
     ]
-    image = blobs["datasets/example/v1/payload/images/a.jpg"]
-    assert image.options == {"if_generation_match": 0}
+    assert [upload[0] for upload in uploads.mock_calls] == [
+        "annotation",
+        "image",
+        "manifest",
+    ]
+    image = blobs[1]
+    image.upload_from_filename.assert_called_once_with(
+        str(dataset_root / "images" / "a.jpg"), if_generation_match=0
+    )
     assert image.retention.mode == "Unlocked"
     assert image.retention.retain_until_time is not None
-    manifest = blobs["datasets/example/v1/dataset-artifact.json"]
-    assert json.loads(manifest.data or "") == {
+    manifest = blobs[2]
+    manifest.upload_from_string.assert_called_once()
+    upload = manifest.upload_from_string.call_args
+    assert json.loads(upload.args[0]) == {
         "dataset": "example",
         "source": "test",
         "files": {
@@ -123,21 +103,23 @@ def test_publish_dataset_artifact_uploads_payload_then_manifest(
             },
         },
     }
-    assert manifest.options["if_generation_match"] == 0
+    assert upload.kwargs == {
+        "content_type": "application/json",
+        "if_generation_match": 0,
+    }
     assert manifest.retention.mode == "Unlocked"
 
 
 def test_publish_dataset_artifact_rejects_empty_input(
-    dataset_root: Path, tmp_path: Path
+    dataset_root: Path, tmp_path: Path, storage_client
 ) -> None:
     """A Dataset without provenance input is not published."""
     input_path = tmp_path / "dataset-input.json"
     input_path.write_text("{}")
-    client = _MemoryStorageClient()
 
     with pytest.raises(ValueError, match="non-empty JSON object"):
         publish_dataset_artifact(
-            client,
+            storage_client,
             bucket_name="dataset-bucket",
             artifact_prefix="datasets/example/v1",
             payload_root=dataset_root,
@@ -145,11 +127,11 @@ def test_publish_dataset_artifact_rejects_empty_input(
             retention_days=30,
         )
 
-    assert client.buckets == {}
+    storage_client.bucket.assert_not_called()
 
 
 def test_publish_dataset_artifact_rejects_input_that_defines_files(
-    dataset_root: Path, tmp_path: Path
+    dataset_root: Path, tmp_path: Path, storage_client
 ) -> None:
     """The publisher alone writes the file listing of a manifest."""
     input_path = tmp_path / "dataset-input.json"
@@ -157,7 +139,7 @@ def test_publish_dataset_artifact_rejects_input_that_defines_files(
 
     with pytest.raises(ValueError, match="must not define files"):
         publish_dataset_artifact(
-            _MemoryStorageClient(),
+            storage_client,
             bucket_name="dataset-bucket",
             artifact_prefix="datasets/example/v1",
             payload_root=dataset_root,
@@ -167,7 +149,7 @@ def test_publish_dataset_artifact_rejects_input_that_defines_files(
 
 
 def test_publish_dataset_artifact_rejects_zero_retention(
-    dataset_root: Path, tmp_path: Path
+    dataset_root: Path, tmp_path: Path, storage_client
 ) -> None:
     """A Dataset Artifact is always published with object retention."""
     input_path = tmp_path / "dataset-input.json"
@@ -175,7 +157,7 @@ def test_publish_dataset_artifact_rejects_zero_retention(
 
     with pytest.raises(ValueError, match="at least one day"):
         publish_dataset_artifact(
-            _MemoryStorageClient(),
+            storage_client,
             bucket_name="dataset-bucket",
             artifact_prefix="datasets/example/v1",
             payload_root=dataset_root,

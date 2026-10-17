@@ -62,7 +62,8 @@ class AnnotationDataset(Dataset[tuple[torch.Tensor, Any]]):
         Returns
         -------
         tuple[torch.Tensor, Any]
-            ``(image, annotations)`` where image is ``(C, H, W)`` uint8.
+            ``(image, annotations)`` where the image is a ``(C, H, W)`` tensor
+            retaining decoded channel count/bit depth unless transformed.
             ``annotations`` is a ``list[Annotation]`` when no
             ``target_transform`` is set, or the transform's output otherwise.
         """

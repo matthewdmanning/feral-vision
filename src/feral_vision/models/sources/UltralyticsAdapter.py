@@ -34,16 +34,26 @@ _TASK_TO_OUTPUTS: dict[str, list[CVTask]] = {
 
 
 class UltralyticsAdapter(SourceAdapter):
+    """Load native task models while preserving provider head and criterion selection."""
+
     def fetch(self, cfg: DictConfig) -> nn.Module:
+        """Load a configured model and delegate class-count adjustment to Ultralytics."""
         from ultralytics import YOLO
 
         log.info("loading ultralytics model %s", cfg.architecture.id)
-        loaded_model: Any = YOLO(cfg.architecture.id).model
+        loaded: Any = YOLO(cfg.architecture.id, **cfg.architecture.get("kwargs", {}))
+        loaded_model: Any = loaded.model
         num_classes = getattr(cfg.architecture, "num_classes", None)
-        if num_classes is not None and loaded_model.model[-1].nc != num_classes:
-            from ultralytics.nn.tasks import DetectionModel
+        if num_classes is None:
+            return loaded_model
+        from ultralytics.nn.tasks import ClassificationModel
 
-            model = DetectionModel(loaded_model.yaml, nc=num_classes, verbose=False)
+        if loaded.task == "classify":
+            ClassificationModel.reshape_outputs(loaded_model, num_classes)
+            model = loaded_model
+        elif loaded_model.model[-1].nc != num_classes:
+            model_class = loaded.task_map[loaded.task]["model"]
+            model = model_class(loaded_model.yaml, nc=num_classes, verbose=False)
             model.load(loaded_model, verbose=False)
         else:
             model = loaded_model
