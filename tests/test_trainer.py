@@ -12,7 +12,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from types import SimpleNamespace
+from unittest.mock import create_autospec
 
 import mlflow
 import pytest
@@ -20,32 +20,66 @@ import torch
 import yaml
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
 
 from feral_vision.data.annotations import BBoxAnnotation
 from feral_vision.training.optim import build_loss_fn, build_optimizer
 from feral_vision.training.trainer import Trainer
+from feral_vision.training.tracking import active_mlflow_run
 
 
-def _make_cfg(epochs: int) -> SimpleNamespace:
-    """Minimal Hydra-cfg stand-in exposing only cfg.train.epochs."""
-    return SimpleNamespace(train=SimpleNamespace(epochs=epochs))
+def test_active_run_keeps_its_tracking_store_and_experiment(tmp_path, tracking_uri):
+    """A caller-owned run remains usable when a recipe supplies different tracking settings."""
+    client = mlflow.MlflowClient(tracking_uri)
+    experiment = client.create_experiment(
+        "caller-owned", artifact_location=(tmp_path / "artifacts").as_uri()
+    )
+    cfg = OmegaConf.create(
+        {
+            "tracking": {
+                "tracking_uri": f"sqlite:///{tmp_path / 'another.db'}",
+                "experiment_name": "recipe-experiment",
+            }
+        }
+    )
+    with mlflow.start_run(experiment_id=experiment) as run:
+        try:
+            with active_mlflow_run(cfg):
+                assert mlflow.get_tracking_uri() == tracking_uri
+                assert mlflow.active_run().info.run_id == run.info.run_id
+                mlflow.log_param("caller_run_preserved", True)
+            assert mlflow.active_run().info.run_id == run.info.run_id
+        finally:
+            mlflow.set_tracking_uri(tracking_uri)
+    assert client.get_run(run.info.run_id).data.params["caller_run_preserved"] == "True"
+
+
+@pytest.fixture
+def tracking_uri(tmp_path: Path):
+    """Restore the caller's MLflow tracking URI after each local integration test."""
+    previous = mlflow.get_tracking_uri()
+    uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
+    mlflow.set_tracking_uri(uri)
+    try:
+        yield uri
+    finally:
+        mlflow.set_tracking_uri(previous)
+
+
+def _make_cfg(epochs: int) -> DictConfig:
+    """Build the minimal real Hydra configuration consumed by training."""
+    return OmegaConf.create({"train": {"epochs": epochs}})
 
 
 def _tiny_dataloader(
     n: int = 4, channels: int = 3, classes: int = 2, image_size: int = 8
 ):
-    """List of 2D image batches usable as a real Iterable dataloader."""
-    return [
-        (
-            torch.randn(2, channels, image_size, image_size),
-            torch.randn(2, classes, image_size, image_size),
-        )
-        for _ in range(n)
-    ]
-
-
-def _trivial_loss(outputs, targets):
-    return ((outputs - targets) ** 2).mean()
+    """Build real PyTorch batches of two-dimensional images and targets."""
+    dataset = TensorDataset(
+        torch.randn(n * 2, channels, image_size, image_size),
+        torch.randn(n * 2, classes, image_size, image_size),
+    )
+    return DataLoader(dataset, batch_size=2)
 
 
 def _build_trainer(tmp_path: Path, epochs: int = 2) -> Trainer:
@@ -54,7 +88,7 @@ def _build_trainer(tmp_path: Path, epochs: int = 2) -> Trainer:
     return Trainer(
         model=model,
         optimizer=optimizer,
-        loss_fn=_trivial_loss,
+        loss_fn=nn.MSELoss(),
         cfg=_make_cfg(epochs),
         best_model_path=tmp_path / "best.pt",
     )
@@ -75,7 +109,6 @@ class _BestModelTrainer(Trainer):
         self._epoch = 0
 
     def _train_one_epoch(self, dataloader) -> float:
-        self._input_example = torch.ones(2, 3, 8, 8)
         with torch.no_grad():
             self.model.weight.fill_(float(self._epoch + 1))
         self._epoch += 1
@@ -114,7 +147,7 @@ def test_fit_creates_nested_parent_dir_for_checkpoint(tmp_path):
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
-        loss_fn=_trivial_loss,
+        loss_fn=nn.MSELoss(),
         cfg=_make_cfg(1),
         best_model_path=nested,
     )
@@ -122,10 +155,11 @@ def test_fit_creates_nested_parent_dir_for_checkpoint(tmp_path):
     assert nested.exists()
 
 
-def test_fit_tracks_dataset_artifact_lineage_and_best_checkpoint(tmp_path):
+@pytest.mark.parametrize("serialization_format", ["pickle", "pt2"])
+def test_fit_tracks_dataset_artifact_lineage_and_best_checkpoint(
+    tmp_path, tracking_uri, serialization_format
+):
     """MLflow records the exact Dataset Artifact manifest used by training."""
-    tracking_uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
-    mlflow.set_tracking_uri(tracking_uri)
     artifact_root = tmp_path / "artifacts"
     client = mlflow.tracking.MlflowClient(tracking_uri)
     experiment_id = client.create_experiment(
@@ -146,21 +180,31 @@ def test_fit_tracks_dataset_artifact_lineage_and_best_checkpoint(tmp_path):
         + "\n"
     )
     expected_manifest_sha256 = hashlib.sha256(dataset_manifest.read_bytes()).hexdigest()
-    cfg = SimpleNamespace(
-        train=SimpleNamespace(epochs=1),
-        data=SimpleNamespace(root=str(data_root)),
-        model=SimpleNamespace(architecture=SimpleNamespace(id="trainer-test-model")),
-        tracking=SimpleNamespace(
-            tracking_uri=tracking_uri,
-            experiment_name="trainer-tests",
-        ),
+    cfg = OmegaConf.create(
+        {
+            "train": {"epochs": 1},
+            "data": {"root": str(data_root)},
+            "model": {"architecture": {"id": "trainer-test-model"}},
+            "tracking": {
+                "tracking_uri": tracking_uri,
+                "experiment_name": "trainer-tests",
+                "model_name": "hydra-selected-model",
+                "serialization_format": serialization_format,
+                "input_example": {
+                    "_target_": "numpy.ones",
+                    "_convert_": "all",
+                    "shape": [2, 3, 8, 8],
+                    "dtype": "float32",
+                },
+            },
+        }
     )
     best_path = tmp_path / "best.pt"
     model = nn.Conv2d(3, 2, kernel_size=1)
     trainer = Trainer(
         model=model,
         optimizer=torch.optim.SGD(model.parameters(), lr=0.01),
-        loss_fn=_trivial_loss,
+        loss_fn=nn.MSELoss(),
         cfg=cfg,
         best_model_path=best_path,
     )
@@ -180,53 +224,61 @@ def test_fit_tracks_dataset_artifact_lineage_and_best_checkpoint(tmp_path):
     assert logged_manifests[0].read_bytes() == dataset_manifest.read_bytes()
     resolved_configs = list(artifact_root.rglob("resolved_config.json"))
     assert len(resolved_configs) == 1
-    assert json.loads(resolved_configs[0].read_text()) == {
-        "data": {"root": str(data_root)},
-        "model": {"architecture": {"id": "trainer-test-model"}},
-        "tracking": {
-            "experiment_name": "trainer-tests",
-            "tracking_uri": tracking_uri,
-        },
-        "train": {"epochs": 1},
-    }
+    assert json.loads(resolved_configs[0].read_text()) == OmegaConf.to_container(
+        cfg, resolve=True
+    )
+    logged_models = client.search_logged_models(experiment_ids=[experiment_id])
+    assert len(logged_models) == 1
+    assert logged_models[0].name == "hydra-selected-model"
     model_versions = client.search_model_versions("name = 'trainer-test-model'")
     assert len(model_versions) == 1
     assert model_versions[0].run_id == run.info.run_id
 
 
-def test_fit_logs_best_model_weights_not_final_epoch_weights(tmp_path):
+def test_fit_logs_best_model_weights_not_final_epoch_weights(tmp_path, tracking_uri):
     """MLflow stores only the selected best model artifact for a run."""
-    tracking_uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
-    mlflow.set_tracking_uri(tracking_uri)
     artifact_root = tmp_path / "artifacts"
     client = mlflow.tracking.MlflowClient(tracking_uri)
-    client.create_experiment(
+    experiment_id = client.create_experiment(
         "best-model-tests", artifact_location=artifact_root.as_uri()
     )
-    cfg = SimpleNamespace(
-        train=SimpleNamespace(epochs=2),
-        data=SimpleNamespace(root=str(tmp_path)),
-        tracking=SimpleNamespace(
-            tracking_uri=tracking_uri,
-            experiment_name="best-model-tests",
-        ),
+    cfg = OmegaConf.create(
+        {
+            "train": {"epochs": 2},
+            "data": {"root": str(tmp_path)},
+            "tracking": {
+                "tracking_uri": tracking_uri,
+                "experiment_name": "best-model-tests",
+            },
+        }
     )
     model = nn.Conv2d(3, 1, kernel_size=1, bias=False)
     trainer = _BestModelTrainer(
         model=model,
         optimizer=torch.optim.SGD(model.parameters(), lr=0.01),
-        loss_fn=_trivial_loss,
+        loss_fn=nn.MSELoss(),
         cfg=cfg,
         best_model_path=tmp_path / "best.pt",
     )
 
     trainer.fit([])
 
+    run = client.search_runs([experiment_id])[0]
+    logged_losses = client.get_metric_history(run.info.run_id, "train_loss")
+    assert sorted((metric.step, metric.value) for metric in logged_losses) == [
+        (0, 1.0),
+        (1, 2.0),
+    ]
+    assert run.info.status == "FINISHED"
     mlmodel_file = next(artifact_root.rglob("MLmodel"))
     logged_model = mlflow.pytorch.load_model(str(mlmodel_file.parent))
     input_example = torch.ones(2, 3, 8, 8)
-    assert torch.allclose(logged_model(input_example), torch.full((2, 1, 8, 8), 3.0))
-    assert torch.allclose(trainer.model(input_example), torch.full((2, 1, 8, 8), 6.0))
+    torch.testing.assert_close(
+        logged_model(input_example), torch.full((2, 1, 8, 8), 3.0)
+    )
+    torch.testing.assert_close(
+        trainer.model(input_example), torch.full((2, 1, 8, 8), 6.0)
+    )
 
 
 @pytest.mark.parametrize("epochs,gamma", [(1, 0.5), (2, 0.5), (3, 0.1)])
@@ -237,7 +289,7 @@ def test_scheduler_steps_once_per_epoch(tmp_path, epochs, gamma):
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
-        loss_fn=_trivial_loss,
+        loss_fn=nn.MSELoss(),
         cfg=_make_cfg(epochs),
         scheduler=scheduler,
         best_model_path=tmp_path / "best.pt",
@@ -256,6 +308,45 @@ def test_base_validate_returns_empty_dict_and_falls_back_to_train_loss(
     assert history["best_loss"] == min(history["train_loss"])
 
 
+def test_checkpoint_and_plateau_scheduler_use_independent_named_metrics(
+    tmp_path, trainer_fixture_dataset, monkeypatch
+):
+    """Maximize checkpoint accuracy while the scheduler minimizes validation loss."""
+    model = nn.Conv2d(3, 2, kernel_size=1)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", patience=0, factor=0.5
+    )
+    trainer = Trainer(
+        model,
+        optimizer,
+        loss_fn=nn.MSELoss(),
+        cfg=_make_cfg(2),
+        scheduler=scheduler,
+        monitor="accuracy",
+        mode="max",
+        scheduler_monitor="validation_loss",
+        best_model_path=tmp_path / "best.pt",
+    )
+    validation = create_autospec(
+        trainer._validate,
+        side_effect=[
+            {"unrelated": 100.0, "accuracy": 0.4, "validation_loss": 1.0},
+            {"unrelated": 50.0, "accuracy": 0.8, "validation_loss": 2.0},
+        ],
+    )
+    monkeypatch.setattr(trainer, "_validate", validation)
+
+    history = trainer.fit(_tiny_dataloader(), val_dataset=trainer_fixture_dataset)
+
+    assert history["best_loss"] == 0.8
+    assert optimizer.param_groups[0]["lr"] == pytest.approx(0.05)
+    assert scheduler.best == 1.0
+    torch.testing.assert_close(
+        torch.load(trainer.best_model_path, weights_only=True), model.state_dict()
+    )
+
+
 @pytest.mark.parametrize("epochs", [1, 3])
 def test_validate_metric_is_tracked_per_epoch_using_real_dataset(
     tmp_path, trainer_fixture_dataset, epochs
@@ -265,7 +356,7 @@ def test_validate_metric_is_tracked_per_epoch_using_real_dataset(
     trainer = _ValLenTrainer(
         model=model,
         optimizer=optimizer,
-        loss_fn=_trivial_loss,
+        loss_fn=nn.MSELoss(),
         cfg=_make_cfg(epochs),
         best_model_path=tmp_path / "best.pt",
     )
@@ -281,7 +372,7 @@ def test_validate_metric_drives_checkpoint_selection_over_train_loss(
     trainer = _ValLenTrainer(
         model=model,
         optimizer=optimizer,
-        loss_fn=_trivial_loss,
+        loss_fn=nn.MSELoss(),
         cfg=_make_cfg(1),
         best_model_path=tmp_path / "best.pt",
     )
@@ -331,11 +422,12 @@ def _bbox_dataloader(
 ):
     """Build batches whose target boxes come from real parsed annotations."""
     batch_size = cfg.train.batch_size
-    targets = target_boxes.unsqueeze(0).expand(batch_size, -1, -1)
-    return [
-        (torch.randn(batch_size, 3, image_size, image_size), targets.clone())
-        for _ in range(n_batches)
-    ]
+    sample_count = batch_size * n_batches
+    dataset = TensorDataset(
+        torch.randn(sample_count, 3, image_size, image_size),
+        target_boxes.unsqueeze(0).expand(sample_count, -1, -1),
+    )
+    return DataLoader(dataset, batch_size=batch_size)
 
 
 @pytest.mark.parametrize(

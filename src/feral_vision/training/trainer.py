@@ -2,27 +2,34 @@
 
 The :class:`Trainer` is deliberately decoupled from how its collaborators are
 built: it receives an already-constructed ``model``, ``optimizer``, ``loss_fn``
-and (optionally) ``scheduler``. This keeps the loop trivially unit-testable with
-dummies. :func:`build_trainer` wires the *real* collaborators from the other
-units and is exercised by the canonical training entrypoint (:func:`main`).
+and (optionally) ``scheduler``. One loss-computation callable feeds the shared
+optimizer loop. :func:`build_trainer` preserves existing configured callers;
+run metadata and asynchronous metrics live in :mod:`.tracking`.
 """
 
 from __future__ import annotations
 
-import copy
-import hashlib
 import math
-import os
-from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal
 
 if TYPE_CHECKING:
+    from mlflow.utils.async_logging.run_operations import RunOperations
+
     from feral_vision.data.dataset import AnnotationDataset
 
 import torch
 from torch import nn
 
+from feral_vision.tasks import TRAINING_TASKS
+from feral_vision.training.execution import LossComputation, prediction_loss
+from feral_vision.training.tracking import (
+    active_mlflow_run,
+    log_dataset_lineage,
+    log_metrics,
+    log_model,
+    log_resolved_config,
+)
 from feral_vision.utils import get_logger
 
 logger = get_logger(__name__)
@@ -33,168 +40,63 @@ INITIAL_BEST_LOSS: float = math.inf
 LossFn = Callable[[Any, Any], torch.Tensor]
 
 
-def _resolved_config(cfg: Any) -> Any:
-    """Convert a Hydra config or lightweight config object into JSON-safe data."""
-    try:
-        from omegaconf import OmegaConf
-
-        if OmegaConf.is_config(cfg):
-            return OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    except ImportError:  # pragma: no cover - OmegaConf is a project dependency
-        pass
-
-    if isinstance(cfg, dict):
-        return {key: _resolved_config(value) for key, value in cfg.items()}
-    if isinstance(cfg, (list, tuple)):
-        return [_resolved_config(value) for value in cfg]
-    if hasattr(cfg, "__dict__"):
-        return {key: _resolved_config(value) for key, value in vars(cfg).items()}
-    if isinstance(cfg, Path):
-        return str(cfg)
-    return cfg
-
-
-def _try_log_resolved_config(cfg: Any) -> None:
-    """Store the exact resolved Run Recipe in an active MLflow run."""
-    try:
-        import mlflow
-
-        if mlflow.active_run() is not None:
-            mlflow.log_dict(_resolved_config(cfg), "run_config/resolved_config.json")
-    except Exception:  # pragma: no cover - logging must never break training
-        pass
-
-
-def _try_log_metric(name: str, value: float, step: int) -> None:
-    """Use this function to log a single metric to MLflow when a run is active.
-
-    Guarded so the trainer never requires a running tracking server: if mlflow
-    is unavailable or no run is active, logging is silently skipped.
-
-    Parameters
-    ----------
-    name : str
-        Metric name as it will appear in MLflow.
-    value : float
-        Metric value for the current step.
-    step : int
-        Training step (typically the epoch index).
-    """
-    try:
-        import mlflow
-
-        if mlflow.active_run() is not None:
-            mlflow.log_metric(name, value, step=step)
-    except Exception:  # pragma: no cover - logging must never break training
-        pass
-
-
-def _dataset_artifact_manifest_path(cfg: Any) -> Path | None:
-    """Resolve the upstream Dataset Artifact manifest consumed by training."""
-    configured_path = os.environ.get("DATASET_ARTIFACT_MANIFEST")
-    if configured_path:
-        return Path(configured_path)
-
-    data_root = getattr(getattr(cfg, "data", None), "root", None)
-    if data_root:
-        return Path(str(data_root)) / "dataset-artifact.json"
-    return None
-
-
-def _try_log_dataset_lineage(cfg: Any) -> None:
-    """Record the exact upstream Dataset Artifact manifest in an active MLflow run."""
-    try:
-        import mlflow
-
-        manifest_path = _dataset_artifact_manifest_path(cfg)
-        if (
-            mlflow.active_run() is None
-            or manifest_path is None
-            or not manifest_path.is_file()
-        ):
-            return
-
-        digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
-        expected_digest = os.environ.get("DATASET_ARTIFACT_SHA256")
-        if expected_digest and digest != expected_digest:
-            raise ValueError(
-                "dataset-artifact.json changed after deployment validation: "
-                f"expected {expected_digest}, got {digest}"
-            )
-
-        mlflow.log_param("dataset_artifact_sha256", digest)
-        dataset_artifact_uri = os.environ.get("DATASET_ARTIFACT_URI")
-        if dataset_artifact_uri:
-            mlflow.log_param("dataset_artifact_uri", dataset_artifact_uri)
-        mlflow.log_artifact(str(manifest_path), artifact_path="data_lineage")
-    except Exception:  # pragma: no cover - logging must never break training
-        logger.exception("Failed to record Dataset Artifact lineage")
-
-
-@contextmanager
-def _active_mlflow_run(cfg: Any) -> Iterator[None]:
-    """Start a configured MLflow run, or continue when tracking is unavailable."""
-    tracking = getattr(cfg, "tracking", None)
-    if tracking is None:
-        yield
-        return
-
-    try:
-        import mlflow
-
-        tracking_uri = getattr(tracking, "tracking_uri", None)
-        experiment_name = getattr(tracking, "experiment_name", None)
-        if tracking_uri is not None:
-            mlflow.set_tracking_uri(tracking_uri)
-        if experiment_name is not None:
-            mlflow.set_experiment(experiment_name)
-        if mlflow.active_run() is not None:
-            yield
-            return
-        run = mlflow.start_run()
-    except Exception:  # pragma: no cover - tracking must never break training
-        logger.warning("MLflow tracking is unavailable; continuing without a run")
-        yield
-        return
-
-    with run:
-        external_run_id = os.environ.get("FERAL_VISION_RUN_ID")
-        if external_run_id:
-            mlflow.set_tag("feral_vision_run_id", external_run_id)
-        yield
-
-
 class Trainer:
     """Minimal, dependency-injected supervised training loop.
 
     Parameters
     ----------
     model : nn.Module
-        Model to train.
+        Model to train; parameter updates remain in this loop.
     optimizer : torch.optim.Optimizer
         Optimizer instance.
-    loss_fn : LossFn
-        Callable ``(outputs, targets) -> scalar tensor``.
+    loss_fn : callable, optional
+        Existing ``(outputs, targets) -> scalar`` criterion. New callers may
+        instead supply ``compute_loss``. It is not used with a task adapter.
     cfg : Any
         Hydra config carrying at minimum ``cfg.train.epochs``.
     scheduler : Any, optional
-        Learning-rate scheduler with a ``step()`` method.
+        Epoch scheduler, or ReduceLROnPlateau stepped after validation.
     device : torch.device or str, optional
         Device to move model and tensors to. Defaults to CPU.
     best_model_path : str or Path, optional
         Path at which the best checkpoint is written.
+    compute_loss : callable, optional
+        ``(model, batch) -> (scalar total, named scalar tensors)``. Owns model
+        invocation and loss computation, not backward or optimizer updates.
+    input_example : optional
+        Explicit MLflow-supported example, not required for native publication.
+    input_example_fn : callable, optional
+        Explicitly extracts an MLflow-supported example from a batch. No
+        implicit model-output inspection or example extraction is performed.
+    monitor : str, optional
+        Named checkpoint metric. Omission preserves existing validation
+        selection behavior; use a name to avoid dictionary-order dependence.
+    mode : {"min", "max"}, default="min"
+        Direction used to compare the checkpoint metric.
+    scheduler_monitor : str, optional
+        Metric for ReduceLROnPlateau; defaults to the checkpoint monitor.
+    task_adapter : object, optional
+        Compatibility input for existing callers; its loss is bound once to
+        ``compute_loss``. New callers provide loss and collation separately.
     """
 
     def __init__(
         self,
         model: nn.Module,
         optimizer: torch.optim.Optimizer,
-        loss_fn: LossFn,
-        cfg: Any,
+        loss_fn: LossFn | None = None,
+        cfg: Any = None,
         scheduler: Any | None = None,
         task_adapter: Any | None = None,
         device: torch.device | str | None = None,
         best_model_path: str | Path = DEFAULT_BEST_MODEL_PATH,
+        *,
+        compute_loss: LossComputation | None = None,
+        input_example: Any = None,
+        input_example_fn: Callable[[Any], Any] | None = None,
+        monitor: str | None = None,
+        mode: Literal["min", "max"] = "min",
+        scheduler_monitor: str | None = None,
     ) -> None:
         self.device = (
             torch.device(device) if device is not None else torch.device("cpu")
@@ -202,44 +104,52 @@ class Trainer:
         self.model = model.to(self.device)
         self.optimizer = optimizer
         self.loss_fn = loss_fn
+        # Resolve legacy construction once, not in each training iteration.
+        if compute_loss is None:
+            if task_adapter is not None:
+                compute_loss = task_adapter.loss
+            else:
+                from functools import partial
+
+                if loss_fn is None:
+                    raise TypeError("Provide compute_loss or loss_fn.")
+                compute_loss = partial(prediction_loss, criterion=loss_fn)
+        self.compute_loss = compute_loss
+        self.monitor = monitor
+        self.mode = mode
+        self.scheduler_monitor = scheduler_monitor
+        self.input_example_fn = input_example_fn
+        self._epoch_metrics: dict[str, float] = {}
+        self._pending_logs: list[RunOperations] = []
         self.cfg = cfg
         self.scheduler = scheduler
         self.task_adapter = task_adapter
         self.best_model_path = Path(best_model_path)
-        self.best_loss = INITIAL_BEST_LOSS
-        self._input_example: torch.Tensor | None = None
-
-    def _move(self, tensor: Any) -> Any:
-        return tensor.to(self.device) if isinstance(tensor, torch.Tensor) else tensor
+        self.best_loss = INITIAL_BEST_LOSS if mode == "min" else -math.inf
+        self._input_example = input_example
 
     def _train_one_epoch(self, dataloader: Iterable[Any]) -> float:
+        """Run one shared optimizer loop and aggregate detached loss terms."""
         self.model.train()
-        running_loss = 0.0
+        totals: dict[str, torch.Tensor] = {}
         batch_count = 0
         for batch in dataloader:
             self.optimizer.zero_grad()
-            if self.task_adapter is None:
-                inputs, targets = batch
-                inputs = self._move(inputs)
-                targets = self._move(targets)
-                if self._input_example is None:
-                    self._input_example = inputs.detach().cpu()
-                outputs = self.model(inputs)
-                loss = self.loss_fn(outputs, targets)
-            else:
-                loss, _ = self.task_adapter.loss(self.model, batch)
-                if self._input_example is None:
-                    self._input_example = batch.images.detach().cpu()
+            loss, components = self.compute_loss(self.model, batch)
             loss.backward()
             self.optimizer.step()
 
-            running_loss += float(loss.item())
+            if self._input_example is None and self.input_example_fn is not None:
+                self._input_example = self.input_example_fn(batch)
+            for name, value in {**components, "train_loss": loss}.items():
+                detached = value.detach()
+                totals[name] = totals.get(name, 0) + detached
             batch_count += 1
 
-        if self.scheduler is not None:
-            self.scheduler.step()
-
-        return running_loss / batch_count if batch_count else INITIAL_BEST_LOSS
+        self._epoch_metrics = {
+            name: float(value / batch_count) for name, value in totals.items()
+        }
+        return self._epoch_metrics.get("train_loss", INITIAL_BEST_LOSS)
 
     @torch.no_grad()
     def _validate(self, dataset: AnnotationDataset) -> dict[str, float]:
@@ -267,66 +177,48 @@ class Trainer:
         self.best_model_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(self.model.state_dict(), self.best_model_path)
 
-    def _try_log_model(self) -> None:
-        """Log only the selected best model to MLflow when possible."""
-        if self._input_example is None or not self.best_model_path.exists():
-            return
-
-        try:
-            import mlflow
-            from mlflow.models import infer_signature
-
-            active_run = mlflow.active_run()
-            if active_run is None:
-                return
-
-            current_state = copy.deepcopy(self.model.state_dict())
-            was_training = self.model.training
-            try:
-                best_state = torch.load(
-                    self.best_model_path, map_location=self.device, weights_only=True
-                )
-                self.model.load_state_dict(best_state)
-                input_example = self._input_example.numpy()
-                self.model.eval()
-                with torch.no_grad():
-                    predictions = self.model(self._move(self._input_example))
-                signature = infer_signature(
-                    input_example, predictions.detach().cpu().numpy()
-                )
-                mlflow.pytorch.log_model(
-                    self.model,
-                    name="pytorch_model",
-                    signature=signature,
-                    input_example=input_example,
-                )
-                model_cfg = getattr(self.cfg, "model", None)
-                architecture = getattr(model_cfg, "architecture", None)
-                registered_model_name = getattr(architecture, "id", None)
-                if registered_model_name:
-                    model_version = mlflow.register_model(
-                        model_uri=f"runs:/{active_run.info.run_id}/pytorch_model",
-                        name=registered_model_name,
-                    )
-                    mlflow.set_tag("registered_model_name", registered_model_name)
-                    mlflow.set_tag("model_version", model_version.version)
-            finally:
-                self.model.load_state_dict(current_state)
-                self.model.train(was_training)
-        except Exception:  # pragma: no cover - logging must never break training
-            pass
-
     def fit(
         self,
         dataloader: Iterable[Any],
         val_dataset: AnnotationDataset | None = None,
     ) -> dict[str, Any]:
         """Train while recording the configured MLflow run when available."""
-        with _active_mlflow_run(self.cfg):
-            _try_log_resolved_config(self.cfg)
-            _try_log_dataset_lineage(self.cfg)
-            history = self._fit(dataloader, val_dataset)
-            self._try_log_model()
+        self._pending_logs.clear()
+        with active_mlflow_run(self.cfg):
+            try:
+                log_resolved_config(self.cfg)
+                log_dataset_lineage(self.cfg)
+                history = self._fit(dataloader, val_dataset)
+            finally:
+                if self._pending_logs:
+                    from mlflow.utils.async_logging.run_operations import (
+                        get_combined_run_operations,
+                    )
+
+                    pending = get_combined_run_operations(self._pending_logs)
+                    self._pending_logs.clear()
+                    pending.wait()
+            import mlflow
+            from hydra.utils import instantiate
+
+            if mlflow.active_run() is not None:
+                model_cfg = getattr(self.cfg, "model", None)
+                architecture = getattr(model_cfg, "architecture", None)
+                tracking = getattr(self.cfg, "tracking", None)
+                example = getattr(tracking, "input_example", None)
+                log_model(
+                    self.model,
+                    self.best_model_path,
+                    instantiate(example)
+                    if example is not None
+                    else self._input_example,
+                    getattr(architecture, "id", None),
+                    signature=instantiate(getattr(tracking, "signature", None)),
+                    serialization_format=getattr(
+                        tracking, "serialization_format", "pickle"
+                    ),
+                    name=getattr(tracking, "model_name", "pytorch_model"),
+                )
             return history
 
     def _fit(
@@ -336,20 +228,19 @@ class Trainer:
     ) -> dict[str, Any]:
         """Run the training loop for ``cfg.train.epochs`` epochs.
 
-        Trains for the configured number of epochs, logging each metric to
-        MLflow via :func:`_try_log_metric`. When ``val_dataset`` is provided,
-        :meth:`_validate` is called each epoch and its returned metrics are
-        used to select the best checkpoint; otherwise train loss is used.
+        Trains for the configured number of epochs and submits one asynchronous
+        MLflow metric batch per epoch. Named monitors select scheduler and
+        checkpoint measurements independently.
 
         Parameters
         ----------
         dataloader : Iterable
             Batched training data iterable (e.g. a ``DataLoader``).
         val_dataset : AnnotationDataset, optional
-            Validation dataset passed directly to :meth:`_validate`. When
-            provided, the first metric value returned by ``_validate``
-            determines checkpoint selection; train loss is used as fallback
-            when ``_validate`` returns an empty dict.
+            Validation dataset passed directly to :meth:`_validate`. Set
+            ``monitor`` to select a metric explicitly. When it is omitted,
+            existing callers retain first-validation-metric selection, or
+            training loss when validation returns no measurements.
 
         Returns
         -------
@@ -361,34 +252,46 @@ class Trainer:
         history: dict[str, Any] = {"train_loss": [], "best_loss": None}
 
         for epoch in range(epochs):
+            self._epoch_metrics = {}
             train_loss = self._train_one_epoch(dataloader)
-            history["train_loss"].append(train_loss)
-            _try_log_metric("train_loss", train_loss, epoch)
-            logger.info("epoch %d/%d train_loss=%.6f", epoch + 1, epochs, train_loss)
+            metrics = {**self._epoch_metrics, "train_loss": train_loss}
+            validation_metrics = (
+                self._validate(val_dataset) if val_dataset is not None else {}
+            )
+            metrics.update(validation_metrics)
+            # Preserve established callers; named monitors remove ordering dependence.
+            monitor = self.monitor or next(iter(validation_metrics), "train_loss")
+            for name, value in metrics.items():
+                history.setdefault(name, []).append(value)
+                logger.info("epoch %d/%d %s=%.6f", epoch + 1, epochs, name, value)
 
-            tracked_loss = train_loss
-            if val_dataset is not None:
-                metrics = self._validate(val_dataset)
-                for name, value in metrics.items():
-                    history.setdefault(name, []).append(value)
-                    _try_log_metric(name, value, epoch)
-                    logger.info("epoch %d/%d %s=%.6f", epoch + 1, epochs, name, value)
-                if metrics:
-                    tracked_loss = next(iter(metrics.values()))
+            if self.scheduler is not None:
+                if isinstance(
+                    self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau
+                ):
+                    self.scheduler.step(metrics[self.scheduler_monitor or monitor])
+                else:
+                    self.scheduler.step()
 
-            if tracked_loss < self.best_loss:
+            tracked_loss = metrics[monitor]
+            improved = (
+                tracked_loss < self.best_loss
+                if self.mode == "min"
+                else tracked_loss > self.best_loss
+            )
+            if improved:
                 self.best_loss = tracked_loss
                 self._save_best()
+            operation = log_metrics(metrics, epoch)
+            if operation is not None:
+                self._pending_logs.append(operation)
 
         history["best_loss"] = self.best_loss
         return history
 
 
 def build_trainer(cfg: Any) -> Trainer:
-    """Use this function to wire a :class:`Trainer` with real collaborators from other units.
-
-    Imports are local so this module imports cleanly even while collaborators
-    are skeletons; the canonical training entrypoint calls this function.
+    """Build the Hydra-selected task loss and its shared Trainer collaborators.
 
     Parameters
     ----------
@@ -408,40 +311,143 @@ def build_trainer(cfg: Any) -> Trainer:
         build_scheduler,
     )
 
-    model = model_builder(cfg.model)
+    from functools import partial
+    from feral_vision.training.execution import (
+        huggingface_loss,
+        model_loss,
+        ultralytics_loss,
+    )
+
+    task = TRAINING_TASKS[getattr(cfg.train, "task", "generic")]
+    model = model_builder(cfg.model, task=task).to(cfg.train.device)
     optimizer = build_optimizer(model.parameters(), cfg.train.optim)
     scheduler = build_scheduler(optimizer, cfg.train.scheduler)
-    loss_fn = build_loss_fn(cfg.train.loss_fn)
+    execution = _loss_mode(cfg)
     task_adapter = build_task_adapter(cfg)
-
+    loss_fn = None
+    computations: dict[str, LossComputation] = {
+        "model": model_loss,
+        "huggingface": huggingface_loss,
+        "ultralytics": ultralytics_loss,
+    }
+    if execution == "prediction":
+        criterion = build_loss_fn(cfg.train.loss_fn)
+        if isinstance(criterion, nn.Module):
+            criterion = criterion.to(cfg.train.device)
+        loss_fn = criterion
+        compute_loss: LossComputation = partial(
+            prediction_loss,
+            criterion=criterion,
+            aux_weight=getattr(cfg.train, "aux_weight", 0.5),
+        )
+    elif task_adapter is not None:
+        compute_loss = task_adapter.loss
+    else:
+        compute_loss = computations[execution]
     return Trainer(
         model=model,
         optimizer=optimizer,
         loss_fn=loss_fn,
+        compute_loss=compute_loss,
         cfg=cfg,
         scheduler=scheduler,
         task_adapter=task_adapter,
         device=cfg.train.device,
+        best_model_path=getattr(cfg.train, "best_model_path", DEFAULT_BEST_MODEL_PATH),
+        monitor=getattr(cfg.train, "monitor", None),
+        mode=getattr(cfg.train, "mode", "min"),
+        scheduler_monitor=getattr(cfg.train, "scheduler_monitor", None),
     )
 
 
+def _loss_mode(cfg: Any) -> str:
+    """Resolve the explicitly configured execution mode or its task/provider default."""
+    mode = getattr(cfg.train, "loss_mode", "auto")
+    if mode != "auto":
+        return mode
+    task = TRAINING_TASKS[getattr(cfg.train, "task", "generic")]
+    source = cfg.model.architecture.source
+    if source == "hf_hub" and task != "generic":
+        return "huggingface"
+    if source == "ultralytics" and task == "detection":
+        return "detection_giou"
+    if source == "ultralytics" and task in {
+        "classification",
+        "instance_segmentation",
+        "pose",
+    }:
+        return "ultralytics"
+    if task in {"detection", "instance_segmentation", "pose", "panoptic_segmentation"}:
+        return "model"
+    return "prediction"
+
+
 def build_task_adapter(cfg: Any) -> Any | None:
-    """Use this function when a Run Recipe selects task-specific trainer behavior."""
-    task = getattr(cfg.train, "task", "generic")
-    if task == "generic":
-        return None
-    if task == "detection":
+    """Keep the existing detection/GIoU compatibility facade for its selected execution."""
+    if _loss_mode(cfg) == "detection_giou":
         from feral_vision.training.task_adapters import DetectionTaskAdapter
 
         return DetectionTaskAdapter(num_classes=int(cfg.train.num_classes))
-    raise ValueError(f"unsupported training task {task!r}")
+    return None
+
+
+def build_dataloader(cfg: Any):
+    """Instantiate a prepared DataLoader through Hydra, retaining the legacy source fallback.
+
+    Parameters
+    ----------
+    cfg : Any
+        Resolved recipe containing task, source, and optional DataLoader/collator targets.
+
+    Returns
+    -------
+    DataLoader
+        Loader for the selected provider's prepared batch contract.
+    """
+    from functools import partial
+    from hydra.utils import instantiate, to_absolute_path
+    from torch.utils.data import DataLoader, default_collate
+    from feral_vision.data.batching import collate_huggingface, collate_vision
+    from feral_vision.data.loading import instantiate_dataloader
+    from feral_vision.training.detection import collate_detection
+
+    mode = _loss_mode(cfg)
+    collate_fn = getattr(cfg.train, "collate_fn", None)
+    if collate_fn is not None:
+        collate_fn = instantiate(collate_fn)
+    elif mode == "detection_giou":
+        collate_fn = partial(collate_detection, num_classes=int(cfg.train.num_classes))
+    elif mode == "model":
+        collate_fn = collate_vision
+    elif mode == "huggingface":
+        collate_fn = collate_huggingface
+    elif mode == "ultralytics" and TRAINING_TASKS[cfg.train.task] != "classification":
+        from ultralytics.data.dataset import YOLODataset
+
+        collate_fn = YOLODataset.collate_fn
+    else:
+        collate_fn = default_collate
+
+    specification = getattr(cfg.train, "dataloader", None)
+    if specification is not None:
+        return instantiate_dataloader(specification, collate_fn=collate_fn)
+
+    from feral_vision.data.dataset import AnnotationDataset
+    from feral_vision.io_utils import DatasetSource
+
+    dataset = AnnotationDataset(DatasetSource(to_absolute_path(cfg.data.root)))
+    return DataLoader(
+        dataset,
+        batch_size=cfg.train.batch_size,
+        shuffle=True,
+        num_workers=cfg.train.num_workers,
+        collate_fn=collate_fn,
+    )
 
 
 def main() -> None:
     """Execute the canonical Hydra-configured training entrypoint."""
     import hydra
-    from hydra.utils import to_absolute_path
-
     from feral_vision.config.store import register_configs
 
     register_configs()
@@ -450,26 +456,8 @@ def main() -> None:
         version_base=None, config_path="../../../conf", config_name="runs/detection"
     )
     def _run(cfg: Any) -> None:
-        from torch.utils.data import DataLoader
-
-        from feral_vision.data.dataset import AnnotationDataset
-        from feral_vision.io_utils import DatasetSource
-
-        train_dataset = AnnotationDataset(
-            DatasetSource(to_absolute_path(cfg.data.root))
-        )
         trainer = build_trainer(cfg)
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=cfg.train.batch_size,
-            shuffle=True,
-            num_workers=cfg.train.num_workers,
-            collate_fn=(
-                trainer.task_adapter.collate
-                if trainer.task_adapter is not None
-                else None
-            ),
-        )
+        train_loader = build_dataloader(cfg)
         trainer.fit(train_loader)
 
     _run()

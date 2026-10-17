@@ -1,15 +1,17 @@
-"""Contracts for external model-source adapters; HF tests use the real client."""
+"""Offline contracts for model-source adapters using API-checked library mocks."""
 
 from __future__ import annotations
 
 # stdlib
-import sys
-from types import ModuleType, SimpleNamespace
+import importlib
+from unittest.mock import create_autospec
 
 # third-party
 import pytest
 import torch
-from huggingface_hub import constants as hf_constants
+import ultralytics
+import ultralytics.nn.tasks as ultralytics_tasks
+from huggingface_hub import ModelInfo
 from huggingface_hub.errors import OfflineModeIsEnabled
 from omegaconf import OmegaConf
 from torch import nn
@@ -52,31 +54,68 @@ def _make_cfg(
 # ---------------------------------------------------------------------------
 
 
-# Hugging Face's own testing org hosts a stable, tiny, public repo for exactly
-# this purpose, so these tests call the real huggingface_hub client.
-HF_TESTING_REPO = "hf-internal-testing/tiny-random-ViTForImageClassification"
+@pytest.fixture
+def unregistered_model(monkeypatch):
+    """Keep metadata inspection independent of external MLflow registry state."""
+    from feral_vision.models import register_model
+
+    lookup = create_autospec(
+        register_model.load_model_registry, side_effect=KeyError("unregistered")
+    )
+    monkeypatch.setattr(register_model, "load_model_registry", lookup)
 
 
-@pytest.mark.network
-def test_hf_adapter_inspect_maps_real_hub_metadata_to_project_model_properties():
-    properties, metadata = HFAdapter().inspect(_make_cfg("hf_hub", HF_TESTING_REPO))
+@pytest.mark.parametrize(
+    "pipeline_tag,expected_outputs",
+    [
+        ("image-classification", [CVTask.CLASSIFICATION]),
+        ("object-detection", [CVTask.DETECTION]),
+        ("semantic-segmentation", [CVTask.SEG_SEMANTIC]),
+        ("instance-segmentation", [CVTask.SEG_INSTANCE]),
+        ("image-segmentation", [CVTask.SEG_SEMANTIC, CVTask.SEG_INSTANCE]),
+    ],
+)
+def test_hf_adapter_maps_hub_metadata_to_project_tasks(
+    monkeypatch, unregistered_model, pipeline_tag, expected_outputs
+):
+    hub = importlib.import_module("feral_vision.models.sources.HFAdapter")
+    info = ModelInfo(
+        id="test/vision-model",
+        pipeline_tag=pipeline_tag,
+        tags=["vision"],
+        config={"model_type": "test-architecture"},
+    )
+    model_info = create_autospec(hub.model_info, return_value=info)
+    monkeypatch.setattr(hub, "model_info", model_info)
 
-    assert properties.model_outputs == [CVTask.CLASSIFICATION]
-    assert metadata["pipeline_tag"] == "image-classification"
-    assert "vit" in metadata["tags"]
-    assert metadata["config"]["model_type"] == "vit"
+    properties, metadata = HFAdapter().inspect(_make_cfg("hf_hub", "test/vision-model"))
+
+    model_info.assert_called_once_with("test/vision-model")
+    assert properties.model_outputs == expected_outputs
+    assert metadata == {
+        "pipeline_tag": pipeline_tag,
+        "tags": ["vision"],
+        "config": {"model_type": "test-architecture"},
+    }
 
 
-@pytest.mark.network
-def test_hf_adapter_downloads_only_weight_files_missing_from_the_destination(tmp_path):
+def test_hf_adapter_requests_only_weight_files_missing_from_destination(
+    tmp_path, monkeypatch
+):
+    hub = importlib.import_module("feral_vision.models.sources.HFAdapter")
     destination = tmp_path / "weights"
     destination.mkdir()
     (destination / "config.json").write_bytes(b"cached")
+    download = create_autospec(hub.hf_hub_download)
+    model = nn.Identity()
+    load = create_autospec(hub._load_local, return_value=model)
+    monkeypatch.setattr(hub, "hf_hub_download", download)
+    monkeypatch.setattr(hub, "_load_local", load)
 
-    HFAdapter().fetch(
+    result = HFAdapter().fetch(
         _make_cfg(
             "hf_hub",
-            HF_TESTING_REPO,
+            "test/vision-model",
             weights={
                 "id": ["pytorch_model.bin", "config.json"],
                 "location": str(destination),
@@ -84,19 +123,59 @@ def test_hf_adapter_downloads_only_weight_files_missing_from_the_destination(tmp
         )
     )
 
-    assert (destination / "pytorch_model.bin").stat().st_size > 0
+    assert result is model
+    download.assert_called_once_with(
+        repo_id="test/vision-model", filename="pytorch_model.bin", local_dir=destination
+    )
+    load.assert_called_once_with(
+        destination, ["pytorch_model.bin", "config.json"], task=None
+    )
     assert (destination / "config.json").read_bytes() == b"cached"
 
 
-def test_hf_adapter_explains_how_to_recover_when_the_hub_is_unreachable(monkeypatch):
-    # The documented switch for "no HTTP calls": the real client then raises
-    # huggingface_hub.errors.OfflineModeIsEnabled from model_info.
-    monkeypatch.setattr(hf_constants, "HF_HUB_OFFLINE", True)
+def test_hf_adapter_explains_how_to_recover_when_the_hub_is_unreachable(
+    monkeypatch, unregistered_model
+):
+    hub = importlib.import_module("feral_vision.models.sources.HFAdapter")
+    info = create_autospec(hub.model_info, side_effect=OfflineModeIsEnabled("offline"))
+    monkeypatch.setattr(hub, "model_info", info)
 
     with pytest.raises(RuntimeError, match="pass fetch_if_needed=True") as raised:
-        HFAdapter().inspect(_make_cfg("hf_hub", HF_TESTING_REPO))
+        HFAdapter().inspect(_make_cfg("hf_hub", "test/vision-model"))
 
     assert isinstance(raised.value.__cause__, OfflineModeIsEnabled)
+
+
+@pytest.mark.parametrize(
+    "task,class_name",
+    [
+        ("classification", "AutoModelForImageClassification"),
+        ("detection", "AutoModelForObjectDetection"),
+        ("semantic_segmentation", "AutoModelForSemanticSegmentation"),
+        ("instance_segmentation", "AutoModelForInstanceSegmentation"),
+        ("panoptic_segmentation", "AutoModelForUniversalSegmentation"),
+        ("pose", "AutoModelForPoseEstimation"),
+    ],
+)
+def test_hf_uses_selected_task_head_and_native_loading_options(
+    monkeypatch, task, class_name
+):
+    """Hydra's selected task chooses the upstream task class without fetching real weights."""
+    import transformers
+
+    model_class = getattr(transformers, class_name)
+    expected = nn.Identity()
+    load = create_autospec(model_class.from_pretrained, return_value=expected)
+    monkeypatch.setattr(model_class, "from_pretrained", load)
+    cfg = _make_cfg("hf_hub", "test/model", num_classes=3)
+    cfg.architecture.kwargs = {"ignore_mismatched_sizes": True}
+
+    result = HFAdapter().fetch(cfg, task=task)
+
+    assert result is expected
+    load.assert_called_once_with(
+        "test/model", num_labels=3, ignore_mismatched_sizes=True
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -114,31 +193,32 @@ def test_hf_adapter_explains_how_to_recover_when_the_hub_is_unreachable(monkeypa
 def test_torch_hub_adapter_uses_configured_model_name_or_default(
     monkeypatch, weights, expected_name
 ):
-    calls: list[tuple[str, str, bool, bool]] = []
     model = nn.Identity()
-
-    def _load(repo: str, name: str, *, verbose: bool, trust_repo: bool) -> nn.Module:
-        calls.append((repo, name, verbose, trust_repo))
-        return model
-
-    monkeypatch.setattr(torch.hub, "load", _load)
+    load = create_autospec(torch.hub.load, return_value=model)
+    monkeypatch.setattr(torch.hub, "load", load)
 
     result = TorchHubAdapter().fetch(
         _make_cfg("torch_hub", "owner/repo", weights=weights)
     )
 
     assert result is model
-    assert calls == [("owner/repo", expected_name, False, True)]
+    load.assert_called_once_with(
+        "owner/repo", expected_name, verbose=False, trust_repo=True
+    )
 
 
-def test_torch_hub_adapter_requires_explicit_local_inspection_fallback(monkeypatch):
+def test_torch_hub_adapter_requires_explicit_local_inspection_fallback(
+    monkeypatch, unregistered_model
+):
     adapter = TorchHubAdapter()
     cfg = _make_cfg("torch_hub", "owner/repo")
 
     with pytest.raises(RuntimeError, match="pass fetch_if_needed=True"):
         adapter.inspect(cfg)
 
-    monkeypatch.setattr(adapter, "fetch", lambda configured: nn.Linear(3, 2))
+    monkeypatch.setattr(
+        adapter, "fetch", lambda configured: nn.Conv2d(3, 2, kernel_size=1)
+    )
     properties, metadata = adapter.inspect(cfg, fetch_if_needed=True)
 
     assert properties.model_outputs == []
@@ -150,65 +230,60 @@ def test_torch_hub_adapter_requires_explicit_local_inspection_fallback(monkeypat
 # ---------------------------------------------------------------------------
 
 
-def test_ultralytics_adapter_returns_module_and_preserves_task_metadata(monkeypatch):
+@pytest.mark.parametrize(
+    "task,expected_output",
+    [
+        ("detect", CVTask.DETECTION),
+        ("segment", CVTask.SEG_INSTANCE),
+        ("classify", CVTask.CLASSIFICATION),
+    ],
+)
+def test_ultralytics_adapter_returns_module_and_preserves_task_metadata(
+    monkeypatch, unregistered_model, task, expected_output
+):
     loaded_module = nn.Conv2d(3, 2, kernel_size=1)
 
-    class _YOLO:
-        """Minimal offline Ultralytics facade with a model and task metadata."""
-
-        def __init__(self, model_id: str) -> None:
-            self.model = loaded_module
-            self.task = "segment"
-            self.names = {0: "cat", 1: "dog"}
-            self.model.nc = 2
-
-    ultralytics = ModuleType("ultralytics")
-    ultralytics.YOLO = _YOLO  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "ultralytics", ultralytics)
+    yolo = create_autospec(ultralytics.YOLO)
+    yolo.return_value.model = loaded_module
+    yolo.return_value.task = task
+    yolo.return_value.names = {0: "cat", 1: "dog"}
+    loaded_module.nc = 2
+    monkeypatch.setattr(ultralytics, "YOLO", yolo)
     cfg = _make_cfg("ultralytics", "yolo11n-seg.pt")
 
     adapter = UltralyticsAdapter()
     assert adapter.fetch(cfg) is loaded_module
     properties, metadata = adapter.inspect(cfg)
 
-    assert properties.model_outputs == [CVTask.SEG_INSTANCE]
-    assert metadata == {"task": "segment", "nc": 2, "names": {0: "cat", 1: "dog"}}
+    assert properties.model_outputs == [expected_output]
+    assert metadata == {"task": task, "nc": 2, "names": {0: "cat", 1: "dog"}}
 
 
-def test_ultralytics_adapter_rebuilds_detection_head_for_configured_taxonomy(
+@pytest.mark.parametrize(
+    "task,model_class",
+    [
+        ("detect", ultralytics_tasks.DetectionModel),
+        ("segment", ultralytics_tasks.SegmentationModel),
+        ("pose", ultralytics_tasks.PoseModel),
+    ],
+)
+def test_ultralytics_adapter_preserves_task_when_rebuilding_configured_head(
     monkeypatch,
+    task,
+    model_class,
 ):
-    pretrained = SimpleNamespace(
-        model=[SimpleNamespace(nc=80)],
-        yaml={"nc": 80},
-    )
-    fine_tuning_model = nn.Identity()
-    loaded_weights: list[object] = []
-    fine_tuning_model.load = lambda weights, verbose: loaded_weights.append(weights)  # type: ignore[attr-defined]
-
-    class _YOLO:
-        """Minimal offline facade returning an eighty-class pretrained detector."""
-
-        def __init__(self, model_id: str) -> None:
-            self.model = pretrained
-
-    def _detection_model(yaml, *, nc: int, verbose: bool) -> nn.Module:
-        """Use this function to capture construction of the configured fine-tuning head."""
-        assert yaml == {"nc": 80}
-        assert nc == 10
-        assert verbose is False
-        return fine_tuning_model
-
-    ultralytics = ModuleType("ultralytics")
-    ultralytics.__path__ = []  # type: ignore[attr-defined]
-    ultralytics.YOLO = _YOLO  # type: ignore[attr-defined]
-    ultralytics_nn = ModuleType("ultralytics.nn")
-    ultralytics_nn.__path__ = []  # type: ignore[attr-defined]
-    ultralytics_tasks = ModuleType("ultralytics.nn.tasks")
-    ultralytics_tasks.DetectionModel = _detection_model  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "ultralytics", ultralytics)
-    monkeypatch.setitem(sys.modules, "ultralytics.nn", ultralytics_nn)
-    monkeypatch.setitem(sys.modules, "ultralytics.nn.tasks", ultralytics_tasks)
+    head = nn.Identity()
+    head.nc = 80
+    pretrained = nn.Module()
+    pretrained.model = nn.ModuleList([head])
+    pretrained.yaml = {"nc": 80}
+    fine_tuning_model = create_autospec(model_class, instance=True)
+    detection_model = create_autospec(model_class, return_value=fine_tuning_model)
+    yolo = create_autospec(ultralytics.YOLO)
+    yolo.return_value.model = pretrained
+    yolo.return_value.task = task
+    yolo.return_value.task_map = {task: {"model": detection_model}}
+    monkeypatch.setattr(ultralytics, "YOLO", yolo)
 
     assert (
         UltralyticsAdapter().fetch(
@@ -216,7 +291,29 @@ def test_ultralytics_adapter_rebuilds_detection_head_for_configured_taxonomy(
         )
         is fine_tuning_model
     )
-    assert loaded_weights == [pretrained]
+    yolo.assert_called_once_with("yolo11n.pt")
+    detection_model.assert_called_once_with({"nc": 80}, nc=10, verbose=False)
+    fine_tuning_model.load.assert_called_once_with(pretrained, verbose=False)
+
+
+def test_ultralytics_classifier_uses_native_head_adjustment(monkeypatch):
+    """Classification delegates head adjustment to Ultralytics rather than assuming `.nc`."""
+    model = nn.Conv2d(3, 2, 1)
+    yolo = create_autospec(ultralytics.YOLO)
+    yolo.return_value.model = model
+    yolo.return_value.task = "classify"
+    reshape = create_autospec(ultralytics_tasks.ClassificationModel.reshape_outputs)
+    monkeypatch.setattr(ultralytics, "YOLO", yolo)
+    monkeypatch.setattr(
+        ultralytics_tasks.ClassificationModel, "reshape_outputs", reshape
+    )
+
+    result = UltralyticsAdapter().fetch(
+        _make_cfg("ultralytics", "test-cls.pt", num_classes=3)
+    )
+
+    assert result is model
+    reshape.assert_called_once_with(model, 3)
 
 
 # ---------------------------------------------------------------------------
@@ -252,19 +349,14 @@ def test_model_builder_delegates_remote_architecture_to_selected_adapter(monkeyp
     from feral_vision.models import register_model
 
     expected_model = nn.Identity()
-    calls: list[object] = []
-
-    class _Adapter:
-        """Minimal source adapter proving the builder's delegation boundary."""
-
-        def fetch(self, cfg):
-            calls.append(cfg)
-            return expected_model
-
+    adapter = create_autospec(SourceAdapter, instance=True, spec_set=True)
+    adapter.fetch.return_value = expected_model
     cfg = _make_cfg("hf_hub", "owner/model")
-    monkeypatch.setattr(register_model, "get_adapter", lambda source: _Adapter())
+    get_adapter = create_autospec(register_model.get_adapter, return_value=adapter)
+    monkeypatch.setattr(register_model, "get_adapter", get_adapter)
 
     model = register_model.model_builder(cfg)
 
     assert model is expected_model
-    assert calls == [cfg]
+    get_adapter.assert_called_once_with("hf_hub")
+    adapter.fetch.assert_called_once_with(cfg)

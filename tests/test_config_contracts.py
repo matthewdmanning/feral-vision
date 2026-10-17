@@ -109,6 +109,55 @@ def test_recipe_rejects_unknown_structured_override() -> None:
         _compose_recipe(_CANONICAL_RECIPE, ["train.nope=1"])
 
 
+@pytest.mark.parametrize(
+    "task",
+    [
+        "classification",
+        "detection",
+        "semantic_segmentation",
+        "instance_segmentation",
+        "panoptic_segmentation",
+        "pose",
+    ],
+)
+def test_common_task_and_publication_options_are_hydra_overrides(task):
+    """Existing recipes select common tasks and publication behavior without Python edits."""
+    cfg = _compose_recipe(
+        _CANONICAL_RECIPE,
+        [
+            f"train.task={task}",
+            "train.loss_mode=auto",
+            "train.monitor=train_loss",
+            "train.mode=min",
+            "tracking.serialization_format=pickle",
+            "tracking.model_name=selected-model",
+        ],
+    )
+
+    assert cfg.train.task == task
+    assert cfg.train.loss_mode == "auto"
+    assert cfg.tracking.serialization_format == "pickle"
+    assert cfg.tracking.model_name == "selected-model"
+
+
+def test_native_inference_options_are_hydra_overrides():
+    """The existing schema configures an MLflow model and native calling options."""
+    cfg = _compose_recipe(
+        _CANONICAL_RECIPE,
+        [
+            "inference.model_uri=models:/vision@champion",
+            "inference.call_mode=kwargs",
+            "+inference.forward_kwargs={return_dict:true}",
+            "+inference.load_kwargs={dst_path:/tmp/inference-cache}",
+        ],
+    )
+
+    assert cfg.inference.model_uri == "models:/vision@champion"
+    assert cfg.inference.call_mode == "kwargs"
+    assert cfg.inference.forward_kwargs.return_dict is True
+    assert cfg.inference.load_kwargs.dst_path == "/tmp/inference-cache"
+
+
 # ---------------------------------------------------------------------------
 # Model variants — source, location, and metadata ownership
 # ---------------------------------------------------------------------------

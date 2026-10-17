@@ -85,7 +85,7 @@ def test_segmentation_loss_applies_configured_component_weights(
     ) + bce_weight * F.cross_entropy(logits, target_indices)
 
     assert loss.shape == torch.Size([])
-    assert torch.allclose(loss, expected)
+    torch.testing.assert_close(loss, expected)
     loss.backward()
     assert logits.grad is not None
     assert torch.isfinite(logits.grad).all()

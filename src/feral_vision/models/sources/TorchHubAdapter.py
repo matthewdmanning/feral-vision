@@ -18,15 +18,23 @@ log = get_logger(__name__)
 
 
 class TorchHubAdapter(SourceAdapter):
+    """Load the configured Hub entrypoint with Hydra-selected native options."""
+
     def fetch(self, cfg: DictConfig) -> nn.Module:
+        """Delegate configured model construction to the upstream Hub implementation."""
         import torch
 
         weights = getattr(cfg, "weights", None)
         model_name = weights.id[0] if weights and weights.id else "default"
         log.info("loading %s from torch.hub repo %s", model_name, cfg.architecture.id)
-        return torch.hub.load(
-            cfg.architecture.id, model_name, verbose=False, trust_repo=True
-        )
+        from hydra.utils import instantiate
+
+        options = {
+            "verbose": False,
+            "trust_repo": True,
+            **instantiate(cfg.architecture.get("kwargs", {}), _convert_="all"),
+        }
+        return torch.hub.load(cfg.architecture.id, model_name, **options)
 
     def inspect(
         self, cfg: DictConfig, *, fetch_if_needed: bool = False

@@ -23,6 +23,8 @@ dependencies = [
     "pycocotools>=2.0",
     "ultralytics>=8.3",
     "mcp>=2,<3",
+    "transformers>=5.20.1",
+    "torchvision>=0.27.1",
 ]
 
 [build-system]

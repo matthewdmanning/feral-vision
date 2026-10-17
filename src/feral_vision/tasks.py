@@ -17,3 +17,18 @@ class CVTask(StrEnum):
     #   DETECTION is exclusive with all others
     #   POSE is at most one per dataset
     #   CLASSIFICATION may appear multiple times (multi-head)
+
+
+# Canonical training task names; aliases preserve existing configuration values.
+TRAINING_TASKS = {
+    "generic": "generic",
+    "classification": "classification",
+    "detection": "detection",
+    "semantic_segmentation": "semantic_segmentation",
+    "seg_semantic": "semantic_segmentation",
+    "segmentation": "semantic_segmentation",
+    "instance_segmentation": "instance_segmentation",
+    "seg_instance": "instance_segmentation",
+    "panoptic_segmentation": "panoptic_segmentation",
+    "pose": "pose",
+}

@@ -130,18 +130,27 @@ def registered_config(name: str) -> DictConfig:
     return OmegaConf.create(_load_entry(name)["config"])
 
 
-def model_builder(cfg: DictConfig) -> nn.Module:
+def model_builder(cfg: DictConfig, *, task: str | None = None) -> nn.Module:
     """Build an ``nn.Module`` from its configured architecture source."""
     if cfg.architecture.source == "local":
         return _build_local(cfg)
-    return get_adapter(cfg.architecture.source).fetch(cfg)
+    adapter = get_adapter(cfg.architecture.source)
+    if cfg.architecture.source == "hf_hub" and task is not None:
+        return adapter.fetch(cfg, task=task)
+    return adapter.fetch(cfg)
 
 
 def _build_local(cfg: DictConfig) -> nn.Module:
     """Instantiate an in-repository architecture from its required location."""
     module_path, _, class_name = cfg.architecture.location.rpartition(".")
     cls = getattr(importlib.import_module(module_path), class_name)
-    return cls.from_config(cfg) if hasattr(cls, "from_config") else cls()
+    if hasattr(cls, "from_config"):
+        return cls.from_config(cfg)
+    from hydra.utils import instantiate
+
+    return instantiate(
+        {"_target_": cfg.architecture.location, **cfg.architecture.get("kwargs", {})}
+    )
 
 
 def register_model(
@@ -178,23 +187,17 @@ def _get_adapter(source: str):
         if spec is None or spec.loader is None:
             continue
         module = importlib.util.module_from_spec(spec)
-        try:
-            spec.loader.exec_module(module)
-        except Exception:
-            continue
+        spec.loader.exec_module(module)
         if getattr(module, "SOURCE_KEY", None) != source:
             continue
         for name in dir(module):
             candidate = getattr(module, name)
-            try:
-                if (
-                    isinstance(candidate, type)
-                    and issubclass(candidate, SourceAdapter)
-                    and candidate is not SourceAdapter
-                ):
-                    return candidate()
-            except Exception:
-                continue
+            if (
+                isinstance(candidate, type)
+                and issubclass(candidate, SourceAdapter)
+                and candidate is not SourceAdapter
+            ):
+                return candidate()
     raise KeyError(
         f"no adapter for source {source!r}; add SOURCE_KEY = {source!r} to {sources_dir}"
     )
