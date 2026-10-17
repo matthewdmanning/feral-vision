@@ -32,7 +32,7 @@ not require an experiment name or start an MLflow run.
 
 The library API consumes the composed configuration::
 
-   from feral_vision.inference import build_predictor
+   from sightkit_learn.inference import build_predictor
 
    predictor = build_predictor(cfg)
    predictions = predictor.predict(prepared_batch)
@@ -138,7 +138,7 @@ class-index interpretation when comparing them with predictions.
 
 The labeled dataset API separates inputs from targets before model execution::
 
-   from feral_vision.inference import build_dataloader, build_predictor
+   from sightkit_learn.inference import build_dataloader, build_predictor
 
    predictor = build_predictor(cfg)
    loader = build_dataloader(cfg)
@@ -170,7 +170,7 @@ these standard cases.
 
 For native COCO detection/instance targets, use ``CocoDetection`` with
 ``wrap_dataset_for_transforms_v2`` and
-``feral_vision.data.batching.collate_vision``; see :doc:`dataset`.
+``sightkit_learn.data.batching.collate_vision``; see :doc:`dataset`.
 ``AnnotationDataset`` and ``StreamingAnnotationDataset`` also remain available
 for the existing stem-matched payload, with explicit target conversion when
 required by a consumer.

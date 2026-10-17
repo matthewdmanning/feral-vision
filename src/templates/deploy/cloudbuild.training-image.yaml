@@ -1,0 +1,44 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-training-image
+    args:
+      - build
+      - --pull
+      - --tag
+      - ${_TRAINING_IMAGE}
+      - --file
+      - feral-vision/deploy/Dockerfile.gcp
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: verify-training-image
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        docker run --rm --entrypoint bash "${_TRAINING_IMAGE}" -ceu '
+          test -x /usr/local/bin/uv
+          test -x /workspace/.venv/bin/python
+          test -f /workspace/feral-vision/conf/runs/detection.yaml
+          test -f /workspace/feral-vision/scripts/runs/container_train.sh
+          python -c "import torch, hydra, sightkit_learn; print(torch.__version__)"
+          python -m sightkit_learn.training.trainer --config-dir /workspace/feral-vision/conf --config-name runs/detection --cfg job >/tmp/resolved-training-config.yaml
+          gcloud version >/dev/null
+          bash -n /workspace/feral-vision/scripts/runs/container_train.sh
+        '
+    waitFor:
+      - build-training-image
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-training-image
+    args:
+      - push
+      - ${_TRAINING_IMAGE}
+    waitFor:
+      - verify-training-image
+
+images:
+  - ${_TRAINING_IMAGE}
+
+options:
+  logging: CLOUD_LOGGING_ONLY

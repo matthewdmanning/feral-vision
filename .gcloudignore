@@ -7,10 +7,10 @@
 .ruff_cache/
 docs/_build/
 .dvc/tmp/
-data/
+feral-vision/data/
 .vscode/
 
 !src/
-!src/feral_vision/
-!src/feral_vision/data/
-!src/feral_vision/data/dataset_artifact.py
+!src/sightkit_learn/
+!src/sightkit_learn/data/
+!src/sightkit_learn/data/dataset_artifact.py

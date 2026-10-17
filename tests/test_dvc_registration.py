@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-REGISTER_SCRIPT = REPOSITORY_ROOT / "scripts/data/register.sh"
+REGISTER_SCRIPT = REPOSITORY_ROOT / "feral-vision/scripts/data/register.sh"
 
 # ---------------------------------------------------------------------------
 # Helpers / local fixtures
@@ -30,7 +30,9 @@ def dvc_repo(tmp_path: Path) -> Path:
     shutil.copyfile(REPOSITORY_ROOT / ".gitignore", repo / ".gitignore")
     dockerfile = repo / "deploy/dataset-publisher/Dockerfile"
     dockerfile.parent.mkdir(parents=True)
-    shutil.copyfile(REPOSITORY_ROOT / "deploy/dataset-publisher/Dockerfile", dockerfile)
+    shutil.copyfile(
+        REPOSITORY_ROOT / "feral-vision/deploy/dataset-publisher/Dockerfile", dockerfile
+    )
     return repo
 
 

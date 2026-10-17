@@ -1,23 +1,23 @@
 Models
 ======
 
-.. automodule:: feral_vision.models.default
+.. automodule:: sightkit_learn.models.default
    :members:
 
-.. automodule:: feral_vision.models.ModelProperties
+.. automodule:: sightkit_learn.models.ModelProperties
    :members:
 
-.. automodule:: feral_vision.models.register_model
+.. automodule:: sightkit_learn.models.register_model
    :members:
 
-.. automodule:: feral_vision.models.sources.SourceAdapter
+.. automodule:: sightkit_learn.models.sources.SourceAdapter
    :members:
 
-.. automodule:: feral_vision.models.sources.HFAdapter
+.. automodule:: sightkit_learn.models.sources.HFAdapter
    :members:
 
-.. automodule:: feral_vision.models.sources.TorchHubAdapter
+.. automodule:: sightkit_learn.models.sources.TorchHubAdapter
    :members:
 
-.. automodule:: feral_vision.models.sources.UltralyticsAdapter
+.. automodule:: sightkit_learn.models.sources.UltralyticsAdapter
    :members:

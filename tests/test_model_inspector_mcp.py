@@ -20,7 +20,7 @@ from mcp import ClientSession, StdioServerParameters
 async def _exercise_server(project_root: Path) -> None:
     """Use this function to verify adapter tools through the real stdio server."""
     server_path = Path(__file__).resolve().parents[1] / "mcp/server/main.py"
-    sources = project_root / "src/feral_vision/models/sources"
+    sources = project_root / "src/sightkit_learn/models/sources"
     sources.mkdir(parents=True)
     adapter_code = 'SOURCE_KEY = "example"\n'
     (sources / "ExampleAdapter.py").write_text(adapter_code)
@@ -47,7 +47,7 @@ async def _exercise_server(project_root: Path) -> None:
         assert json.loads(listed.content[0].text) == [
             {
                 "source_key": "example",
-                "file": "src/feral_vision/models/sources/ExampleAdapter.py",
+                "file": "src/sightkit_learn/models/sources/ExampleAdapter.py",
             }
         ]
         read_result = await session.call_tool("read_adapter", {"source_key": "example"})

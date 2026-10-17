@@ -15,7 +15,7 @@ Prepare data
 ------------
 
 Workflow scripts acquire and transform data. Register one prepared Dataset with
-``scripts/data/register.sh``; it runs ``dvc add`` and a targeted ``dvc push``.
+``feral-vision/scripts/data/register.sh``; it runs ``dvc add`` and a targeted ``dvc push``.
 There is no fixed DVC preparation pipeline. See :doc:`dataset` for the required
 layout, default remote configuration, complete registration command, and the
 remaining cloud publication integration.
@@ -33,18 +33,20 @@ with compatible annotations; a configured default path alone does not provide on
 Train
 -----
 
-The canonical training entrypoint is ``feral_vision.training.trainer``:
+The canonical training entrypoint is ``sightkit_learn.training.trainer``:
 
 .. code-block:: bash
 
-   uv run python -m feral_vision.training.trainer
+   cd feral-vision
+   uv run python -m sightkit_learn.training.trainer --config-dir conf --config-name runs/detection
 
 See :doc:`training` for GCP training and further detail.
 
 Model inspector
 ---------------
 
-The model inspector uses the MCP 2 Python SDK and serves its tools over stdio.
+Run the following command from the repository root (return there after local
+training). The model inspector uses the MCP 2 Python SDK and serves its tools over stdio.
 The repository connector configuration and desktop bundle use the locked
 environment. An MCP client launches the server with:
 

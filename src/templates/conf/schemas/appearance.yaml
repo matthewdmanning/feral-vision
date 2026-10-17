@@ -1,0 +1,125 @@
+Length:
+  input_type: radio
+  description: Coat Length
+  options:
+    Long:
+      description: Long, fluffy fur
+    Medium:
+      description: Longer fur around the mane, tail, and/or rear
+    Short:
+      description: Short fur across the entire body
+Pattern/Color:
+  input_type: radio
+  description: Color(s) and patterning of cat
+  options:
+    Solid:
+      input_type: radio
+      description: 'Mutually exclusive: Choose the primary solid color.'
+      options:
+        Black:
+          description: Common color, often with golden eyes
+        Brown:
+          description: Very rare as a solid color
+        Orange (Red):
+          description: Very common
+        Gray:
+          description: Diluted black
+        White:
+          description: Pure white cats exist
+        Buff (Tan):
+          description: Diluted orange
+    Tabby:
+      input_type: radio
+      description: 'Mutually exclusive: Choose the primary underlying color.'
+      options:
+        Brown:
+          description: Commonly seen with tabby stripes
+        Orange (Red):
+          description: Often seen with tabby stripes
+        Gray:
+          description: Often seen under tabby stripes
+        Buff (Tan):
+          description: Often seen with dark orange tabby stripes
+        Any:
+          description: Can appear in any color
+    Tortoiseshell:
+      input_type: radio
+      description: 'Mutually exclusive: Choose standard or dilute.'
+      options:
+        Standard:
+          description: Mixed blend of orange and black
+        Dilute:
+          description: Mixed blend of gray and buff
+    Calico:
+      input_type: radio
+      description: 'Mutually exclusive: Choose standard or dilute.'
+      options:
+        Standard:
+          description: Distinct patches of solid orange, black, and white
+        Dilute:
+          description: Distinct patches of buff, gray, and white
+    Bicolor (Piebald):
+      input_type: radio
+      description: 'Mutually exclusive: Choose the base color paired with white.'
+      options:
+        Black:
+          description: White combined with black
+        Brown:
+          description: White combined with brown
+        Orange (Red):
+          description: White combined with orange
+        Gray:
+          description: White combined with gray
+        Buff (Tan):
+          description: White combined with buff
+        Any:
+          description: Always white combined with another base color
+    Pointed:
+      input_type: radio
+      description: Mutually exclusive.
+      options:
+        Standard:
+          description: Light-colored body with darker color on extremities
+    Shaded:
+      input_type: radio
+      description: Mutually exclusive.
+      options:
+        Standard:
+          description: White base fur that gets darker toward the tips
+Features:
+  input_type: checkbox
+  description: 'Multi-choice: A cat can have none, one, or several unique features.'
+  options:
+    Eartip:
+      description: The universal sign that a community cat has been spayed or neutered
+    Ear Notch:
+      description: An alternative to the eartip
+    Folded Ears:
+      description: The tips of the ears are folded over, often due to genetics
+    Polydactyl:
+      description: Cats with an extra toe, or toes, on one or more paws (Hemingway
+        cats)
+    Manx:
+      description: A missing or partial tail, due to genetics or previous injury
+Markings:
+  input_type: checkbox
+  description: 'Multi-choice: A cat can have several distinct markings at once.'
+  options:
+    Tuxedo:
+      description: Typically black and white, with a blaze up the nose and a 'jacket'
+        on the back
+    Snowshoe:
+      description: Pointed pattern with blue eyes and white markings on the face and
+        body
+    Socks:
+      description: Different color, usually white, on paw or leg
+    Van:
+      description: All-white body with colored markings on the head and tail only
+    Blaze:
+      description: White stripe between the eyes
+    Eye patch:
+      description: Colored spot across one eye, on a mostly white face
+    Locket:
+      description: Triangular white patch on the chest
+    Tail Tip:
+      description: Different color, usually white, on the tip of the tail

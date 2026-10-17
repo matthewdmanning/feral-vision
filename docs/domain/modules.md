@@ -1,7 +1,7 @@
 # Modules
 
 This document is the authority for the module layout of this repository.
-The current code does not conform to it yet.
+The released library, starter assets, and project implementation follow this split.
 
 ## Top-level groups
 
@@ -16,6 +16,26 @@ The current code does not conform to it yet.
 
 **Ignored for now**: `mcp/` is a separate tool. It gives agents access to
 Hugging Face model signatures.
+
+## Responsibilities after migration
+
+The library retains the training loop, loss execution, inference, annotation
+readers, model providers, and generic dataset publication helpers. Hydra
+configuration is supplied by the caller; the released trainer does not discover
+a repository recipe or choose the Feral Vision experiment.
+
+The concrete COCO animal acquisition (`scripts/fetch.py`), cat-versus-other
+conversion (`scripts/coco_detection.py`), and example run logging
+(`scripts/log_run.py`) belong in production and starter assets. The preview app,
+its reference JSON, schema conversion, and local validation launchers live under
+`tools/`. Tests import these implementation files only to verify the retained
+workflows; library imports never reach them.
+
+`uv build` includes both library code and non-Python starter assets. It excludes
+`feral-vision/`, `tools/`, and tests from the wheel. Copy the starter tree before
+editing its recipes and cloud placeholders; it is not a runtime dependency of
+the library. Existing `feral_vision.*` MLflow metadata keys remain stable for
+persisted records even though Python imports now use `sightkit_learn`.
 
 ## Templates tree
 

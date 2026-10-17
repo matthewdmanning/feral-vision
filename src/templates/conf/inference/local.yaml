@@ -1,0 +1,8 @@
+defaults:
+  - inference_schema
+  - _self_
+
+threshold: 0.5
+device: cpu
+tta: false
+min_box_area: 1

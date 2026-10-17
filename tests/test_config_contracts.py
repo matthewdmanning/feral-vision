@@ -11,15 +11,15 @@ from hydra.core.global_hydra import GlobalHydra
 from hydra.errors import ConfigCompositionException
 from omegaconf import DictConfig, OmegaConf
 
-from feral_vision.config.store import register_configs
-from feral_vision.models.register_model import get_adapter
+from sightkit_learn.config.store import register_configs
+from sightkit_learn.models.register_model import get_adapter
 
 # ---------------------------------------------------------------------------
 # Helpers / local fixtures
 # ---------------------------------------------------------------------------
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-_CONF_ROOT = _REPOSITORY_ROOT / "conf"
+_CONF_ROOT = _REPOSITORY_ROOT / "feral-vision" / "conf"
 _CANONICAL_RECIPE = _CONF_ROOT / "runs" / "detection.yaml"
 _REQUIRED_CONCERNS = frozenset(
     {"data", "model", "train", "inference", "tracking", "augmentation"}
@@ -48,7 +48,7 @@ def _config_name(path: Path) -> str:
 
 def _compose_recipe(path: Path, overrides: list[str] | None = None) -> DictConfig:
     """Compose one complete recipe after registering the structured schemas."""
-    with initialize(version_base=None, config_path="../conf"):
+    with initialize(version_base=None, config_path="../feral-vision/conf"):
         return compose(config_name=_config_name(path), overrides=overrides or [])
 
 

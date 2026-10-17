@@ -10,9 +10,9 @@ import pytest
 from mlflow.tracking import MlflowClient
 from omegaconf import DictConfig, OmegaConf
 
-import feral_vision.models.register_model as registry
-from feral_vision.models.ModelProperties import ModelProperties
-from feral_vision.tasks import CVTask
+import sightkit_learn.models.register_model as registry
+from sightkit_learn.models.ModelProperties import ModelProperties
+from sightkit_learn.tasks import CVTask
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def model_definition(
             "architecture": {
                 "source": "local",
                 "id": name,
-                "location": "feral_vision.models.default.Net",
+                "location": "sightkit_learn.models.default.Net",
             }
         }
     )

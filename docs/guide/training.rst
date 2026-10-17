@@ -2,7 +2,7 @@ Training
 ========
 
 Feral Vision has one complete training Run Recipe:
-``conf/runs/detection.yaml``. Local execution, image validation, and the GPU
+``feral-vision/conf/runs/detection.yaml``. Local execution, image validation, and the GPU
 training deployment all compose that same recipe.
 
 Training and tracking errors
@@ -159,9 +159,9 @@ The container verifies the same SHA-256 again before starting the trainer.
 Training image
 --------------
 
-The only supported GPU training image is ``deploy/Dockerfile.gcp``. Build it
-through ``scripts/cloud/build_training_image.sh``, which uses
-``deploy/cloudbuild.training-image.yaml`` and returns a digest-pinned Artifact
+The only supported GPU training image is ``feral-vision/deploy/Dockerfile.gcp``. Build it
+through ``feral-vision/scripts/cloud/build_training_image.sh``, which uses
+``feral-vision/deploy/cloudbuild.training-image.yaml`` and returns a digest-pinned Artifact
 Registry reference for Terraform.
 
 The image build composes ``runs/detection`` and imports the core runtime before
@@ -173,14 +173,14 @@ timestamps do not determine whether a build is needed.
 GPU deployment
 --------------
 
-Run ``terraform/preflight/preflight.py`` with the exact intended Terraform
+Run ``feral-vision/terraform/preflight/preflight.py`` with the exact intended Terraform
 inputs before every apply. A passing preflight produces a saved Terraform plan
 and ``deployment-manifest.json`` containing the plan SHA-256, digest-pinned
 training image, Dataset Artifact URI, and Dataset Artifact manifest SHA-256.
 
 Apply only through::
 
-   scripts/runs/detection.sh --manifest terraform/preflight/reports/<timestamp>/deployment-manifest.json
+   feral-vision/scripts/runs/detection.sh --manifest feral-vision/terraform/preflight/reports/<timestamp>/deployment-manifest.json
 
 The launcher rejects a changed plan, collects startup logs, waits for terminal
 ``training-evidence.json``, and verifies that the Dataset Artifact manifest hash

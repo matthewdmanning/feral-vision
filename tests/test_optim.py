@@ -11,14 +11,14 @@ from hydra.core.global_hydra import GlobalHydra
 from hydra.utils import get_class
 from omegaconf import DictConfig
 
-from feral_vision.config.store import register_configs
-from feral_vision.training.optim import (
+from sightkit_learn.config.store import register_configs
+from sightkit_learn.training.optim import (
     build_loss_fn,
     build_optimizer,
     build_scheduler,
 )
 
-_CONF_ROOT = Path(__file__).resolve().parents[1] / "conf"
+_CONF_ROOT = Path(__file__).resolve().parents[1] / "feral-vision" / "conf"
 
 
 def _variant_names(group: str) -> tuple[str, ...]:
@@ -28,7 +28,7 @@ def _variant_names(group: str) -> tuple[str, ...]:
 
 def _compose_training_cfg(override: str) -> DictConfig:
     """Compose the canonical Run Recipe with one training-component override."""
-    with initialize(version_base=None, config_path="../conf"):
+    with initialize(version_base=None, config_path="../feral-vision/conf"):
         return compose(config_name="runs/detection", overrides=[override])
 
 

@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from feral_vision.data.annotations import (
+from sightkit_learn.data.annotations import (
     BBoxAnnotation,
     MaskAnnotation,
     PoseAnnotation,

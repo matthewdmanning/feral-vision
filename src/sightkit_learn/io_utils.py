@@ -1,0 +1,166 @@
+from __future__ import annotations
+
+import math
+from pathlib import Path
+
+import torch
+from torchvision.io import read_image
+
+from sightkit_learn.data.annotations import (
+    Annotation,
+    BBoxAnnotation,
+    MaskAnnotation,
+)
+
+_IMAGES_DIR = "images"
+_ANNOTATIONS_DIR = "annotations"
+
+
+def _build_index(root: Path) -> list[tuple[Path, list[Path]]]:
+    """Use this function to scan a dataset root and pair each image with its annotation file(s).
+
+    Scans ``root/images/`` and ``root/annotations/`` by filename stem.
+    ``names.yaml`` is excluded from annotation matching.
+
+    Parameters
+    ----------
+    root : Path
+        Root directory containing ``images/`` and ``annotations/``
+        subdirectories.
+
+    Returns
+    -------
+    list[tuple[Path, list[Path]]]
+        Sorted list of ``(image_path, [annotation_paths])`` pairs.
+
+    Raises
+    ------
+    FileNotFoundError
+        If any image has no matching annotation by stem.
+    """
+    images_dir = root / _IMAGES_DIR
+    annotations_dir = root / _ANNOTATIONS_DIR
+
+    annotations_by_stem: dict[str, list[Path]] = {}
+    for p in sorted(annotations_dir.iterdir()):
+        if p.is_file() and p.stem != "names":
+            annotations_by_stem.setdefault(p.stem, []).append(p)
+
+    samples: list[tuple[Path, list[Path]]] = []
+    for image_path in sorted(images_dir.iterdir()):
+        if not image_path.is_file():
+            continue
+        ann_paths = annotations_by_stem.get(image_path.stem)
+        if ann_paths is None:
+            raise FileNotFoundError(
+                f"no annotation matching image stem {image_path.stem!r}"
+                f" in {annotations_dir}"
+            )
+        samples.append((image_path, ann_paths))
+
+    return samples
+
+
+def _read_image_tensor(path: Path) -> torch.Tensor:
+    """Use this function to load an image as a ``(C, H, W)`` tensor using TorchVision's unchanged decoding.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the image file.
+
+    Returns
+    -------
+    torch.Tensor
+        Image tensor of shape ``(C, H, W)`` retaining the decoded channel
+        count and supported source bit depth, such as uint8 or uint16 PNG.
+    """
+    return read_image(str(path))
+
+
+def _load_annotation(path: Path) -> Annotation:
+    """Use this function to load an annotation file, dispatching to the correct type by extension.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the annotation file. Extension determines the annotation type:
+        ``.png``/``.jpg``/``.bmp`` → :class:`~sightkit_learn.data.annotations.MaskAnnotation`;
+        ``.txt`` → :class:`~sightkit_learn.data.annotations.BBoxAnnotation`.
+
+    Returns
+    -------
+    Annotation
+        A fully loaded annotation object.
+
+    Raises
+    ------
+    NotImplementedError
+        If the file extension has no registered annotation loader.
+    """
+    suffix = path.suffix.lower()
+    if suffix in {".jpg", ".jpeg", ".png", ".bmp"}:
+        return MaskAnnotation(path=path).load()
+    if suffix == ".txt":
+        return BBoxAnnotation(path=path).load()
+    raise NotImplementedError(f"no annotation loader for {suffix!r}: {path}")
+
+
+class DatasetSource:
+    """Scans a root directory and loads image / annotation pairs on demand.
+
+    Owns all filesystem scanning and disk I/O. Inject into
+    :class:`~sightkit_learn.data.dataset.AnnotationDataset` or
+    :class:`~sightkit_learn.data.dataset.StreamingAnnotationDataset`.
+
+    Parameters
+    ----------
+    root : str or Path
+        Root directory containing ``images/`` and ``annotations/``
+        subdirectories.
+    """
+
+    def __init__(self, root: str | Path) -> None:
+        self._index = _build_index(Path(root))
+
+    def __len__(self) -> int:
+        """Return the total number of image / annotation pairs."""
+        return len(self._index)
+
+    def load(self, index: int) -> tuple[torch.Tensor, list[Annotation]]:
+        """Load and return one image / annotation pair.
+
+        Parameters
+        ----------
+        index : int
+            Sample index.
+
+        Returns
+        -------
+        tuple[torch.Tensor, list[Annotation]]
+            ``(image, annotations)`` where the image is a ``(C, H, W)`` tensor
+            with the decoder's channel count and dtype.
+        """
+        img_path, ann_paths = self._index[index]
+        return _read_image_tensor(img_path), [_load_annotation(p) for p in ann_paths]
+
+    def partition(self, worker_id: int, num_workers: int) -> DatasetSource:
+        """Return a view covering only this worker's contiguous slice of the index.
+
+        Parameters
+        ----------
+        worker_id : int
+            Zero-based worker index.
+        num_workers : int
+            Total number of workers.
+
+        Returns
+        -------
+        DatasetSource
+            A shallow copy whose ``_index`` covers only this worker's slice.
+        """
+        per_worker = math.ceil(len(self._index) / num_workers)
+        start = worker_id * per_worker
+        sliced: DatasetSource = object.__new__(DatasetSource)
+        sliced._index = self._index[start : start + per_worker]
+        return sliced

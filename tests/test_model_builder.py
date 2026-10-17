@@ -9,8 +9,8 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig
 from torch import nn
 
-from feral_vision.config.store import register_configs
-from feral_vision.models.register_model import model_builder
+from sightkit_learn.config.store import register_configs
+from sightkit_learn.models.register_model import model_builder
 
 
 @pytest.fixture(autouse=True)
@@ -25,7 +25,7 @@ def _registered_and_isolated_hydra() -> None:
 @pytest.fixture
 def local_model_cfg() -> DictConfig:
     """Compose the canonical recipe with the local in-repository model."""
-    with initialize(version_base=None, config_path="../conf"):
+    with initialize(version_base=None, config_path="../feral-vision/conf"):
         return compose(config_name="runs/detection", overrides=["model=net"]).model
 
 

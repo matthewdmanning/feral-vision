@@ -2,7 +2,7 @@
 
 Use this guide when changing data ingestion, dataset layout, or dataset
 publication. Data operation entrypoints live in
-[`scripts/data/`](../../scripts/data/).
+[`feral-vision/scripts/data/`](../../feral-vision/scripts/data/).
 
 ## Data flow
 
@@ -25,7 +25,7 @@ of these directories. Its limitations are not requirements on other dataset
 readers: Hydra can instantiate native PyTorch/TorchVision datasets directly.
 For example, `ImageFolder` reads class directories and `CocoDetection` reads
 COCO JSON; neither requires project Annotation objects or a format conversion.
-The COCO output from `data/fetch.py` is incompatible with the legacy reader;
+The COCO output from `feral-vision/scripts/fetch.py` is incompatible with the legacy reader;
 select a compatible native reader when consuming that format.
 
 ## Runtime packaging for training and inference
@@ -78,7 +78,7 @@ datasets/<dataset>/<artifact>/
 ~~~
 
 The dataset-only bucket is the source for Dataset Artifacts. Its Terraform root
-is [`terraform/buckets/dataset/`](../../terraform/buckets/dataset/). It has
+is [`feral-vision/terraform/buckets/dataset/`](../../feral-vision/terraform/buckets/dataset/). It has
 Object Versioning off, a 7-day soft-delete window, Object Retention Lock
 enabled, and least-privilege access for the Cloud Build publisher and training
 readers. General storage must not be a source for a Dataset Artifact.
@@ -118,12 +118,12 @@ remains in `TRAINING_DATA_BUCKET_URI`; no URI prefix is hard-coded.
 Scripts and source adapters own acquisition, conversion, and augmentation.
 DVC registers exactly one prepared Dataset at a time; a Variant follows the
 same registration contract as a raw Dataset. The previous `dvc.yaml` and
-`scripts/data/acquire.sh`, `process.sh`, and `common.sh` were removed because
+former `scripts/data/acquire.sh`, `process.sh`, and `common.sh` were removed because
 they imposed a fixed stage graph that did not match the producers. Existing
-Dataset files were preserved. Do not recreate broad ownership of `data/raw`,
-`data/processed`, or `data/augmented`.
+Dataset files were preserved. Do not recreate broad ownership of `feral-vision/data/raw`,
+`feral-vision/data/processed`, or `feral-vision/data/augmented`.
 
-Use `scripts/data/register.sh DATASET_ROOT` from the selected DVC repository,
+Use `feral-vision/scripts/data/register.sh DATASET_ROOT` from the selected DVC repository,
 with DVC available on PATH and a default remote configured. It checks repository
 containment and the two Dataset directories, then runs `dvc add` and a targeted
 `dvc push`. It does not validate annotations or provenance, run acquisition,
@@ -142,16 +142,16 @@ that is not proof of cloud permissions or existing cloud data.
 
 ## Remaining publication gaps
 
-- `deploy/cloudbuild.prepare.yaml` still calls the retained payload/manifest
+- `feral-vision/deploy/cloudbuild.prepare.yaml` still calls the retained payload/manifest
   publisher without DVC registration. Connect its exact Dataset to a durably
   preserved `.dvc` record and source/operation provenance. This is upstream work;
   GPU training must continue consuming the published manifest without DVC.
 - `publish_dataset_artifact` checks directories and basic metadata, not
   annotation semantics, non-empty payloads, or full provenance.
-- `scripts/cloud/materialize_detection_variant.sh` imports an absent Variant
+- `feral-vision/scripts/cloud/materialize_detection_variant.sh` imports an absent Variant
   publisher. Its YOLO output conflicts with preflight/startup's pinned COCO
   `instances.json` requirement. Resolve the seam before claiming GPU readiness.
 
 The publication Dockerfile is
-[`deploy/dataset-publisher/Dockerfile`](../../deploy/dataset-publisher/Dockerfile).
+[`feral-vision/deploy/dataset-publisher/Dockerfile`](../../feral-vision/deploy/dataset-publisher/Dockerfile).
 It has no `.dvc` suffix, so DVC does not mistake it for tracking metadata.

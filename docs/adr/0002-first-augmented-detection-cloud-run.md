@@ -13,7 +13,7 @@ The current GPU training setup is defined by:
 - [Cloud operations](../agents/cloudops.md)
 - [Program flow](../agents/program-flow.md)
 - [Training guide](../guide/training.rst)
-- [`terraform/runs/detection/README.md`](../../terraform/runs/detection/README.md)
+- [`feral-vision/terraform/runs/detection/README.md`](../../feral-vision/terraform/runs/detection/README.md)
 
 ## Historical decision
 
@@ -28,8 +28,8 @@ particular:
 
 - `dataset-artifact.json` is now the explicit data-versioning/training seam;
 - the GPU runtime does not initialize or reproduce DVC state;
-- there is one complete training recipe, `conf/runs/detection.yaml`;
-- there is one GPU training image, `deploy/Dockerfile.gcp`;
+- there is one complete training recipe, `feral-vision/conf/runs/detection.yaml`;
+- there is one GPU training image, `feral-vision/deploy/Dockerfile.gcp`;
 - image build, deployment preflight, Terraform apply, and terminal evidence use
   the canonical paths documented in `AGENTS.md`;
 - the run-specific preparation/deployment wrappers described by the original

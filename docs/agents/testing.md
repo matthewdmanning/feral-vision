@@ -5,7 +5,7 @@ examples. Keep test data guidance here rather than in the general data guide.
 
 ## Terraform test boundary
 
-Terraform test files exist solely in [`terraform/tests/`](../../terraform/tests/).
+Terraform test files exist solely in [`feral-vision/terraform/tests/`](../../feral-vision/terraform/tests/).
 Keep all `*.tftest.hcl` files, Terraform test fixtures, and Terraform test
 support there. Do not place Terraform tests under `tests/`, `src/`, or a
 Terraform module directory.

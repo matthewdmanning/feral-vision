@@ -1,0 +1,11 @@
+defaults:
+  - nll_schema
+  - _self_
+
+# conf/train/loss_fn/nll.yaml
+# NLLLoss — instantiated directly (no partial needed). Expects log-probabilities from log_softmax.
+# Source: https://pytorch.org/docs/stable/generated/torch.nn.NLLLoss.html
+
+_target_: torch.nn.NLLLoss
+reduction: mean
+ignore_index: -100

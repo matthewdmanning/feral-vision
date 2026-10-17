@@ -11,7 +11,7 @@ from transformers.utils import ModelOutput
 from torchvision.models.detection import FasterRCNN
 from ultralytics.nn.tasks import BaseModel
 
-from feral_vision.config.schema import (
+from sightkit_learn.config.schema import (
     CrossEntropyConfig,
     ModelConfig,
     SGDConfig,
@@ -19,8 +19,8 @@ from feral_vision.config.schema import (
     StepLRConfig,
     TrainConfig,
 )
-from feral_vision.models import register_model
-from feral_vision.training.trainer import build_dataloader, build_trainer
+from sightkit_learn.models import register_model
+from sightkit_learn.training.trainer import build_dataloader, build_trainer
 
 
 @pytest.fixture

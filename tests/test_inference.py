@@ -14,9 +14,9 @@ from transformers.utils import ModelOutput
 from torchvision.models._utils import IntermediateLayerGetter
 from torchvision.models.segmentation import FCN
 
-from feral_vision.config.schema import InferenceConfig
-from feral_vision.inference import Predictor, build_predictor
-from feral_vision.training.tracking import log_model
+from sightkit_learn.config.schema import InferenceConfig
+from sightkit_learn.inference import Predictor, build_predictor
+from sightkit_learn.training.tracking import log_model
 
 
 @pytest.fixture
