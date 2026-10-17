@@ -5,9 +5,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 import torch
-
-# uint8 images span [0, 255]; divide by this to scale into [0, 1].
-_UINT8_MAX: float = 255.0
+from torchvision.transforms.v2 import functional as F
 
 
 def preprocess(image: np.ndarray, size: int = 256) -> torch.Tensor:
@@ -41,7 +39,4 @@ def preprocess(image: np.ndarray, size: int = 256) -> torch.Tensor:
         raise ValueError(f"unsupported image shape for preprocessing: {image.shape}")
 
     resized = cv2.resize(rgb, (size, size), interpolation=cv2.INTER_LINEAR)
-    scaled = resized.astype(np.float32) / _UINT8_MAX
-    # HWC -> CHW.
-    tensor = torch.from_numpy(scaled).permute(2, 0, 1).contiguous()
-    return tensor
+    return F.to_dtype(F.to_image(resized), dtype=torch.float32, scale=True)

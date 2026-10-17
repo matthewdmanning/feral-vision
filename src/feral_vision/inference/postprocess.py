@@ -10,6 +10,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 import torch
+from torchvision.ops import box_convert
 
 from feral_vision.constants import BOX_COORD_COUNT
 
@@ -48,22 +49,12 @@ def masks_to_boxes(mask: torch.Tensor, min_box_area: int = 1) -> torch.Tensor:
     bool_mask = _to_bool_hw(mask)
     np_mask = bool_mask.numpy().astype(np.uint8)
 
-    num_labels, _labels, stats, _centroids = cv2.connectedComponentsWithStats(
+    _num_labels, _labels, stats, _centroids = cv2.connectedComponentsWithStats(
         np_mask, connectivity=8
     )
 
-    boxes: list[list[float]] = []
-    # Label 0 is the background component; skip it.
-    for label in range(1, num_labels):
-        x = int(stats[label, cv2.CC_STAT_LEFT])
-        y = int(stats[label, cv2.CC_STAT_TOP])
-        w = int(stats[label, cv2.CC_STAT_WIDTH])
-        h = int(stats[label, cv2.CC_STAT_HEIGHT])
-        if w * h < min_box_area:
-            continue
-        # xyxy with exclusive far edge expressed as inclusive+1 -> x+w, y+h.
-        boxes.append([float(x), float(y), float(x + w), float(y + h)])
-
-    if not boxes:
-        return torch.zeros((0, BOX_COORD_COUNT), dtype=torch.float32)
-    return torch.tensor(boxes, dtype=torch.float32)
+    # OpenCV stores left, top, width, height before the component pixel area.
+    # Keep the existing bounding-rectangle area threshold and exclusive far edge.
+    boxes = torch.from_numpy(stats[1:, :BOX_COORD_COUNT]).to(torch.float32)
+    boxes = boxes[boxes[:, 2] * boxes[:, 3] >= min_box_area]
+    return box_convert(boxes, in_fmt="xywh", out_fmt="xyxy")
