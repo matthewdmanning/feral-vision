@@ -6,7 +6,7 @@ Date: 2026-08-06
 
 Cloud Build `76e4b4fb-1437-49c3-894e-b416bc5cd3c9` successfully built the DVC
 publisher image but failed to push it to
-`us-east4-docker.pkg.dev/cs-poc-kewg0kffb7uwobgq1rex2af/feral-docker`.
+`us-east4-docker.pkg.dev/YOUR_PROJECT_ID/feral-docker`.
 Artifact Registry denied `artifactregistry.repositories.uploadArtifacts` to the
 Cloud Build service identity.
 

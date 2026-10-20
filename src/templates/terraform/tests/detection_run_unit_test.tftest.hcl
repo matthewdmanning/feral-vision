@@ -37,6 +37,7 @@ override_data {
 variables {
   gcs_uri_prefix               = var.test_gcs_uri_prefix
   bucket_name                  = "test-dataset-bucket"
+  bucket_project_id            = "test-project"
   run_id                       = "run-20260921-abc"
   project_id                   = "test-project"
   service_account_email        = "trainer@test-project.iam.gserviceaccount.com"

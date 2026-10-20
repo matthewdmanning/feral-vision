@@ -19,7 +19,7 @@ substitutions:
   _MAX_EPOCHS: "50"
   _BATCH_SIZE: "16"
 
-serviceAccount: projects/cs-poc-kewg0kffb7uwobgq1rex2af/serviceAccounts/feral-vision-ai@cs-poc-kewg0kffb7uwobgq1rex2af.iam.gserviceaccount.com
+# Pass the build identity at submit time: gcloud builds submit --service-account=...
 
 options:
   logging: CLOUD_LOGGING_ONLY

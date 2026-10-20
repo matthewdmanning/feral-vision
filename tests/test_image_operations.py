@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import stat
 import subprocess
+from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD_SCRIPT = ROOT / "feral-vision" / "scripts" / "cloud" / "build_training_image.sh"
@@ -72,6 +71,8 @@ def _command() -> list[str]:
         "trainer",
         "--tag",
         "candidate",
+        "--service-account",
+        "builder@fixture-project.iam.gserviceaccount.com",
     ]
 
 
@@ -103,6 +104,11 @@ def test_build_training_image_submits_canonical_build_and_returns_digest(
     assert any(
         call.startswith("builds submit . ")
         and "--config=feral-vision/deploy/cloudbuild.training-image.yaml" in call
+        and (
+            "--service-account=projects/fixture-project/serviceAccounts/"
+            "builder@fixture-project.iam.gserviceaccount.com"
+        )
+        in call
         and (
             "--substitutions=_TRAINING_IMAGE="
             "us-east4-docker.pkg.dev/fixture-project/feral-docker/trainer:candidate"

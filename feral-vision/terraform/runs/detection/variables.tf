@@ -23,7 +23,6 @@ variable "bucket_name" {
 variable "bucket_project_id" {
   description = "Project that owns the existing dataset-only bucket."
   type        = string
-  default     = "cs-poc-kewg0kffb7uwobgq1rex2af"
   nullable    = false
 }
 

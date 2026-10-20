@@ -17,9 +17,7 @@ steps:
 images:
   - ${_TRAINING_IMAGE}
 
-substitutions:
-  _BASE_IMAGE: us-east4-docker.pkg.dev/cs-poc-kewg0kffb7uwobgq1rex2af/feral-docker/feral-vision-gcp@sha256:00ab0ba68c7434aa7d378e4fd13e89d12f663c1e7d24847706d7c38351d9fd99
-  _TRAINING_IMAGE: us-east4-docker.pkg.dev/cs-poc-kewg0kffb7uwobgq1rex2af/feral-docker/feral-vision-gcp:dvc-source-less
+# Pass _BASE_IMAGE (digest-pinned) and _TRAINING_IMAGE with --substitutions.
 
 options:
   logging: CLOUD_LOGGING_ONLY
