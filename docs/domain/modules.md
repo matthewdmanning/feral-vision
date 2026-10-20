@@ -37,6 +37,35 @@ editing its recipes and cloud placeholders; it is not a runtime dependency of
 the library. Existing `feral_vision.*` MLflow metadata keys remain stable for
 persisted records even though Python imports now use `sightkit_learn`.
 
+## Library modules
+
+The current code in these modules needs a large refactor.
+
+| Module | Contents |
+| --- | --- |
+| `config` | `schema.py`: dataclasses that define the configuration structure. `store.py`: reads the configuration in the production folder against those dataclasses. |
+| `data` | Datasets, annotations, augmentations. |
+| `models` | Model Source Adapters, model properties. |
+| `engine` | Runs the model object. Training and inference differ only in model mode. Holds the trainer, losses, optimizers, and Task Adapters. |
+| `tracking` | Experiment tracking. |
+
+## Production workflows
+
+Production is not one linear pipeline. It has two primary workflows.
+They are independent and connect only through versioned artifacts.
+Other code supports functions outside these workflows. An example is
+visualizing model performance metrics.
+
+| Workflow | Input | Output | Modules |
+| --- | --- | --- | --- |
+| Data | External Data Source or Dataset | Dataset, Dataset Variant | `data`, `config` |
+| Engine | Dataset Variant, model, Run Recipe | Checkpoints, metrics, predictions, Run Record | `engine`, `models`, `data`, `tracking`, `config` |
+
+- **Data workflow**: acquires Datasets and prepares Dataset Variants.
+- **Engine workflow**: runs the model. Training, evaluation, and inference differ only in model mode.
+- **Model sourcing** is not a workflow. It is one operation that stages the engine environment.
+- **Model deployment** is out of scope for this project. There is no promotion step.
+
 ## Templates tree
 
 `feral-vision/` has the same tree as `src/templates/`.
