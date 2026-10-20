@@ -103,7 +103,6 @@ The startup script logs major stages to the serial console:
 - `verify_dataset_artifact`
 - `stage_dataset_payload`
 - `verify_staged_dataset`
-- `verify_gpu`
 - `train`
 - `done`
 

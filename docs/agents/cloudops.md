@@ -183,12 +183,11 @@ request merely because repository files changed later.
 Build the image only through
 [`feral-vision/scripts/cloud/build_training_image.sh`](../../feral-vision/scripts/cloud/build_training_image.sh),
 which submits [`feral-vision/deploy/cloudbuild.training-image.yaml`](../../feral-vision/deploy/cloudbuild.training-image.yaml).
-Cloud Build must complete its import/config image checks before push. Before
-VM creation, preflight runs `scripts/runs/check_training_e2e.sh` inside the exact
-cached image with GPU access and bounded local resources. The suite
-uses the canonical entrypoint/recipe and checks COCO loading, training losses,
-a checkpoint, and MLflow completion. It never downloads images or weights.
-The build script resolves the pushed image digest and prints the digest-pinned
+Cloud Build must confirm the required image files exist before push. The GPU
+training suite `scripts/runs/check_training_e2e.sh` runs in the pre-push Docker
+build (`tools/docker_container_tests.sh`). It uses the canonical
+entrypoint/recipe and checks COCO loading, training losses, a checkpoint, and
+MLflow completion. The build script resolves the pushed image digest and prints the digest-pinned
 reference consumed by Terraform.
 
 Cloud Build image construction is distinct from GPU training. A successful

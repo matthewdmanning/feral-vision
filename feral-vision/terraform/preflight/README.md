@@ -130,21 +130,9 @@ Terraform to render the real startup template and checks valid default/custom
 paths plus broken syntax, traversal, mismatched mounts, and shell substitution.
 It executes no startup commands and creates no resources.
 
-Preflight streams `scripts/runs/check_training_e2e.sh` into the exact cached
-digest selected in the saved plan. It checks the Linux/amd64 image entrypoint,
-runs with GPU access and local safety limits; it does not require a cloud-sized host.
-The suite uses the deployed container entrypoint and unchanged recipe, with
-only temporary Dataset/tracking destinations. It requires CUDA visibility, T4
-kernel support, successful COCO loading, a checkpoint, finite losses for every
-configured epoch, and a completed MLflow run. It does not mount checkout code
-over the installed image. Build-time import/config checks remain separate
-because the standard Cloud Build worker has no GPU.
+Preflight confirms only that the exact digest selected in the saved plan is
+cached locally as a Linux/amd64 image with the canonical entrypoint. It never
+pulls the image and runs no container.
 
-There is no CPU fallback. This is a container correctness check, not a cloud
-capacity simulation. Local GPU hardware is reported with results; failures
-caused by local resource limits must be distinguished from application errors.
-
-Download safety: checks inspect the exact local image digest first, use
-`--pull=never` and `--network=none`, and stop on a cache miss. Model weights
-must already exist in the image working directory or Ultralytics weights cache.
-The smoke container is limited to 2 GiB RAM and two CPUs for local safety. No cache is pruned.
+The GPU training suite `scripts/runs/check_training_e2e.sh` runs in the
+pre-push Docker build (`tools/docker_container_tests.sh`), not in preflight.

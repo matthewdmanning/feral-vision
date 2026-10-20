@@ -94,8 +94,6 @@ run) cat >/dev/null;;
 esac
 """)
     engine.chmod(0o700)
-    script = temporary / "smoke.sh"
-    script.write_text("echo smoke\n")
     log = temporary / "calls"
     for cached in (False, True):
         log.write_text("")
@@ -104,18 +102,14 @@ esac
             "CACHE_PRESENT": str(int(cached)), "DOCKER_CALL_LOG": str(log),
         }):
             try:
-                module._training_setup_checks(inputs["training_image"], script, reporter)
+                module._training_setup_checks(inputs["training_image"], reporter)
             except module.PreflightFailure:
                 assert not cached and reporter.results[-1].name == "no_implicit_image_download"
             else:
-                assert cached, "A missing image did not block E2E"
+                assert cached, "A missing image did not block deployment"
         calls = log.read_text().splitlines()
-        assert not any(call.startswith("pull ") for call in calls), calls
-        runs = [call for call in calls if call.startswith("run ")]
-        assert len(runs) == int(cached), calls
-        if cached:
-            assert all(flag in runs[0].split() for flag in ["--pull=never", "--network=none", "--gpus=all", "--memory=2g", "--cpus=2"]), runs
-        print(f"PASS: cached={cached}; no pulls; offline resource-capped run only when cached")
+        assert not any(call.startswith(("pull ", "run ")) for call in calls), calls
+        print(f"PASS: cached={cached}; no pulls and no container runs")
 
 with tempfile.TemporaryDirectory(prefix="feral-startup-check-") as work:
     for label, changes, expected in cases:

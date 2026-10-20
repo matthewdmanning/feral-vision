@@ -270,15 +270,13 @@ def _output(plan: dict[str, Any], name: str) -> Any:
     return value
 
 
-def _training_setup_checks(image: str, script: Path, reporter: Reporter) -> None:
-    """Use this function to test only cached training assets without downloading them.
+def _training_setup_checks(image: str, reporter: Reporter) -> None:
+    """Use this function to confirm the training image is cached without downloading it.
 
     Parameters
     ----------
     image : str
         Reviewed digest-pinned image that must already exist locally.
-    script : Path
-        GPU E2E suite streamed into the cached image.
     reporter : Reporter
         Blocking deployment checkpoint recorder.
     """
@@ -305,28 +303,6 @@ def _training_setup_checks(image: str, script: Path, reporter: Reporter) -> None
         and details["Config"]["Entrypoint"]
         == ["bash", "/workspace/feral-vision/scripts/runs/container_train.sh"],
         "Cached image must match the deployed Linux/amd64 image and canonical entrypoint",
-    )
-    reporter.command(
-        "TRAINING_SETUP",
-        "canonical_e2e_training",
-        [
-            "timeout",
-            "600",
-            docker,
-            "run",
-            "--pull=never",
-            "--network=none",
-            "--gpus=all",
-            "--memory=2g",
-            "--cpus=2",
-            "--rm",
-            "-i",
-            "--entrypoint",
-            "bash",
-            image,
-            "-s",
-        ],
-        input_text=script.read_text(),
     )
 
 
@@ -1075,11 +1051,7 @@ def main() -> int:
         _cloud_checks(facts, reporter, report_dir)
         metadata.update(facts)
 
-        _training_setup_checks(
-            str(facts["training_image"]),
-            repository_root / "scripts/runs/check_training_e2e.sh",
-            reporter,
-        )
+        _training_setup_checks(str(facts["training_image"]), reporter)
 
         if args.skip_write_probe:
             reporter.warning(

@@ -16,3 +16,7 @@ docker run --rm -v "$PWD:/repo:ro" -w /repo \
   --entrypoint bash "$IMAGE" \
   -c 'uv sync --frozen --group dev && /tmp/venv/bin/python -m pytest -q -p no:cacheprovider' \
   || { echo "[pre-push] Docker tests failed. Push aborted."; exit 1; }
+
+docker run --rm --gpus all -i --entrypoint bash "$IMAGE" -s \
+  < feral-vision/scripts/runs/check_training_e2e.sh \
+  || { echo "[pre-push] GPU training e2e failed. Push aborted."; exit 1; }

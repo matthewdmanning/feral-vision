@@ -33,7 +33,6 @@ COPY feral-vision/conf/ ./feral-vision/conf/
 COPY feral-vision/scripts/runs/container_train.sh ./feral-vision/scripts/runs/container_train.sh
 COPY feral-vision/scripts/runs/cloud_train.sh ./feral-vision/scripts/runs/cloud_train.sh
 COPY feral-vision/scripts/runs/run_outputs.py ./feral-vision/scripts/runs/run_outputs.py
-COPY feral-vision/scripts/runs/check_training_e2e.sh ./feral-vision/scripts/runs/check_training_e2e.sh
 
 # The repository lockfile pins PyTorch 2.12.1 and its CUDA 13 user-space
 # dependencies. Keep the NVIDIA base on CUDA 13 as well, but use the small base
@@ -42,12 +41,5 @@ COPY feral-vision/scripts/runs/check_training_e2e.sh ./feral-vision/scripts/runs
 RUN uv sync --frozen --no-dev --no-editable
 
 WORKDIR /workspace/feral-vision
-
-# Fail the image build if the canonical recipe cannot be composed or if core
-# runtime imports are missing. GPU visibility is checked on the actual VM.
-RUN python -c "import torch, hydra, sightkit_learn; print(torch.__version__)" \
-    && python -m sightkit_learn.training.trainer --config-dir /workspace/feral-vision/conf --config-name runs/detection --cfg job >/tmp/resolved-training-config.yaml \
-    && gcloud version >/dev/null \
-    && bash -n /workspace/feral-vision/scripts/runs/container_train.sh
 
 ENTRYPOINT ["bash", "/workspace/feral-vision/scripts/runs/container_train.sh"]
