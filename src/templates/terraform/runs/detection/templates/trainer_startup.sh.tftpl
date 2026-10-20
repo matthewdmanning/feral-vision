@@ -77,11 +77,7 @@ export_evidence() {
       "$run_artifact_uri/dataset-artifact.json" \
       --quiet
   fi
-  gcloud storage rsync --recursive --quiet \
-    "$local_ssd_mount_dir/mlflow" "$run_artifact_uri/mlflow"
-  if [ -f "$local_ssd_mount_dir/mlflow.db" ]; then
-    gcloud storage cp "$local_ssd_mount_dir/mlflow.db" "$run_artifact_uri/mlflow.db" --quiet
-  fi
+  # Training outputs are uploaded by the container (scripts/runs/cloud_train.sh).
   checkpoint "terminal evidence export attempted"
   return "$exit_code"
 }
@@ -98,7 +94,7 @@ if ! mountpoint -q "$local_ssd_mount_dir"; then
   fi
   mount -o discard,defaults "$local_ssd_device" "$local_ssd_mount_dir"
 fi
-mkdir -p "$dataset_host_mount_dir/images" "$dataset_host_mount_dir/annotations" "$local_ssd_mount_dir/mlflow"
+mkdir -p "$dataset_host_mount_dir/images" "$dataset_host_mount_dir/annotations"
 checkpoint "passed device=$local_ssd_device mount=$local_ssd_mount_dir"
 
 # --- Host container/GPU tooling --------------------------------------------
@@ -170,7 +166,7 @@ docker run --rm \
   -e DATASET_ARTIFACT_URI="$dataset_base_uri" \
   -e FERAL_VISION_RUN_ID="$run_id" \
   -e MLFLOW_TRACKING_URI="$mlflow_tracking_uri" \
-  -e MLFLOW_ARTIFACT_PREFIX="$run_artifact_uri" \
+  -e TRAINING_DATA_BUCKET_URI="$run_artifact_uri" \
   "$training_image"
 checkpoint "passed"
 
