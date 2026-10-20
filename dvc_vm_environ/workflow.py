@@ -1,19 +1,19 @@
 """Independent DVC Dataset registration and portable handoff functions."""
 
-from contextlib import contextmanager, redirect_stdout
 import fcntl
 import hashlib
 import io
 import json
 import logging
 import os
-from pathlib import Path, PurePosixPath
 import re
 import shutil
 import stat
 import sys
 import tarfile
 import tempfile
+from contextlib import contextmanager, redirect_stdout
+from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
 import yaml
@@ -341,29 +341,22 @@ def isolated_repo(root, remote):
 
 
 def publish(repo, target):
-    """Push one output and prove its complete remote object availability.
+    """Push the catalogue archive and prove its remote availability.
 
     Raises
     ------
     Mismatch
-        If any selected object is absent locally or remotely after publication.
+        If the archive object is absent locally or remotely after publication.
     """
-    selected = record(target.read_bytes(), catalogue=target.name == "catalogue.tar.dvc")
-    digest = selected["outs"][0]["md5"]
-    expected = {digest}
-    if digest.endswith(".dir"):
-        index = Path(repo.cache.local.oid_to_path(digest)).read_bytes()
-        expected.update(entry["md5"] for entry in validate_index(index, selected))
-    if any(not repo.cache.local.exists(oid) for oid in expected):
+    digest = record(target.read_bytes(), catalogue=True)["outs"][0]["md5"]
+    if not repo.cache.local.exists(digest):
         raise Mismatch("Publication has missing local cache objects")
     repo.push(targets=[str(target)], remote="storage", jobs=2)
     if repo.status(targets=[str(target)], cloud=True, remote="storage", jobs=2):
         raise Mismatch(
             "Publication remote status is incomplete; descriptor was not updated"
         )
-    remote = repo.cloud.get_remote_odb("storage", "status")
-    # Check the explicit set as well: a missing .dir must not hide child objects.
-    if any(not remote.exists(oid) for oid in expected):
+    if not repo.cloud.get_remote_odb("storage", "status").exists(digest):
         raise Mismatch("Publication remote is missing a selected object")
 
 
@@ -651,7 +644,7 @@ def register(
                 index = Path(repo.cache.local.oid_to_path(digest)).read_bytes()
                 validate_index(index, selected)
                 native_verify(data_dir, selected)
-                publish(repo, target)
+                # Dataset files stay in Cloud Storage; only the catalogue is published.
                 entries[key] = (raw, index)
             archive_root = op / "publication"
             with isolated_repo(archive_root, remote) as repo:
@@ -695,7 +688,10 @@ def register(
 
 
 def stage(catalogue, dataset_id, destination, remote_url):
-    """Restore one selected Dataset and atomically install its verified handoff.
+    """Verify a Dataset already copied from Cloud Storage against its record.
+
+    The caller copies the files to ``destination/dataset``; this adds the
+    catalogue record and index beside it, then verifies the files.
 
     Returns
     -------
@@ -705,40 +701,27 @@ def stage(catalogue, dataset_id, destination, remote_url):
     remote = remote_locator(remote_url)
     key = identity_key(dataset_id)
     dest = Path(destination).absolute()
-    if dest.is_symlink() or (
-        dest.exists() and (not dest.is_dir() or any(dest.iterdir()))
-    ):
-        raise Invalid("Destination must be absent or an empty real directory")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(
-        prefix=f".{dest.name}-stage-", dir=dest.parent
-    ) as temporary:
-        op = Path(temporary)
+    with tempfile.TemporaryDirectory(prefix="stage-") as temporary:
         entries = restore_catalogue(
-            Path(catalogue).absolute(), op / "catalogue", remote
+            Path(catalogue).absolute(), Path(temporary) / "catalogue", remote
         )
-        if key not in entries or record(entries[key][0])["meta"]["id"] != dataset_id:
-            raise Invalid("Dataset ID is absent from this catalogue snapshot")
-        raw, index = entries[key]
-        retrieval = op / "retrieval"
-        with isolated_repo(retrieval, remote) as repo:
-            target = retrieval / "dataset.dvc"
-            target.write_bytes(raw)
-            # Seed the validated original tree before DVC can use remote index paths.
-            selected = record(raw)
-            index_path = Path(repo.cache.local.oid_to_path(selected["outs"][0]["md5"]))
-            index_path.parent.mkdir(parents=True, exist_ok=True)
-            index_path.write_bytes(index)
-            repo.pull(targets=[str(target)], remote="storage", jobs=2)
-            handoff = op / "handoff"
-            handoff.mkdir()
-            shutil.copytree(retrieval / "dataset", handoff / "dataset", symlinks=True)
-            (handoff / "dataset.dvc").write_bytes(raw)
-            (handoff / "dataset.dir").write_bytes(index)
-            verify(handoff)
-        # rename replaces an empty directory atomically, and rejects a nonempty one.
-        os.rename(handoff, dest)
-    return handoff_result(dest, record(raw))
+    if key not in entries or record(entries[key][0])["meta"]["id"] != dataset_id:
+        raise Invalid("Dataset ID is absent from this catalogue snapshot")
+    if (
+        dest.is_symlink()
+        or not dest.is_dir()
+        or [item.name for item in dest.iterdir()] != ["dataset"]
+    ):
+        raise Invalid("Destination must hold only the copied dataset directory")
+    raw, index = entries[key]
+    (dest / "dataset.dvc").write_bytes(raw)
+    (dest / "dataset.dir").write_bytes(index)
+    try:
+        return verify(dest)
+    except Exception:
+        (dest / "dataset.dvc").unlink()
+        (dest / "dataset.dir").unlink()
+        raise
 
 
 @contextmanager

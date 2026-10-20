@@ -46,7 +46,7 @@ done
 # Argument values stay argv data: never evaluate caller input as code.
 args=("$operation")
 for key in "${!values[@]}"; do args+=("$key" "${values[$key]}"); done
-[[ -x $here/.venv/bin/python ]] || { printf '%s\n' 'Install the isolated environment with uv sync --project data_flow_rewrite --frozen' >&2; exit 1; }
+[[ -x $here/.venv/bin/python ]] || { printf '%s\n' 'Install the isolated environment with UV_PROJECT_ENVIRONMENT=dvc_vm_environ/.venv uv sync --package feral-vision-dvc-vm-environ --frozen' >&2; exit 1; }
 exec "$here/.venv/bin/python" -I -c '
 import sys
 sys.path.insert(0, sys.argv[1])
