@@ -33,6 +33,7 @@ COPY feral-vision/conf/ ./feral-vision/conf/
 COPY feral-vision/scripts/runs/container_train.sh ./feral-vision/scripts/runs/container_train.sh
 COPY feral-vision/scripts/runs/cloud_train.sh ./feral-vision/scripts/runs/cloud_train.sh
 COPY feral-vision/scripts/runs/run_outputs.py ./feral-vision/scripts/runs/run_outputs.py
+COPY feral-vision/scripts/runs/check_training_e2e.sh ./feral-vision/scripts/runs/check_training_e2e.sh
 
 # The repository lockfile pins PyTorch 2.12.1 and its CUDA 13 user-space
 # dependencies. Keep the NVIDIA base on CUDA 13 as well, but use the small base
