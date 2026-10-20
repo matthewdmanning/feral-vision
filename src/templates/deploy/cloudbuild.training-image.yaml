@@ -16,7 +16,7 @@ steps:
     args:
       - -ceu
       - |
-        docker run --rm --entrypoint bash "${_TRAINING_IMAGE}" -ceu '
+        docker run --pull=never --network=none --memory=2g --cpus=2 --rm --entrypoint bash "${_TRAINING_IMAGE}" -ceu '
           test -x /usr/local/bin/uv
           test -x /workspace/.venv/bin/python
           test -f /workspace/feral-vision/conf/runs/detection.yaml
