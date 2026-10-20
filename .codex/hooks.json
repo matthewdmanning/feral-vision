@@ -1,15 +1,3 @@
 {
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "View|Edit|Write|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "'C:\\GitHub\\feral-vision\\.codex\\hooks\\block-secrets.sh'"
-          }
-        ]
-      }
-    ]
-  }
+  "hooks": {}
 }

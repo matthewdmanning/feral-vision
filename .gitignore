@@ -9,7 +9,6 @@ outputs/
 coverage.json
 coverage.xml
 metrics.json
-mlflow.db
 
 # Virtual environments
 .venv
@@ -58,7 +57,6 @@ coverage.xml
 example_augment.txt
 *.pt
 docs/_build
-docs/external_refs/mlflow_examples.md
 .vscode/tasks.json
 
 # Local Codex authentication
@@ -70,3 +68,8 @@ aug_preview/
 feral-vision/terraform/runs/detection/run.tfvars
 # Ephemeral first augmented detection-run evidence
 artifacts/*/
+terraform/runs/detection/run.tfvars
+
+# Retained local artifacts from before the production-folder migration
+/data/**
+/models/**
