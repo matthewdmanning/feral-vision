@@ -66,6 +66,30 @@ one.
 
 ## Cloud change discipline
 
+### Mandatory Google Cloud skills
+
+Before planning, reviewing, implementing, or executing Google Cloud operations,
+read and apply the skills below for the applicable scope. This includes
+read-only checks, Terraform, client libraries, REST APIs, and shell scripts;
+skills are not optional CLI helpers.
+
+| Scope | Required skill |
+| --- | --- |
+| All Google Cloud operations: establish the caller, execution environment, target, authentication, and authorization | [google-cloud-recipe-auth](../../.agents/skills/google-cloud-recipe-auth/SKILL.md) |
+| Cloud Storage bucket/object operations and configuration, including reads, transfers, access, lifecycle, and retention | `google-cloud-storage:google-cloud-storage-basics` |
+| Designing or creating a new Cloud Storage bucket, including through Terraform or a client library | [google-cloud-storage-bucket-architect](../../.agents/skills/google-cloud-storage-bucket-architect/SKILL.md) |
+
+Resolve the Cloud Storage plugin skill by name from the session's available
+skills; do not hard-code a machine-specific plugin installation path. Bucket
+creation requires both the storage basics and bucket architect skills. Use
+storage basics for existing buckets; do not invoke bucket architect outside
+its creation scope.
+
+State which skills are being applied. If a required skill cannot be found or
+read, report the missing skill and stop the affected work rather than silently
+substituting remembered guidance. Follow the skill's relevant references and
+apply its requirements to the actual operation, not merely mention its name.
+
 Before any cloud resource attempt, use the applicable repository documentation,
 existing configurations, workspace context, and available non-cloud tools to
 establish the intended behavior and prerequisites. Do not use live cloud calls
