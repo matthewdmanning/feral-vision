@@ -14,13 +14,13 @@ cat > "$trial/OPERATIONS.md" <<EOF
 
 UUID: $trial_id
 Purpose: exercise real DVC registration, publication, recovery, and rejection.
-Created by: bash data_flow_rewrite/tests/run.sh
+Created by: bash dvc_vm_environ/tests/run.sh
 Ignore: exact /.dvc-rewrite-trial-$trial_id/ entry in .git/info/exclude.
-Commands: timeout 300 bash data_flow_rewrite/tests/acceptance.sh $trial
+Commands: timeout 300 bash dvc_vm_environ/tests/acceptance.sh $trial
 Optional audit: copy complete data/augmented, register, stage, verify, compare.
 All fixtures, repositories, remotes, caches, logs, and hashes stay in this tree.
 Cleanup trap verifies source hashes, removes this tree and its exact ignore line.
-Results: data_flow_rewrite/VALIDATION.md (previous result replaced).
+Results: dvc_vm_environ/VALIDATION.md (previous result replaced).
 EOF
 audit='Not run: data/augmented/ is absent from this checkout.'
 cleanup() {
@@ -69,6 +69,8 @@ cat "$trial/acceptance.log"
 if [[ -d $trial/audit-copy ]]; then
   timeout 60 "$here/workflow.sh" register --dataset "$trial/audit-copy" --id supplied-augmented-audit --provenance "$trial/provenance.json" --workspace "$trial/audit-work" --remote-url "$trial/remote" --catalogue "$trial/audit.dvc" --new-catalogue > "$trial/audit-register.json" 2> "$trial/audit.stderr"
   rm -rf -- "$trial/audit-work"
+  mkdir "$trial/audit-staged"
+  cp -a "$trial/audit-copy" "$trial/audit-staged/dataset"
   timeout 60 "$here/workflow.sh" stage --catalogue "$trial/audit.dvc" --id supplied-augmented-audit --destination "$trial/audit-staged" --remote-url "$trial/remote" > "$trial/audit-stage.json" 2>> "$trial/audit.stderr"
   timeout 60 "$here/workflow.sh" verify --staged "$trial/audit-staged" > "$trial/audit-verify.json" 2>> "$trial/audit.stderr"
   diff -r -- "$trial/audit-copy" "$trial/audit-staged/dataset" > "$trial/audit-diff.log"

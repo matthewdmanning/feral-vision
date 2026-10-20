@@ -24,11 +24,14 @@ reject() {
   timeout 60 "${flow[@]}" "$@" > "$root/rejected.stdout" 2> "$root/last.stderr" || actual=$?
   [[ $actual == "$expected" && ! -s $root/rejected.stdout ]] || { cat "$root/last.stderr" >&2; printf 'Unexpected rejection status %s (wanted %s)\n' "$actual" "$expected" >&2; exit 1; }
 }
+# Stand-in for the boot-time Cloud Storage copy to the VM.
+fill() { mkdir -p "$2"; cp -r "$1" "$2/dataset"; }
 register=(register --dataset "$root/source" --provenance "$root/provenance.json" --workspace "$root/work" --remote-url "$root/remote" --catalogue "$root/bootstrap.dvc")
 run "${register[@]}" --id 'dataset/α' --new-catalogue
 hash=$(jq -r .dataset_hash "$root/result.json")
 cp "$root/bootstrap.dvc" "$root/first.dvc"
 pass 'first native registration, metadata archive publication, and JSON result'
+fill "$root/source" "$root/staged"
 run stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/staged" --remote-url "$root/remote"
 cmp "$root/source/images/original.pgm" "$root/staged/dataset/images/original.pgm"
 [[ $(jq -r .dataset_hash "$root/result.json") == "$hash" ]]
@@ -52,6 +55,7 @@ reject 2 "${register[@]}" --id 'dataset/α' --force
 cmp "$root/bootstrap.dvc" "$root/before-reject.dvc"
 pass 'changed provenance cannot replace an ID even with force'
 run "${register[@]}" --id derived --force
+fill "$root/source" "$root/derived"
 run stage --catalogue "$root/bootstrap.dvc" --id derived --destination "$root/derived" --remote-url "$root/remote"
 [[ $(sed -n '/origin:/p' "$root/derived/dataset.dvc") == *derived* ]]
 pass 'derived lineage is retained in the original DVC record'
@@ -62,27 +66,23 @@ printf '%s\n' '{"origin":"acquired","source_refs":["retained-store:fixture/v1"]}
 printf extra > "$root/source/extra.bin"
 reject 2 "${register[@]}" --id 'dataset/α' --force
 run "${register[@]}" --id unrelated
+cp -r "$root/source" "$root/unrelated-source"
 rm "$root/source/extra.bin"
 pass 'changed bytes cannot replace an ID; a different dataset can register separately'
 # Retain only the bootstrap and remote, deleting all registration repositories/caches.
 rm -rf "$root/work" "$root/staged" "$root/derived"
+fill "$root/source" "$root/recovered"
 run stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/recovered" --remote-url "$root/remote"
 cmp "$root/recovered/dataset.dvc" "$root/original-record.dvc"
 cmp "$root/recovered/dataset.dir" "$root/original-index.dir"
 [[ ! -e $root/recovered/dataset/extra.bin ]]
-pass 'cache-free recovery selects one dataset from a multi-Dataset catalogue'
-# Remove the unrelated-only remote object: selection must still succeed.
-unrelated_hash=$(printf extra | md5sum | cut -d' ' -f1)
-unrelated_path="$root/remote/files/md5/${unrelated_hash:0:2}/${unrelated_hash:2}"
-mv "$unrelated_path" "$root/held-unrelated"
-run stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/selected-only" --remote-url "$root/remote"
-mv "$root/held-unrelated" "$unrelated_path"
+pass 'cache-free recovery selects one record from a multi-Dataset catalogue'
+fill "$root/unrelated-source" "$root/unrelated"
 run stage --catalogue "$root/bootstrap.dvc" --id unrelated --destination "$root/unrelated" --remote-url "$root/remote"
 cp "$root/unrelated/dataset.dvc" "$root/recovered/dataset.dvc"
 reject 1 verify --staged "$root/recovered"
 cp "$root/original-record.dvc" "$root/recovered/dataset.dvc"
-pass 'selected staging ignores missing unrelated objects; an unrelated record fails verification'
-# Verify that no unrelated dataset object was retrieved (the handoff has no cache).
+pass 'an unrelated record fails verification'
 [[ $(find "$root/recovered" -type f | wc -l) == 6 ]]
 mv "$root/recovered" "$root/moved"
 run verify --staged "$root/moved"
@@ -126,7 +126,7 @@ rm "$root/moved/dataset/.dvcignore"
 pass 'symlinks, special files, and ignore controls cannot hide dataset contents'
 reject 2 stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/moved" --remote-url "$root/remote"
 run verify --staged "$root/moved"
-pass 'nonempty staging destination is preserved'
+pass 'destination with existing records is preserved'
 for bad in '{"origin":"inference","source_refs":["retained:source"]}' '{"origin":"derived","source_refs":["retained:source"]}' '{"origin":"acquired","source_refs":[]}' '{"origin":"acquired","source_refs":["/worker/input"]}' '{"origin":"acquired","source_refs":["retained:source"],"typo":true}' '{"origin":"acquired","origin":"derived","source_refs":["retained:source"]}'; do
   printf '%s\n' "$bad" > "$root/provenance.json"
   reject 2 "${register[@]}" --id bad
@@ -157,15 +157,16 @@ reject 1 register --dataset "$root/source" --id retry --provenance "$root/proven
 rm "$root/blocked-parent"
 run register --dataset "$root/source" --id retry --provenance "$root/provenance.json" --workspace "$root/retry-work" --remote-url "$root/remote" --catalogue "$root/blocked-parent/retry.dvc" --new-catalogue
 pass 'retry after partially completed publication recovers'
-# Removing an actually referenced object must fail restoration without changing dest.
+# Dataset files are never published: no dataset object reaches the remote.
 object_hash=$(jq -r '.[0].md5' "$root/original-index.dir")
-object_path="$root/remote/files/md5/${object_hash:0:2}/${object_hash:2}"
-mv "$object_path" "$root/held-object"
-mkdir "$root/empty-dest"
-reject 1 stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/empty-dest" --remote-url "$root/remote"
-[[ -d $root/empty-dest && -z $(ls -A "$root/empty-dest") ]]
-mv "$root/held-object" "$object_path"
-pass 'missing remote cache object stops staging and preserves empty destination'
+[[ ! -e $root/remote/files/md5/${object_hash:0:2}/${object_hash:2} && ! -e $root/remote/files/md5/${hash:0:2}/${hash:2} ]]
+pass 'registration publishes only the catalogue, not dataset files'
+# A copied file that differs fails staging and leaves no records behind.
+fill "$root/source" "$root/bad-copy"
+printf broken > "$root/bad-copy/dataset/images/original.pgm"
+reject 1 stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/bad-copy" --remote-url "$root/remote"
+[[ $(ls -A "$root/bad-copy") == dataset ]]
+pass 'changed copied file fails staging without leaving records'
 (cd "$root/source" && sha256sum -c "$root/source.sha256") > "$root/source-check.log"
 run verify --staged "$root/moved"
 pass 'original synthetic source unchanged; final handoff still verifies'
@@ -224,6 +225,7 @@ pass 'symlink, duplicate, absolute, and malformed metadata archives are rejected
   cd "$root"
   printf 'invalid module fixture; must never be imported\n' > workflow.py
   run register --dataset source --id=--opaque-id --provenance provenance.json --workspace relative-work --remote-url "$root/remote" --catalogue relative.dvc --new-catalogue
+  fill source relative-staged
   run stage --catalogue relative.dvc --id=--opaque-id --destination relative-staged --remote-url "$root/remote"
   run verify --staged relative-staged
 )
@@ -236,13 +238,15 @@ rm "$root/source/link"
 reject 2 register --dataset "$root/source" --id missing --provenance "$root/provenance.json" --workspace "$root/rejected-work" --remote-url "$root/remote" --catalogue "$root/absent.dvc"
 reject 2 stage --catalogue "$root/bootstrap.dvc" --id absent-id --destination "$root/absent-stage" --remote-url "$root/remote"
 pass 'empty and linked source trees, lost bootstrap, and unknown IDs fail safely'
+fill "$root/source" "$root/old-snapshot"
 run stage --catalogue "$root/first.dvc" --id 'dataset/α' --destination "$root/old-snapshot" --remote-url "$root/remote"
 run verify --staged "$root/old-snapshot"
 pass 'earlier immutable bootstrap remains recoverable after catalogue extension'
-# Restoring an empty destination succeeds too.
-mkdir "$root/success-empty"
-run stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/success-empty" --remote-url "$root/remote"
-pass 'verified staging atomically replaces an empty destination'
+# A destination without the copied dataset is rejected unchanged.
+mkdir "$root/empty-dest"
+reject 2 stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/empty-dest" --remote-url "$root/remote"
+[[ -z $(ls -A "$root/empty-dest") ]]
+pass 'empty destination is rejected unchanged'
 (cd "$root/source" && sha256sum -c "$root/source.sha256") > "$root/source-check.log"
 # Changing bytes while preserving size and mtime must not bypass fresh hashing.
 cp -p "$root/moved/dataset/images/original.pgm" "$root/mtime-original"
@@ -255,16 +259,5 @@ pass 'fresh DVC hashing detects changed bytes despite identical size and mtime'
 reject 2 register --dataset "$root/source" --id overlap --provenance "$root/provenance.json" --workspace "$root/overlap-work" --remote-url "$root/source/nested-remote" --catalogue "$root/overlap.dvc" --new-catalogue
 [[ ! -e $root/source/nested-remote ]]
 pass 'local remote overlapping the source is rejected without modifying the source'
-# The validated retained index, not unchecked remote index paths, drives staging.
-index_object="$root/remote/files/md5/${hash:0:2}/${hash:2}"
-cp "$index_object" "$root/saved-remote-index"
-chmod u+w "$index_object"
-printf '[{"md5":"%s","relpath":"../escaped"}]' "$object_hash" > "$index_object"
-run stage --catalogue "$root/bootstrap.dvc" --id 'dataset/α' --destination "$root/safe-index-stage" --remote-url "$root/remote"
-[[ ! -e $root/escaped ]]
-cmp "$root/original-index.dir" "$root/safe-index-stage/dataset.dir"
-cp "$root/saved-remote-index" "$index_object"
-chmod a-w "$index_object"
-pass 'validated retained index prevents unsafe remote index paths from controlling retrieval'
 (cd "$root/source" && sha256sum -c "$root/source.sha256") > "$root/source-check.log"
 printf 'Completed %d behavioral checks\n' "$count"

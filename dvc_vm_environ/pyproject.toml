@@ -1,0 +1,17 @@
+[project]
+name = "feral-vision-dvc-vm-environ"
+version = "0.1.0"
+requires-python = ">=3.12,<3.14"
+dependencies = ["dvc[gs]==3.67.1", "dvc-data==3.18.3", "PyYAML==6.0.3"]
+
+[dependency-groups]
+dev = ["pytest==9.1.1", "ruff==0.15.21"]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

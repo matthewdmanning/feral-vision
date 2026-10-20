@@ -8,14 +8,16 @@ README defines its scope; the prior data flow remains separate.
 
 ## Environment and entrypoint
 
-Use Linux, Bash 4.3+, Python 3.12, and `uv`. Install the isolated, locked
-environment from the repository root:
+Use Linux, Bash 4.3+, Python 3.12, and `uv`. This directory is a uv workspace
+member: it shares the root `uv.lock`, so its versions match the project
+exactly. Install only its dependencies into its own environment from the
+repository root:
 
 ```bash
-uv sync --project data_flow_rewrite --frozen
+UV_PROJECT_ENVIRONMENT=dvc_vm_environ/.venv uv sync --package feral-vision-dvc-vm-environ --frozen
 ```
 
-DVC with GCS support is pinned to 3.67.1 and `dvc-data` to 3.18.2. DVC's
+DVC with GCS support is pinned to 3.67.1 and `dvc-data` to 3.18.3. DVC's
 published requirement is `dvc-data>=3.18.2,<3.19.0`. PyYAML is a direct, pinned
 dependency. No root environment or project dependencies are used.
 
@@ -176,7 +178,7 @@ not restore unrelated datasets.
 Run the complete local acceptance suite from the repository root:
 
 ```bash
-timeout 420 bash data_flow_rewrite/tests/run.sh
+timeout 420 bash dvc_vm_environ/tests/run.sh
 ```
 
 The runner uses Bash, `jq`, GNU coreutils/tar, and real local DVC storage. It
