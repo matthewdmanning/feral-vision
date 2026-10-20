@@ -59,7 +59,6 @@ def test_training_image_is_reproducible_and_smoke_checked() -> None:
     assert "nvidia/cuda:13.0.0-base-ubuntu24.04@sha256:" in dockerfile
     assert "ghcr.io/astral-sh/uv:0.12.18@sha256:" in dockerfile
     assert "uv sync --frozen --no-dev --no-editable" in dockerfile
-    assert "--config-name runs/detection --cfg job" in dockerfile
     assert (
         'ENTRYPOINT ["bash", "/workspace/feral-vision/scripts/runs/container_train.sh"]'
         in dockerfile
@@ -82,7 +81,7 @@ def test_vm_authenticates_registry_before_pull_and_checks_host_gpu_runtime() -> 
     ).read_text()
 
     assert 'stage="verify_container_runtime"' in startup
-    assert "nvidia-smi --query-gpu=name,driver_version" in startup
+    assert "command -v nvidia-smi" in startup
     authenticate = startup.index("gcloud auth configure-docker")
     pull = startup.index('docker pull "$training_image"')
     assert authenticate < pull

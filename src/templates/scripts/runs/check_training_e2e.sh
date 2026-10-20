@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run inside the exact cached deployment image, offline, with GPU access.
+# Pre-push: run inside the freshly built deployment image with GPU access.
 set -euo pipefail
 python - <<'PY'
 import hashlib
@@ -47,13 +47,6 @@ with tempfile.TemporaryDirectory(prefix="training-e2e-") as directory:
     # Check the staged input contract before any model construction or retrieval.
     loader = build_dataloader(cfg)
     next(iter(loader))
-    if cfg.model.architecture.source == "ultralytics":
-        from ultralytics.utils import SETTINGS
-
-        weights = Path(cfg.model.architecture.id)
-        assert any(path.is_file() for path in [weights, Path(SETTINGS["weights_dir"]) / weights.name]), (
-            "Reviewed model weights are not cached; stage them once explicitly. Downloads are disabled."
-        )
     env = os.environ | {
         "TRAIN_DATA": str(dataset),
         "DATASET_ARTIFACT_MANIFEST": str(manifest),
