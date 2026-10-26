@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 from typing import Any
 
 from huggingface_hub import hf_hub_download, model_info
@@ -11,7 +12,7 @@ from omegaconf import DictConfig
 from torch import nn
 
 from sightkit_learn.models.ModelProperties import ModelProperties
-from sightkit_learn.models.sources.SourceAdapter import SourceAdapter, _inspect_loaded
+from sightkit_learn.models.sources.SourceAdapter import SourceAdapter
 from sightkit_learn.tasks import CVTask
 from sightkit_learn.utils import get_logger
 
@@ -30,6 +31,24 @@ _TAG_TO_OUTPUTS: dict[str, list[CVTask]] = {
 
 class HFAdapter(SourceAdapter):
     """Inspect Hub metadata and load the Hydra-selected Transformers task head."""
+
+    discovery_filters = SourceAdapter.discovery_filters | {"pipeline_tag"}
+
+    def list_models(self, *, query=None, repository=None, pipeline_tag=None):
+        """Use this function to discover Hugging Face repositories without downloading model weights."""
+        from huggingface_hub import HfApi
+
+        for model in HfApi().list_models(
+            search=query,
+            author=repository,
+            pipeline_tag=pipeline_tag,
+            sort="downloads",
+        ):
+            yield {
+                "model_id": model.id,
+                "architecture_location": f"https://huggingface.co/{model.id}",
+                "pipeline_tag": model.pipeline_tag,
+            }
 
     def fetch(self, cfg: DictConfig, *, task: str | None = None) -> nn.Module:
         """Load configured weights with native options and the selected task-head class.
@@ -65,37 +84,50 @@ class HFAdapter(SourceAdapter):
 
         return _load_direct(cfg.architecture.id, task=task, **options)
 
-    def inspect(
-        self, cfg: DictConfig, *, fetch_if_needed: bool = False
-    ) -> tuple[ModelProperties, dict]:
-        from sightkit_learn.models.register_model import load_model_registry
-
-        try:
-            return load_model_registry(cfg.architecture.id), {}
-        except KeyError:
-            pass
-
+    def inspect(self, cfg: DictConfig) -> tuple[ModelProperties, dict]:
         try:
             info = model_info(cfg.architecture.id)
             tag = getattr(info, "pipeline_tag", None)
-            model_cfg = getattr(info, "config", None) or {}
+            model_cfg = dict(getattr(info, "config", None) or {})
+            files = [item.rfilename for item in (getattr(info, "siblings", None) or [])]
+            if "config.json" in files:
+                config_path = hf_hub_download(
+                    repo_id=cfg.architecture.id,
+                    filename="config.json",
+                    revision=info.sha,
+                )
+                model_cfg = json.loads(Path(config_path).read_text(encoding="utf-8"))
             props = ModelProperties(
                 model_outputs=_TAG_TO_OUTPUTS.get(tag or "", []),
             )
             metadata = {
                 "pipeline_tag": tag,
-                "tags": list(getattr(info, "tags", []) or []),
-                "config": dict(model_cfg),
+                "config": {
+                    key: model_cfg[key]
+                    for key in (
+                        "model_type",
+                        "architectures",
+                        "num_labels",
+                        "id2label",
+                        "label2id",
+                        "image_size",
+                        "num_channels",
+                    )
+                    if key in model_cfg
+                },
+                "available_weights": [
+                    name
+                    for name in files
+                    if name.endswith(
+                        (".safetensors", ".bin", ".pt", ".pth", ".index.json")
+                    )
+                ],
             }
             return props, metadata
         except Exception as exc:
-            if not fetch_if_needed:
-                raise RuntimeError(
-                    f"could not inspect {cfg.architecture.id!r} from HF Hub metadata "
-                    f"({exc}); pass fetch_if_needed=True to fetch and inspect locally"
-                ) from exc
-
-        return _inspect_loaded(self.fetch(cfg))
+            raise RuntimeError(
+                f"could not inspect {cfg.architecture.id!r} from HF Hub metadata ({exc})"
+            ) from exc
 
 
 def _auto_model(task: str | None):

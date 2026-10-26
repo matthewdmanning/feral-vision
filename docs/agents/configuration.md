@@ -6,7 +6,7 @@ Use this guide when changing Hydra or model configuration.
 
 The generic container runner accepts the user's config directory and config
 name and uses that Hydra configuration as written. It supplies no overrides.
-`feral-vision/conf/` is a library of configurations previously tried, not a
+`feral-vision/conf/` holds the parameter files for the current options, not a
 single mandatory experiment. Use `src/sightkit_learn/config/` as the contract;
 Hydra composition produces an OmegaConf `DictConfig`.
 

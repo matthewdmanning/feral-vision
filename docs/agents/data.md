@@ -30,13 +30,6 @@ select a compatible native reader when consuming that format.
 
 ## Runtime packaging for training and inference
 
-`data.loading.instantiate_dataloader` shares Hydra construction between the
-training and inference builders. A collator inside the DataLoader specification
-takes precedence over the builder's collator. `data.batching` contains the
-existing native-vision and Hugging Face collators; their former
-`training.batching` paths remain compatibility imports. PyTorch default
-collation remains suitable for fixed tensors and class/mask targets.
-
 Dataset readers and transforms establish the native sample contract. For COCO
 boxes/masks, TorchVision's `wrap_dataset_for_transforms_v2` wraps `CocoDetection`
 and supplies per-image `boxes`, `labels`, and `masks`; v2 transforms operate
@@ -116,12 +109,6 @@ remains in `TRAINING_DATA_BUCKET_URI`; no URI prefix is hard-coded.
 ## Dataset tracking boundary
 
 Scripts and source adapters own acquisition, conversion, and augmentation.
-DVC registers exactly one prepared Dataset at a time; a Variant follows the
-same registration contract as a raw Dataset. The previous `dvc.yaml` and
-former `scripts/data/acquire.sh`, `process.sh`, and `common.sh` were removed because
-they imposed a fixed stage graph that did not match the producers. Existing
-Dataset files were preserved. Do not recreate broad ownership of `feral-vision/data/raw`,
-`feral-vision/data/processed`, or `feral-vision/data/augmented`.
 
 Use `feral-vision/scripts/data/register.sh DATASET_ROOT` from the selected DVC repository,
 with DVC available on PATH and a default remote configured. It checks repository
@@ -132,13 +119,6 @@ The producer must validate its Dataset before registration. Select independent,
 non-overlapping Dataset roots; retain the generated sibling `.dvc` metadata and
 Git ignore changes in Git. Ignore rules allow these metadata files under
 `data/` without including data files.
-
-Configure the existing dataset-only bucket's `/dvc` prefix as the default remote
-in `.dvc/config.local`; no unexpanded bucket variable is stored in tracked
-configuration. The [Dataset guide](../guide/dataset.rst) is the operator
-reference for complete commands, inputs, outputs, credentials, and official DVC
-references. Registration/recovery has been checked against a filesystem remote;
-that is not proof of cloud permissions or existing cloud data.
 
 ## Remaining publication gaps
 

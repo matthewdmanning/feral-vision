@@ -4,6 +4,9 @@ from __future__ import annotations
 
 # stdlib
 import importlib
+import json
+import base64
+import io
 from unittest.mock import create_autospec
 
 # third-party
@@ -28,6 +31,23 @@ from sightkit_learn.tasks import CVTask
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture
+def hub_metadata_transport(monkeypatch):
+    """Use this fixture to expose Hub declarations while making execution of the source fail."""
+    hub = importlib.import_module("sightkit_learn.models.sources.TorchHubAdapter")
+    source = 'from torchvision.models import resnet18, resnet50, vit_b_16\nraise AssertionError("repository code must not execute")\n'
+    document = {
+        "content": base64.b64encode(source.encode()).decode(),
+        "html_url": "https://github.com/pytorch/vision/blob/v0.20.1/hubconf.py",
+    }
+    transport = create_autospec(
+        hub.urlopen,
+        side_effect=lambda *args, **kwargs: io.BytesIO(json.dumps(document).encode()),
+    )
+    monkeypatch.setattr(hub, "urlopen", transport)
+    return transport
+
+
 def _make_cfg(
     source: str,
     model_id: str,
@@ -41,7 +61,7 @@ def _make_cfg(
             "architecture": {
                 "source": source,
                 "id": model_id,
-                "location": "hub",
+                "location": None,
                 "num_classes": num_classes,
             },
             "weights": weights,
@@ -50,7 +70,7 @@ def _make_cfg(
 
 
 # ---------------------------------------------------------------------------
-# HFAdapter — metadata and cached-weight contracts
+# HFAdapter â€” metadata and cached-weight contracts
 # ---------------------------------------------------------------------------
 
 
@@ -60,7 +80,8 @@ def unregistered_model(monkeypatch):
     from sightkit_learn.models import register_model
 
     lookup = create_autospec(
-        register_model.load_model_registry, side_effect=KeyError("unregistered")
+        register_model.load_model_registry,
+        side_effect=AssertionError("prep must not read MLflow"),
     )
     monkeypatch.setattr(register_model, "load_model_registry", lookup)
 
@@ -94,8 +115,8 @@ def test_hf_adapter_maps_hub_metadata_to_project_tasks(
     assert properties.model_outputs == expected_outputs
     assert metadata == {
         "pipeline_tag": pipeline_tag,
-        "tags": ["vision"],
         "config": {"model_type": "test-architecture"},
+        "available_weights": [],
     }
 
 
@@ -133,6 +154,50 @@ def test_hf_adapter_requests_only_weight_files_missing_from_destination(
     assert (destination / "config.json").read_bytes() == b"cached"
 
 
+def test_hf_inspection_reads_class_information_without_fetching_weights(
+    tmp_path, monkeypatch, unregistered_model
+):
+    """Use this function to verify Hub config and weight choices remain provider facts."""
+    hub = importlib.import_module("sightkit_learn.models.sources.HFAdapter")
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "num_labels": 2,
+                "id2label": {"0": "cat", "1": "dog"},
+                "unrelated_training_history": "discard",
+            }
+        ),
+        encoding="utf-8",
+    )
+    info = ModelInfo(
+        id="test/classifier",
+        sha="provider-revision",
+        pipeline_tag="image-classification",
+        siblings=[
+            {"rfilename": name}
+            for name in [
+                "config.json",
+                "model.safetensors",
+                "pytorch_model.bin",
+                "README.md",
+            ]
+        ],
+    )
+    monkeypatch.setattr(
+        hub, "model_info", create_autospec(hub.model_info, return_value=info)
+    )
+    download = create_autospec(hub.hf_hub_download, return_value=str(config_path))
+    monkeypatch.setattr(hub, "hf_hub_download", download)
+    props, metadata = HFAdapter().inspect(_make_cfg("hf_hub", "test/classifier"))
+    assert props.model_outputs == [CVTask.CLASSIFICATION]
+    assert metadata["config"] == {"num_labels": 2, "id2label": {"0": "cat", "1": "dog"}}
+    assert metadata["available_weights"] == ["model.safetensors", "pytorch_model.bin"]
+    download.assert_called_once_with(
+        repo_id="test/classifier", filename="config.json", revision=info.sha
+    )
+
+
 def test_hf_adapter_explains_how_to_recover_when_the_hub_is_unreachable(
     monkeypatch, unregistered_model
 ):
@@ -140,7 +205,7 @@ def test_hf_adapter_explains_how_to_recover_when_the_hub_is_unreachable(
     info = create_autospec(hub.model_info, side_effect=OfflineModeIsEnabled("offline"))
     monkeypatch.setattr(hub, "model_info", info)
 
-    with pytest.raises(RuntimeError, match="pass fetch_if_needed=True") as raised:
+    with pytest.raises(RuntimeError, match="could not inspect") as raised:
         HFAdapter().inspect(_make_cfg("hf_hub", "test/vision-model"))
 
     assert isinstance(raised.value.__cause__, OfflineModeIsEnabled)
@@ -179,7 +244,7 @@ def test_hf_uses_selected_task_head_and_native_loading_options(
 
 
 # ---------------------------------------------------------------------------
-# TorchHubAdapter — configured source selection contract
+# TorchHubAdapter â€” configured source selection contract
 # ---------------------------------------------------------------------------
 
 
@@ -207,56 +272,13 @@ def test_torch_hub_adapter_uses_configured_model_name_or_default(
     )
 
 
-def test_torch_hub_adapter_requires_explicit_local_inspection_fallback(
-    monkeypatch, unregistered_model
-):
-    adapter = TorchHubAdapter()
-    cfg = _make_cfg("torch_hub", "owner/repo")
-
-    with pytest.raises(RuntimeError, match="pass fetch_if_needed=True"):
-        adapter.inspect(cfg)
-
-    monkeypatch.setattr(
-        adapter, "fetch", lambda configured: nn.Conv2d(3, 2, kernel_size=1)
-    )
-    properties, metadata = adapter.inspect(cfg, fetch_if_needed=True)
-
-    assert properties.model_outputs == []
-    assert metadata == {}
-
-
-# ---------------------------------------------------------------------------
-# UltralyticsAdapter — task metadata and module extraction contracts
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "task,expected_output",
-    [
-        ("detect", CVTask.DETECTION),
-        ("segment", CVTask.SEG_INSTANCE),
-        ("classify", CVTask.CLASSIFICATION),
-    ],
-)
-def test_ultralytics_adapter_returns_module_and_preserves_task_metadata(
-    monkeypatch, unregistered_model, task, expected_output
-):
-    loaded_module = nn.Conv2d(3, 2, kernel_size=1)
-
-    yolo = create_autospec(ultralytics.YOLO)
-    yolo.return_value.model = loaded_module
-    yolo.return_value.task = task
-    yolo.return_value.names = {0: "cat", 1: "dog"}
-    loaded_module.nc = 2
-    monkeypatch.setattr(ultralytics, "YOLO", yolo)
-    cfg = _make_cfg("ultralytics", "yolo11n-seg.pt")
-
-    adapter = UltralyticsAdapter()
-    assert adapter.fetch(cfg) is loaded_module
-    properties, metadata = adapter.inspect(cfg)
-
-    assert properties.model_outputs == [expected_output]
-    assert metadata == {"task": task, "nc": 2, "names": {0: "cat", 1: "dog"}}
+def test_ultralytics_adapter_fetch_returns_native_module(monkeypatch):
+    """Use this function to verify training acquisition still returns the native module."""
+    model = nn.Identity()
+    constructor = create_autospec(ultralytics.YOLO)
+    constructor.return_value.model = model
+    monkeypatch.setattr(ultralytics, "YOLO", constructor)
+    assert UltralyticsAdapter().fetch(_make_cfg("ultralytics", "yolo11n.pt")) is model
 
 
 @pytest.mark.parametrize(
@@ -317,8 +339,146 @@ def test_ultralytics_classifier_uses_native_head_adjustment(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Model acquisition — dynamic adapter routing contract
+# Model acquisition â€” dynamic adapter routing contract
 # ---------------------------------------------------------------------------
+
+
+def test_hf_discovery_uses_provider_search_and_task_filters(monkeypatch):
+    """Use this function to verify Hub discovery returns identifiers suitable for inspection."""
+    import huggingface_hub
+
+    api = create_autospec(huggingface_hub.HfApi, instance=True)
+    api.list_models.return_value = iter(
+        [ModelInfo(id="provider/vision-model", pipeline_tag="object-detection")]
+    )
+    constructor = create_autospec(huggingface_hub.HfApi, return_value=api)
+    monkeypatch.setattr(huggingface_hub, "HfApi", constructor)
+    candidates = list(
+        HFAdapter().list_models(
+            query="vision", repository="provider", pipeline_tag="object-detection"
+        )
+    )
+    assert candidates == [
+        {
+            "model_id": "provider/vision-model",
+            "architecture_location": "https://huggingface.co/provider/vision-model",
+            "pipeline_tag": "object-detection",
+        }
+    ]
+    api.list_models.assert_called_once_with(
+        search="vision",
+        author="provider",
+        pipeline_tag="object-detection",
+        sort="downloads",
+    )
+
+
+@pytest.mark.parametrize(
+    "query,expected_names",
+    [
+        (None, ["resnet18", "resnet50", "vit_b_16"]),
+        ("resnet", ["resnet18", "resnet50"]),
+    ],
+)
+def test_torch_hub_discovery_returns_repository_entrypoints(
+    monkeypatch, hub_metadata_transport, query, expected_names
+):
+    """Use this function to verify Torch Hub discovery keeps repositories and model entrypoints distinct."""
+    candidates = list(
+        TorchHubAdapter().list_models(repository="pytorch/vision:v0.20.1", query=query)
+    )
+    assert [row["architecture_location"] for row in candidates] == expected_names
+    assert all(row["model_id"] == "pytorch/vision:v0.20.1" for row in candidates)
+
+
+def test_ultralytics_architecture_inspection_reports_weight_options_without_inventing_labels(
+    monkeypatch,
+):
+    """Use this function to distinguish architecture defaults from pretrained class vocabulary."""
+    constructor = create_autospec(
+        ultralytics.YOLO, side_effect=AssertionError("prep must not construct a model")
+    )
+    monkeypatch.setattr(ultralytics, "YOLO", constructor)
+    props, metadata = UltralyticsAdapter().inspect(
+        _make_cfg("ultralytics", "cfg/models/11/yolo11.yaml")
+    )
+    assert props.model_outputs == [CVTask.DETECTION]
+    assert metadata["names"] is None
+    assert metadata["nc"] == 80
+    assert metadata["available_weights"] == sorted(
+        f"yolo11{scale}.pt" for scale in "nsmlx"
+    )
+    constructor.assert_not_called()
+
+
+def test_torch_hub_inspection_reports_torchvision_weight_options(
+    monkeypatch, hub_metadata_transport
+):
+    """Use this function to gather published TorchVision weight metadata without constructing a model."""
+    import torchvision
+
+    load = create_autospec(
+        torch.hub.load, side_effect=AssertionError("prep must not load models")
+    )
+    monkeypatch.setattr(torch.hub, "load", load)
+    cfg = _make_cfg("torch_hub", "pytorch/vision:v0.20.1")
+    cfg.architecture.location = "resnet18"
+    props, metadata = TorchHubAdapter().inspect(cfg)
+    assert props.model_outputs == [CVTask.CLASSIFICATION]
+    assert metadata["available_weights"] == [
+        {"id": weight.name, "location": weight.url}
+        for weight in torchvision.models.ResNet18_Weights
+    ]
+    assert len(metadata["names"]) == metadata["nc"] == 1000
+    load.assert_not_called()
+
+
+def test_ultralytics_discovery_includes_architectures_and_checkpoint_families():
+    """Use this function to verify the installed catalogue exposes more than a single YOLO checkpoint."""
+    rows = list(UltralyticsAdapter().list_models())
+    by_id = {row["model_id"]: row for row in rows}
+    for model_id, location in {
+        "yolo11n.pt": "YOLO",
+        "yolo11x-seg.pt": "YOLO",
+        "rtdetr-l.pt": "RTDETR",
+        "sam_b.pt": "SAM",
+        "FastSAM-s.pt": "FastSAM",
+        "yolo_nas_s.pt": "NAS",
+    }.items():
+        assert by_id[model_id]["architecture_location"] == "ultralytics." + location
+        assert by_id[model_id]["kind"] == "checkpoint"
+    assert by_id["cfg/models/11/yolo11.yaml"]["kind"] == "architecture"
+    filtered = list(UltralyticsAdapter().list_models(query="yolo11"))
+    assert filtered
+    assert all("yolo11" in row["model_id"].casefold() for row in filtered)
+    assert not list(UltralyticsAdapter().list_models(query="absent-model-family"))
+
+
+@pytest.mark.parametrize(
+    "class_name,model_id,task,expected_output",
+    [
+        ("SAM", "sam_b.pt", "segment", CVTask.SEG_INSTANCE),
+        ("FastSAM", "FastSAM-s.pt", "segment", CVTask.SEG_INSTANCE),
+        ("NAS", "yolo_nas_s.pt", "detect", CVTask.DETECTION),
+        ("RTDETR", "rtdetr-l.pt", "detect", CVTask.DETECTION),
+    ],
+)
+def test_ultralytics_inspection_reads_metadata_without_constructing_models(
+    monkeypatch, class_name, model_id, task, expected_output
+):
+    """Use this function to gather native constructor documentation without constructing a model."""
+    constructor = create_autospec(
+        getattr(ultralytics, class_name),
+        side_effect=AssertionError("prep must not construct a model"),
+    )
+    monkeypatch.setattr(ultralytics, class_name, constructor)
+    cfg = _make_cfg("ultralytics", model_id)
+    cfg.architecture.location = "ultralytics." + class_name
+    props, metadata = UltralyticsAdapter().inspect(cfg)
+    constructor.assert_not_called()
+    assert props.model_outputs == [expected_output]
+    assert metadata["architecture_location"] == cfg.architecture.location
+    assert metadata["names"] is None
 
 
 @pytest.mark.parametrize(

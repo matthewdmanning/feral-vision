@@ -1,11 +1,11 @@
 """Model inspector MCP server for feral-vision.
 
 Tools:
-  inspect_model     — call adapter.inspect() and return metadata JSON (no file writes)
+  inspect_model     — gather provider information and a Hydra model configuration
+  list_models       — discover model identifiers through any registered provider
+  save_model        — save gathered information to the offline prep registry
+  get_model         — retrieve offline information and its Hydra YAML
   list_adapters     — scan sources/ for registered SOURCE_KEY adapters
-  read_adapter      — return source code of a named adapter
-  write_adapter     — write or overwrite an adapter file (to add new source support)
-  search_hf_models  — search HuggingFace Hub by query / pipeline_tag
 """
 
 from __future__ import annotations
@@ -14,7 +14,9 @@ import importlib.util
 import json
 import os
 import sys
+from contextlib import redirect_stdout
 from pathlib import Path
+from itertools import islice
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -49,8 +51,8 @@ def _load_adapters() -> dict[str, Path]:
         mod = importlib.util.module_from_spec(spec)
         try:
             spec.loader.exec_module(mod)  # type: ignore[union-attr]
-        except Exception:
-            continue
+        except ImportError as exc:
+            raise ToolError(f"cannot import adapter {f.name}: {exc}") from exc
         key = getattr(mod, "SOURCE_KEY", None)
         if key:
             result[key] = f
@@ -106,6 +108,8 @@ def _build_cfg(
     model_id: str,
     weights_id: list[str] | None,
     weights_location: str | None,
+    architecture_location: str | None = None,
+    architecture_kwargs: dict | None = None,
 ):
     """Use this function to construct an OmegaConf DictConfig in the shape expected by SourceAdapter.inspect().
 
@@ -131,7 +135,23 @@ def _build_cfg(
     """
     from omegaconf import OmegaConf
 
-    d: dict = {"architecture": {"source": source, "id": model_id, "location": None}}
+    locations = {
+        "hf_hub": f"https://huggingface.co/{model_id}",
+        "ultralytics": "ultralytics.YOLO",
+    }
+    if source == "torch_hub" and not architecture_location:
+        raise ToolError(
+            "torch_hub requires architecture_location: the hubconf.py model entrypoint, such as resnet18"
+        )
+    d: dict = {
+        "architecture": {
+            "source": source,
+            "id": model_id,
+            "location": architecture_location or locations.get(source),
+            "kwargs": architecture_kwargs or {},
+        },
+        "weights": None,
+    }
     if weights_id:
         d["weights"] = {
             "source": source,
@@ -147,17 +167,88 @@ def _build_cfg(
 
 
 @mcp.tool()
+def list_models(
+    source: str,
+    query: str | None = None,
+    repository: str | None = None,
+    filters: dict[str, str] | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> str:
+    """Use this function to discover models from a registered provider before inspecting them.
+
+    Parameters
+    ----------
+    source : str
+        Registered adapter key: hf_hub, torch_hub, or ultralytics.
+    query : str, optional
+        Model name search. Ultralytics searches its installed catalogue.
+    repository : str, optional
+        Required Torch Hub owner/repo[:ref], or Hugging Face author filter.
+    filters : dict[str, str], optional
+        Exact-match fields reported by list_adapters. All providers support
+        model_id and architecture_location; HF adds pipeline_tag and Ultralytics
+        adds kind (architecture or checkpoint). Filtering precedes pagination.
+    limit, offset : int
+        Page size (1–1000) and zero-based offset. Follow next_offset for more.
+
+    Returns
+    -------
+    str
+        JSON models with model_id and architecture_location for inspect_model,
+        plus next_offset when another page is available.
+    """
+    if not 1 <= limit <= 1000 or offset < 0:
+        raise ToolError(
+            "limit must be between 1 and 1000 and offset must be nonnegative"
+        )
+    adapter = _resolve_adapter(source)
+    filters = filters or {}
+    unsupported = filters.keys() - adapter.discovery_filters
+    if unsupported:
+        raise ToolError(
+            f"unsupported {source} filters: {sorted(unsupported)}; supported: {sorted(adapter.discovery_filters)}"
+        )
+    try:
+        with redirect_stdout(sys.stderr):
+            candidates = adapter.list_models(
+                query=query,
+                repository=repository,
+                pipeline_tag=filters.get("pipeline_tag"),
+            )
+            candidates = (
+                row
+                for row in candidates
+                if all(row.get(key) == value for key, value in filters.items())
+            )
+            rows = list(islice(candidates, offset, offset + limit + 1))
+    except Exception as exc:
+        raise ToolError(f"could not list {source} models: {exc}") from exc
+    return json.dumps(
+        {
+            "source": source,
+            "models": rows[:limit],
+            "next_offset": offset + limit if len(rows) > limit else None,
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
 def inspect_model(
     source: str,
     model_id: str,
     weights_id: list[str] | None = None,
     weights_location: str | None = None,
-    fetch_if_needed: bool = False,
+    architecture_location: str | None = None,
+    architecture_kwargs: dict | None = None,
 ) -> str:
     """Use this function to inspect a model via its source adapter and return metadata as JSON.
 
-    Does NOT write to the MLflow Model Registry. The deprecated registration
-    CLI has no supported replacement yet.
+    Inspect provider information, then pass the result to ``save_model`` to
+    retain it offline. Inspection does not contact MLflow or save a registry entry.
+    Available provider weights are metadata; weights_id and constructor kwargs
+    describe explicit setup choices, not automatically selected alternatives.
 
     Parameters
     ----------
@@ -169,24 +260,112 @@ def inspect_model(
         Weight filenames or hub asset names.
     weights_location : str, optional
         Local directory for caching downloaded weights.
-    fetch_if_needed : bool, optional
-        When ``True``, downloads model weights to inspect architecture if hub
-        metadata is unavailable. Defaults to ``False``.
+    architecture_location : str, optional
+        Required Torch Hub entrypoint (for example ``resnet18``).
+    architecture_kwargs : dict, optional
+        Provider constructor options, such as Torch Hub ``weights=None``.
 
     Returns
     -------
     str
-        JSON string with keys ``model_outputs`` (list of CVTask values),
-        ``n_classes`` (int or null), and ``metadata`` (hub-specific extras).
+        JSON containing ``config``, ``model_outputs``, ``metadata`` and ``missing``.
+        An empty outputs list is unknown, not an assertion of task support.
     """
     adapter = _resolve_adapter(source)
-    cfg = _build_cfg(source, model_id, weights_id, weights_location)
-    props, metadata = adapter.inspect(cfg, fetch_if_needed=fetch_if_needed)
+    cfg = _build_cfg(
+        source,
+        model_id,
+        weights_id,
+        weights_location,
+        architecture_location,
+        architecture_kwargs,
+    )
+    from omegaconf import OmegaConf
+
+    try:
+        # Provider summaries must not corrupt the MCP stdio transport.
+        with redirect_stdout(sys.stderr):
+            props, metadata = adapter.inspect(cfg)
+    except Exception as exc:
+        raise ToolError(
+            f"could not inspect {source} model {model_id!r}: {exc}"
+        ) from exc
     return json.dumps(
         {
+            "config": OmegaConf.to_container(cfg, resolve=True),
             "model_outputs": [t.value for t in props.model_outputs],
-            "n_classes": props.n_classes,
             "metadata": metadata,
+            "missing": []
+            if props.model_outputs
+            else [
+                "model_outputs: task is unknown or has no CVTask mapping; see provider metadata"
+            ],
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+def save_model(
+    name: str,
+    config: dict,
+    model_outputs: list[str],
+    metadata: dict,
+    overwrite: bool = False,
+) -> str:
+    """Use this function to save an inspected model in models/registry/model_registry.json.
+
+    Parameters
+    ----------
+    name : str
+        Local registry name, including a variant when applicable.
+    config, metadata : dict
+        Configuration and provider metadata returned by inspect_model.
+    model_outputs : list[str]
+        Established CVTask values returned by inspection.
+    overwrite : bool
+        Explicitly replace an existing entry. Defaults to False.
+    """
+    from sightkit_learn.models.offline_registry import save_model_definition
+    from omegaconf.errors import OmegaConfBaseException
+
+    try:
+        entry = save_model_definition(
+            PROJECT_ROOT / "models/registry/model_registry.json",
+            name,
+            {"config": config, "model_outputs": model_outputs, "metadata": metadata},
+            overwrite=overwrite,
+        )
+    except (ValueError, TypeError, OSError, OmegaConfBaseException) as exc:
+        raise ToolError(f"could not save model {name!r}: {exc}") from exc
+    return json.dumps({"name": name, **entry}, indent=2)
+
+
+@mcp.tool()
+def get_model(name: str) -> str:
+    """Use this function to retrieve offline model information and Hydra YAML without provider access.
+
+    Parameters
+    ----------
+    name : str
+        Name previously saved in the prep registry.
+    """
+    from omegaconf import OmegaConf
+    from sightkit_learn.models.offline_registry import load_model_definition
+
+    try:
+        cfg, props, metadata = load_model_definition(
+            PROJECT_ROOT / "models/registry/model_registry.json", name
+        )
+    except (KeyError, ValueError, OSError) as exc:
+        raise ToolError(f"could not read model {name!r}: {exc}") from exc
+    return json.dumps(
+        {
+            "name": name,
+            "config": OmegaConf.to_container(cfg, resolve=True),
+            "model_outputs": [task.value for task in props.model_outputs],
+            "metadata": metadata,
+            "yaml": OmegaConf.to_yaml(cfg),
         },
         indent=2,
     )
@@ -199,113 +378,12 @@ def list_adapters() -> str:
     Returns
     -------
     str
-        JSON array of objects with keys ``source_key`` and ``file`` (relative path).
+        JSON array of provider keys and their accepted discovery filters.
     """
     adapters = _load_adapters()
     rows = [
-        {"source_key": k, "file": str(v.relative_to(PROJECT_ROOT))}
-        for k, v in sorted(adapters.items())
-    ]
-    return json.dumps(rows, indent=2)
-
-
-@mcp.tool()
-def read_adapter(source_key: str) -> str:
-    """Use this function to retrieve the full source code of a named adapter for inspection or reference.
-
-    Parameters
-    ----------
-    source_key : str
-        The ``SOURCE_KEY`` value declared by the adapter (e.g. ``"hf_hub"``, ``"ultralytics"``).
-
-    Returns
-    -------
-    str
-        Full UTF-8 source code of the adapter module.
-
-    Raises
-    ------
-    ToolError
-        If no adapter declares the given ``source_key``.
-    """
-    adapters = _load_adapters()
-    if source_key not in adapters:
-        raise ToolError(
-            f"unknown adapter {source_key!r}; available: {sorted(adapters)}"
-        )
-    return adapters[source_key].read_text(encoding="utf-8")
-
-
-@mcp.tool()
-def write_adapter(source_key: str, class_name: str, code: str) -> str:
-    """Use this function to write or overwrite an adapter file when adding support for a new model source.
-
-    Writes to ``src/sightkit_learn/models/sources/{class_name}Adapter.py``.
-    The new adapter becomes available to ``inspect_model`` immediately after writing.
-
-    Parameters
-    ----------
-    source_key : str
-        The ``SOURCE_KEY`` the adapter will declare (e.g. ``"torchvision"``).
-    class_name : str
-        Stem used for both the class name and filename
-        (e.g. ``"Torchvision"`` → ``TorchvisionAdapter.py``).
-    code : str
-        Full Python source of the adapter module. Must define ``SOURCE_KEY``
-        and a ``SourceAdapter`` subclass.
-
-    Returns
-    -------
-    str
-        Relative path of the written file.
-    """
-    dest = SOURCES_DIR / f"{class_name}Adapter.py"
-    dest.write_text(code, encoding="utf-8")
-    return str(dest.relative_to(PROJECT_ROOT))
-
-
-@mcp.tool()
-def search_hf_models(
-    query: str | None = None,
-    pipeline_tag: str | None = None,
-    limit: int = 10,
-) -> str:
-    """Use this function to search HuggingFace Hub for models by keyword or task type.
-
-    Parameters
-    ----------
-    query : str, optional
-        Free-text search term (model name, author, or keyword).
-    pipeline_tag : str, optional
-        Filter by task, e.g. ``"object-detection"``, ``"instance-segmentation"``,
-        ``"semantic-segmentation"``, ``"image-classification"``, ``"pose-estimation"``.
-    limit : int, optional
-        Maximum number of results to return. Defaults to ``10``.
-
-    Returns
-    -------
-    str
-        JSON array of objects with keys ``id``, ``pipeline_tag``, ``downloads``,
-        and ``tags`` (up to 5 per model), sorted by downloads descending.
-    """
-    from huggingface_hub import HfApi
-
-    api = HfApi()
-    kwargs: dict = {"limit": limit, "sort": "downloads", "direction": -1}
-    if pipeline_tag:
-        kwargs["pipeline_tag"] = pipeline_tag
-    if query:
-        kwargs["search"] = query
-
-    models = list(api.list_models(**kwargs))
-    rows = [
-        {
-            "id": m.id,
-            "pipeline_tag": getattr(m, "pipeline_tag", None),
-            "downloads": getattr(m, "downloads", None),
-            "tags": list(getattr(m, "tags", []) or [])[:5],
-        }
-        for m in models
+        {"source_key": key, "filters": sorted(_resolve_adapter(key).discovery_filters)}
+        for key in sorted(adapters)
     ]
     return json.dumps(rows, indent=2)
 

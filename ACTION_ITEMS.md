@@ -8,8 +8,10 @@ Open work, most blocking first. Remove an item when it is done.
   `scripts/docker_container_tests.sh` from a terminal; it prompts for approval,
   builds the deployment image, and runs pytest in Linux. Record the actual
   failures and results rather than assuming the earlier four failures persist.
-- **Verify the training image.** Run `scripts/cloud/check_training_image.sh`
-  with the project ID resolved from `PROJECT_NAME` in `.env.local`. Verify the
+- **Verify the training image.** Load the training parameters with
+  `source feral-vision/scripts/cloud/load_training_parameters.sh` followed by
+  `load_training_parameters`, then run `scripts/cloud/check_training_image.sh`
+  with the project ID resolved from `PROJECT_NAME`. Verify the
   selected digest supports the run's entrypoint and runtime requirements. Image age is not a build
   criterion. If a build is needed, use `scripts/cloud/build_training_image.sh`
   from a clean checkout. Billed Cloud Build run: needs approval.
@@ -20,7 +22,8 @@ Open work, most blocking first. Remove an item when it is done.
   VM startup already checks the actual GPU's architecture before training;
   retain that gate and record its result for the T4 run.
 - **Verify bucket configuration.** Check `TRAINING_DATA_BUCKET_URI` using
-  the project ID resolved from `PROJECT_NAME` in `.env.local`. Reconcile
+  the project ID resolved from `PROJECT_NAME` after loading the training
+  parameters. Reconcile
   Terraform's backend and operational output location separately; a check of a hard-coded operations
   bucket does not establish that the configured training data bucket is missing.
 - **Finish `run.tfvars`.** Set `training_image` to the verified image digest.

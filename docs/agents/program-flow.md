@@ -1,5 +1,24 @@
 # Program Flow
 
+## Model prep
+
+The model-inspector MCP tools gather provider information and save it to
+``models/registry/model_registry.json``. ``inspect_model`` uses the selected
+source adapter; ``list_models`` discovers provider model identifiers and native
+construction locations; ``save_model`` preserves configuration, task outputs and
+provider metadata; ``get_model`` retrieves the offline entry and Hydra YAML.
+Inspection does not use MLflow. Available pretrained weights are gathered
+facts, while starting-weight selection is a setup choice. The prep handoff is
+a Hydra ``DictConfig``. See [Model inspector](../guide/quickstart.rst#model-inspector)
+for provider-specific inputs and download permissions.
+
+The prep tool surface is limited to provider listing, model search/filtering,
+metadata inspection, offline save and retrieval. Search and exact-match filters
+are arguments to ``list_models``. Prep does not edit source files, construct
+models, load weights, download repository archives or execute repository code.
+
+## Training and inference
+
 For the distinction between reusable training behavior and concrete
 Hydra/Terraform choices, read [Training architecture](training.md). The
 training loop belongs in the library; this deployment flow does not make it

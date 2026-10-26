@@ -37,7 +37,6 @@ class SourceConfig:
     source: str = MISSING  # discriminator: hf_hub | torch_hub | ultralytics | ...
     id: str = MISSING  # hub repo ID, model name, dotted class path, or URL
     location: str = MISSING  # stable source location or dotted local class path
-    num_classes: Optional[int] = None  # task head size when the source supports it
     kwargs: dict[str, Any] = field(default_factory=dict)
 
 

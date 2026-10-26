@@ -23,8 +23,8 @@ repository from `git remote -v`.
 
 For CLI work, authenticate `gh` from the local `.env.local` token without
 printing or committing secret values, then verify with `gh auth status`.
-`GITHUB_PERSONAL_ACCESS_TOKEN` in this checkout's `.env.local` was validated
-on 2026-07-21 at 12:00 noon. If `gh` reports an invalid token, repair its saved
+`GITHUB_PERSONAL_ACCESS_TOKEN` in this checkout's `.env.local` is the expected
+`gh` credential. If `gh` reports an invalid token, repair its saved
 credential from that local token before pursuing device authentication or
 requesting a replacement token.
 

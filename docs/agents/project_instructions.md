@@ -117,7 +117,7 @@ See [Check for an existing image first](cloudops.md#check-for-an-existing-image-
 | locating a Hydra configuration concern | [Hydra configuration index](hydra.md) | Configuration README index by concern. Tool ownership: **Hydra**. |
 | Terraform modules, state, plans, or Cloud Resource lifecycle | [Terraform](terraform.md) | Terraform ownership, file map, state, and plan safety. Tool ownership: **Terraform**. |
 | cloud identity, image builds, VMs, or cloud training | [Cloud Operations](cloudops.md) | Cloud-service credentials and operational entrypoints. Tool ownership: **Scripts and source code**. |
-| **a claim that the training image is or is not built, or a decision to build it** | [Check for an existing image first](cloudops.md#check-for-an-existing-image-first) | **Run `feral-vision/scripts/cloud/check_training_image.sh` first.** Earlier agents built the image, forgot, and said it did not exist. |
+| **a claim that the training image is or is not built, or a decision to build it** | [Check for an existing image first](cloudops.md#check-for-an-existing-image-first) | **Run `feral-vision/scripts/cloud/check_training_image.sh` first.** |
 | Git, GitHub Issues, pull requests, or publishing | [GitHub workflow](github.md) | Session checks, authentication, issue tracking, and branch/PR hygiene. |
 | domain terminology or an architectural decision | [Domain Docs](domain.md) | Glossary and ADR discovery. |
 | an agent reached for the wrong tool or source despite these routing instructions | [Pointer failures](pointer_failures.md) | Log of wrong-tool and wrong-source selections, with the agent's stated reason. |
