@@ -43,6 +43,12 @@
       "skillPath": "skills/cloud/google-cloud-recipe-auth/SKILL.md",
       "computedHash": "f17b44e497bef6451b7b63c886bf96b0da38289b46f680ea2adb4c250d4a4245"
     },
+    "google-cloud-storage-basics": {
+      "source": "google/skills",
+      "sourceType": "github",
+      "skillPath": "skills/cloud/google-cloud-storage-basics/SKILL.md",
+      "computedHash": "a0af786d950a9783045e84ce11f59ae180fb0f96dc1519cb25597ded6568d2d1"
+    },
     "google-cloud-storage-bucket-architect": {
       "source": "google/skills",
       "sourceType": "github",

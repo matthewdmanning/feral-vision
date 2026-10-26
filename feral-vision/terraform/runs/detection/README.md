@@ -39,10 +39,12 @@ The published Dataset Artifact is the input boundary:
 1. preflight reads and parses `dataset-artifact.json` and records its SHA-256;
 2. the VM stages images, the generation-pinned annotations object, and the exact
    published `dataset-artifact.json` onto Local SSD;
-3. startup parses the staged manifest and hashes it before touching the GPU;
-4. the container entrypoint verifies that hash again before training;
-5. MLflow lineage and `training-evidence.json` record the manifest SHA-256;
-6. the exact manifest is copied to the run evidence prefix.
+3. startup confirms the staged files exist and hashes the manifest;
+4. MLflow lineage and `training-evidence.json` record the manifest SHA-256;
+5. the exact manifest is copied to the run evidence prefix;
+6. the container uploads every training output (checkpoint, MLflow store and
+   artifacts, console log) every 30 seconds and at exit to
+   `<artifact_prefix>/<run_id>/instances/<VM instance ID>/<attempt>/`.
 
 A `.dvc` tracker or `dvc.lock` is not created, required, or uploaded by this GPU
 workflow. Upstream dataset publication owns those concerns where applicable.
@@ -103,7 +105,6 @@ The startup script logs major stages to the serial console:
 - `verify_dataset_artifact`
 - `stage_dataset_payload`
 - `verify_staged_dataset`
-- `verify_gpu`
 - `train`
 - `done`
 

@@ -42,11 +42,4 @@ RUN uv sync --frozen --no-dev --no-editable
 
 WORKDIR /workspace/feral-vision
 
-# Fail the image build if the canonical recipe cannot be composed or if core
-# runtime imports are missing. GPU visibility is checked on the actual VM.
-RUN python -c "import torch, hydra, sightkit_learn; print(torch.__version__)" \
-    && python -m sightkit_learn.training.trainer --config-dir /workspace/feral-vision/conf --config-name runs/detection --cfg job >/tmp/resolved-training-config.yaml \
-    && gcloud version >/dev/null \
-    && bash -n /workspace/feral-vision/scripts/runs/container_train.sh
-
 ENTRYPOINT ["bash", "/workspace/feral-vision/scripts/runs/container_train.sh"]

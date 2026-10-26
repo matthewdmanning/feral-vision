@@ -82,9 +82,31 @@ keywords = ["private key-----"]
 
 [[rules]]
 id = "blocked-service-account-email"
-description = "GCP service account email"
-regex = '''[a-z0-9-]+@[a-z0-9-]+\.iam\.gserviceaccount\.com'''
-keywords = ["iam.gserviceaccount.com"]
+description = "GCP service account or service agent email (includes project-number defaults)"
+regex = '''[a-z0-9-]+@[a-z0-9.-]*gserviceaccount\.com'''
+keywords = ["gserviceaccount.com"]
+[[rules.allowlists]]
+description = "Placeholder test projects"
+regexes = [
+  '''@((test|fixture|my|example)-)?project\.iam\.gserviceaccount\.com$''',
+  # PROJECT_NUMBER-compute@... leaves only this suffix; a real number keeps its digits.
+  '''^-compute@developer\.gserviceaccount\.com$''',
+]
+
+[[rules]]
+id = "blocked-artifact-registry-path"
+description = "Artifact Registry path naming a real project"
+regex = '''[a-z0-9-]+-docker\.pkg\.dev/[a-z][a-z0-9-]{4,28}[a-z0-9]/'''
+keywords = ["docker.pkg.dev"]
+[[rules.allowlists]]
+description = "Placeholder test projects"
+regexes = ['''/(test|fixture|my|example)-project/$''']
+
+[[rules]]
+id = "blocked-cloudbuild-bucket"
+description = "Cloud Build source bucket named after a real project"
+regex = '''[a-z][a-z0-9-]{4,28}[a-z0-9]_cloudbuild'''
+keywords = ["_cloudbuild"]
 
 [[rules]]
 id = "blocked-secret-manager-path"
@@ -97,3 +119,34 @@ keywords = ["/secrets/"]
 description = "Example files hold placeholders only"
 targetRules = ["env-file", "terraform-tfvars"]
 paths = ['''\.example$''', '''\.tfvars\.example$''']
+
+# Upstream google-cloud-storage-basics skill: placeholder bucket URIs.
+[[allowlists]]
+description = "google-cloud-storage-basics skill docs hold placeholder bucket URIs"
+targetRules = ["blocked-gcs-uri"]
+paths = [
+  '''^\.agents/skills/google-cloud-storage-basics/SKILL\.md$''',
+  '''^\.agents/skills/google-cloud-storage-basics/references/cli-api-usage\.md$''',
+  '''^\.agents/skills/google-cloud-storage-basics/references/core-concepts\.md$''',
+  '''^\.agents/skills/google-cloud-storage-basics/references/data-management\.md$''',
+  '''^\.agents/skills/google-cloud-storage-basics/references/data-transfer\.md$''',
+  '''^\.agents/skills/google-cloud-storage-basics/references/high-performance-storage\.md$''',
+  '''^\.agents/skills/google-cloud-storage-basics/references/storage-intelligence\.md$''',
+]
+
+# Upstream google-cloud-storage-basics skill: placeholder service account emails.
+[[allowlists]]
+description = "google-cloud-storage-basics skill docs hold placeholder service account emails"
+targetRules = ["blocked-service-account-email"]
+condition = "AND"
+paths = [
+  '''^\.agents/skills/google-cloud-storage-basics/references/data-management\.md$''',
+  '''^\.agents/skills/google-cloud-storage-basics/references/iac-usage\.md$''',
+]
+regexes = [
+  '''^my-app-sa@my-project\.iam\.gserviceaccount\.com$''',
+  '''^my-sa@my-project\.iam\.gserviceaccount\.com$''',
+  '''^my-service-account@my-project\.iam\.gserviceaccount\.com$''',
+  '''^my-service-agent@my-project\.iam\.gserviceaccount\.com$''',
+  '''^signed-url-account@my-project\.iam\.gserviceaccount\.com$''',
+]

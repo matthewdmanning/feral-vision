@@ -147,7 +147,12 @@ def watch_outputs(directory: str, uri: str) -> None:
         time.sleep(30)
 
 
-def train(config_dir: str, config_name: str, output_dir: str) -> None:
+def train(
+    config_dir: str,
+    config_name: str,
+    output_dir: str,
+    overrides: list[str] | None = None,
+) -> None:
     """Use this function to run the selected Hydra config without losing local outputs."""
     from hydra import compose, initialize_config_dir
     from omegaconf import OmegaConf
@@ -160,7 +165,7 @@ def train(config_dir: str, config_name: str, output_dir: str) -> None:
     with initialize_config_dir(
         config_dir=str(Path(config_dir).resolve()), version_base=None
     ):
-        cfg = compose(config_name=config_name)
+        cfg = compose(config_name=config_name, overrides=overrides or [])
     OmegaConf.save(cfg, root / "resolved-config.yaml", resolve=True)
     checkpoint = Path(cfg.train.best_model_path).resolve()
     external = []

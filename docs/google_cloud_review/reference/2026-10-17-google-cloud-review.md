@@ -328,7 +328,7 @@ Preserve the original record/index and the exact loader root in run evidence.
 The association to test is **selected DVC record → matching contents → actual
 loader input**, not just a logged hash.
 
-`data_flow_rewrite.stage/verify` is an existing independent, locked staging
+`dvc_vm_environ.stage/verify` is an existing independent, locked staging
 candidate, not an automatically adopted runtime dependency. Its current
 handoff includes `dataset/`, `dataset.dvc`, and `dataset.dir`; integration must
 prove that its selected GCS snapshot and payload are present. If used, package

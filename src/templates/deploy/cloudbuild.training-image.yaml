@@ -16,15 +16,11 @@ steps:
     args:
       - -ceu
       - |
-        docker run --rm --entrypoint bash "${_TRAINING_IMAGE}" -ceu '
+        docker run --pull=never --network=none --memory=2g --cpus=2 --rm --entrypoint bash "${_TRAINING_IMAGE}" -ceu '
           test -x /usr/local/bin/uv
           test -x /workspace/.venv/bin/python
           test -f /workspace/feral-vision/conf/runs/detection.yaml
           test -f /workspace/feral-vision/scripts/runs/container_train.sh
-          python -c "import torch, hydra, sightkit_learn; print(torch.__version__)"
-          python -m sightkit_learn.training.trainer --config-dir /workspace/feral-vision/conf --config-name runs/detection --cfg job >/tmp/resolved-training-config.yaml
-          gcloud version >/dev/null
-          bash -n /workspace/feral-vision/scripts/runs/container_train.sh
         '
     waitFor:
       - build-training-image

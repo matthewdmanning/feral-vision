@@ -67,6 +67,6 @@ printf 'Run outputs: %s\n' "$RUN_OUTPUT_URI"
 python -c 'import os; from run_outputs import publish_outputs; publish_outputs(os.environ["RUN_OUTPUT_DIR"], os.environ["RUN_OUTPUT_URI"])'
 python -c 'import os; from run_outputs import watch_outputs; watch_outputs(os.environ["RUN_OUTPUT_DIR"], os.environ["RUN_OUTPUT_URI"])' &
 watch_pid=$!
-setsid python -c 'import os; from run_outputs import train; train(os.environ["CONFIG_DIR"], os.environ["CONFIG_NAME"], os.environ["RUN_OUTPUT_DIR"])' &
+setsid python -c 'import os, sys; from run_outputs import train; train(os.environ["CONFIG_DIR"], os.environ["CONFIG_NAME"], os.environ["RUN_OUTPUT_DIR"], sys.argv[1:])' "$@" &
 train_pid=$!
 wait "$train_pid"

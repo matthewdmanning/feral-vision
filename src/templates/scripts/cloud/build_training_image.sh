@@ -11,21 +11,25 @@ Usage:
     --region REGION \
     --repository REPOSITORY \
     --image IMAGE \
-    --tag TAG
+    --tag TAG \
+    --service-account SERVICE_ACCOUNT_EMAIL
 
 Builds, verifies, and pushes the one canonical GPU training image. The final
 line prints the digest-pinned Artifact Registry reference required by Terraform.
 
 FIRST run scripts/cloud/check_training_image.sh. The image may already exist.
 An image's age does not determine whether a build is needed.
+
+Defaults come from cloud.env.local (see cloud.env.example); flags override them.
 EOF
 }
 
-project=""
-region=""
-repository=""
-image=""
+project="${GCP_PROJECT:-}"
+region="${GCP_REGION:-}"
+repository="${ARTIFACT_REPOSITORY:-}"
+image="${TRAINING_IMAGE_NAME:-}"
 tag=""
+service_account="${BUILD_SERVICE_ACCOUNT:-}"
 
 while (( "$#" )); do
   case "$1" in
@@ -34,12 +38,13 @@ while (( "$#" )); do
     --repository) repository="${2:?--repository requires a value}"; shift 2 ;;
     --image) image="${2:?--image requires a value}"; shift 2 ;;
     --tag) tag="${2:?--tag requires a value}"; shift 2 ;;
+    --service-account) service_account="${2:?--service-account requires a value}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
-for required in project region repository image tag; do
+for required in project region repository image tag service_account; do
   if [ -z "${!required}" ]; then
     echo "Missing required --${required//_/-}" >&2
     usage >&2
@@ -73,6 +78,7 @@ gcloud builds submit . \
   --project="$project" \
   --region="$region" \
   --quiet \
+  --service-account="projects/${project}/serviceAccounts/${service_account}" \
   --config=feral-vision/deploy/cloudbuild.training-image.yaml \
   --substitutions="_TRAINING_IMAGE=${image_ref}"
 checkpoint "CLOUD_BUILD" "PASS build, image check, and push completed"

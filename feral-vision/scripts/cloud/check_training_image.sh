@@ -18,13 +18,15 @@ or session may have built the image already.
 Exit 0: at least one image exists. The last line is the newest digest-pinned
         reference, ready for training_image in run.tfvars.
 Exit 1: no image exists.
+
+Defaults come from cloud.env.local (see cloud.env.example); flags override them.
 EOF
 }
 
-project=""
-region=""
-repository=""
-image=""
+project="${GCP_PROJECT:-}"
+region="${GCP_REGION:-}"
+repository="${ARTIFACT_REPOSITORY:-}"
+image="${TRAINING_IMAGE_NAME:-}"
 
 while (( "$#" )); do
   case "$1" in

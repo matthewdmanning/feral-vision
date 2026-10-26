@@ -33,7 +33,7 @@ orchestration.
 ### Decisions already made by the user
 
 - All new implementation, tests, configuration, and documentation belong under
-  `data_flow_rewrite/`.
+  `dvc_vm_environ/`.
 - Scope is DVC operations. Scripts may execute in a cloud environment. Google
   Cloud commands such as `gcloud`, infrastructure, training operations, MLflow
   scripts, and unrelated Hydra files are excluded.
@@ -82,7 +82,7 @@ subset as its own Dataset with supplied lineage before staging it separately.
 
 ## 3. Minimal implementation structure
 
-Create an independent package under `data_flow_rewrite/`:
+Create an independent package under `dvc_vm_environ/`:
 
 | File | Responsibility |
 | --- | --- |
@@ -371,7 +371,7 @@ Before any trial:
    that temporary directory. Use bounded command timeouts.
 5. On completion or failure, verify the original source, remove the trial
    directory and its exact ignore entry, and retain a concise result summary
-   under `data_flow_rewrite/`.
+   under `dvc_vm_environ/`.
 
 Test these externally visible outcomes:
 

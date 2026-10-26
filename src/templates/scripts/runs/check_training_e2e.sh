@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# Run inside the exact cached deployment image, offline, with GPU access.
+# Pre-push: run inside the freshly built deployment image with GPU access.
 set -euo pipefail
 python - <<'PY'
-import hashlib
 import json
 import math
 import os
 from pathlib import Path
-import subprocess
+import sys
 import tempfile
 
 from hydra import compose, initialize_config_dir
@@ -26,10 +25,9 @@ with tempfile.TemporaryDirectory(prefix="training-e2e-") as directory:
     (dataset / "images").mkdir(parents=True)
     (dataset / "annotations").mkdir()
     tracking_uri = f"sqlite:///{root / 'mlflow.db'}"
+    overrides = [f"data.root={dataset}", f"tracking.tracking_uri={tracking_uri}"]
     with initialize_config_dir(version_base=None, config_dir="/workspace/feral-vision/conf"):
-        cfg = compose(config_name="runs/detection", overrides=[
-            f"data.root={dataset}", f"tracking.tracking_uri={tracking_uri}",
-        ])
+        cfg = compose(config_name="runs/detection", overrides=overrides)
     side = int(cfg.data.image_size)
     images = []
     annotations = []
@@ -42,26 +40,19 @@ with tempfile.TemporaryDirectory(prefix="training-e2e-") as directory:
         "images": images, "annotations": annotations,
         "categories": [{"id": 1, "name": "cat"}, {"id": 2, "name": "dog"}],
     }))
-    manifest = dataset / "dataset-artifact.json"
-    manifest.write_text(json.dumps({"source": "local-e2e", "image_count": cfg.train.batch_size}))
     # Check the staged input contract before any model construction or retrieval.
     loader = build_dataloader(cfg)
     next(iter(loader))
-    if cfg.model.architecture.source == "ultralytics":
-        from ultralytics.utils import SETTINGS
-
-        weights = Path(cfg.model.architecture.id)
-        assert any(path.is_file() for path in [weights, Path(SETTINGS["weights_dir"]) / weights.name]), (
-            "Reviewed model weights are not cached; stage them once explicitly. Downloads are disabled."
-        )
-    env = os.environ | {
-        "TRAIN_DATA": str(dataset),
-        "DATASET_ARTIFACT_MANIFEST": str(manifest),
-        "DATASET_ARTIFACT_SHA256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
-        "MLFLOW_TRACKING_URI": tracking_uri,
-    }
-    subprocess.run(["bash", "/workspace/feral-vision/scripts/runs/container_train.sh"], env=env, check=True)
-    checkpoint = Path(cfg.train.best_model_path)
+    # Run the deployed training step without its Cloud Storage upload, which
+    # needs the GCE metadata server; tests/test_cloud_run_outputs.py covers it.
+    outputs = root / "outputs"
+    outputs.mkdir()
+    os.chdir(outputs)
+    sys.path.insert(0, "/workspace/feral-vision/scripts/runs")
+    from run_outputs import train
+    train("/workspace/feral-vision/conf", "runs/detection", str(outputs), overrides)
+    checkpoint = Path(cfg.train.best_model_path).resolve()
+    assert checkpoint.is_relative_to(outputs), "Checkpoint is outside the uploaded output directory"
     assert checkpoint.is_file() and checkpoint.stat().st_size > 0, "No training checkpoint"
     client = MlflowClient(tracking_uri=tracking_uri)
     experiment = client.get_experiment_by_name(cfg.tracking.experiment_name)
@@ -70,5 +61,5 @@ with tempfile.TemporaryDirectory(prefix="training-e2e-") as directory:
     assert len(runs) == 1 and runs[0].info.status == "FINISHED", "Training did not finish"
     losses = client.get_metric_history(runs[0].info.run_id, "train_loss")
     assert len(losses) == cfg.train.epochs and all(math.isfinite(item.value) for item in losses), "Missing or nonfinite epoch losses"
-    print("PASS: deployed entrypoint, COCO input, CUDA training, checkpoint, and MLflow run")
+    print("PASS: deployed training step, COCO input, CUDA training, checkpoint, and MLflow run")
 PY
