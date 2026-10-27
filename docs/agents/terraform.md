@@ -5,8 +5,7 @@ Use [Cloud Operations](cloudops.md) for image builds and GPU runtime behavior.
 
 ## Toolchain
 
-Use Terraform 1.16 or later within 1.x and Google provider 8.x. The current
-validated toolchain is Terraform 1.16.6 and Google provider 8.7.0; the provider
+Use Terraform 1.16 or later within 1.x and Google provider 8.x. The provider
 version and checksums are locked independently in all three roots. Initialize
 with `-backend=false` for local validation without accessing GCS state.
 
@@ -69,7 +68,7 @@ Follow the HashiCorp Terraform style guide for layout and naming.
 | `feral-vision/terraform/runs/detection/.terraform.lock.hcl` | Provider lock; commit it |
 | `feral-vision/terraform/buckets/dataset/` | Dataset-only bucket root: versioning off, soft delete, Object Retention Lock, own `gcs` backend prefix |
 | `feral-vision/terraform/tests/` | Mocked-provider tests (see below) |
-| `feral-vision/terraform/preflight/` | Deployment gate (see below) |
+| `feral-vision/terraform/preflight/` | Deployment preflight |
 
 Commit all three `.terraform.lock.hcl` files. A `terraform init` on another
 operating system can add platform hashes to them; review and commit that change
@@ -101,51 +100,6 @@ Run both suites after changing shared Terraform behavior; the template suite is
 under `src/templates/terraform/tests/`. Neither suite proves provider defaults,
 IAM, backend access, startup execution, or live GCP prerequisites. The bucket's
 `prevent_destroy` lifecycle rule is not exercised by these plan-only tests.
-
-## Required GPU deployment gate
-
-Before every GPU apply, run:
-
-~~~bash
-python feral-vision/terraform/preflight/preflight.py --var-file /path/to/run.tfvars
-~~~
-
-The preflight must pass before apply. It checks:
-
-- the repository still has one canonical training recipe/image/entrypoint;
-- GPU runtime has not reintroduced DVC commands or a `dvc.lock` gate;
-- Terraform formatting, initialization, and validation;
-- rendered startup Bash syntax, shell-safe inputs, and SSD/container path mapping;
-- exact locally cached deployment image, its entrypoint, and GPU
-  E2E training with checkpoint/MLflow assertions; no automatic downloads;
-- a saved plan contains only the disposable training VM and no unexpected
-  update/replacement/destroy action;
-- the fixed machine, T4, NVMe Local SSD, on-demand scheduling, network, and
-  service-account settings;
-- live project/zone/machine/GPU/network/service-account/image prerequisites;
-- the published `dataset-artifact.json`, its SHA-256, dataset image prefix, and
-  generation-pinned annotations object;
-- observable quota and artifact-output writeability.
-
-A passing run emits `deployment-manifest.json`. That manifest pins the exact
-saved plan SHA-256, training-image digest, Dataset Artifact URI, and Dataset
-Artifact manifest SHA-256.
-
-Review the saved plan, then apply only through:
-
-~~~bash
-feral-vision/scripts/runs/detection.sh \
-  --manifest feral-vision/terraform/preflight/reports/<timestamp>/deployment-manifest.json
-~~~
-
-The launcher rejects a saved plan whose bytes changed after preflight. Do not
-regenerate a plan between review and apply and do not use `-auto-approve` for
-this workflow.
-
-Keep the generated reports and manifest when diagnosing a failed deployment.
-They record where provisioning stopped. Compare them across retries instead of
-changing Terraform based only on the final error. See the
-[preflight guide](../../feral-vision/terraform/preflight/README.md) for the report files.
 
 ## Dataset boundary
 

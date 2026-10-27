@@ -15,8 +15,8 @@ plans, and lifecycle ownership, see [Terraform](terraform.md). See
 - Start at the existing VM/container beachhead. Terraform and Docker setup are
   separate reference material, not steps to redesign for the training script.
 - The script template must accept the user's files and configuration choices;
-  do not fix a bucket, filename, dataset, model, task or historical run recipe.
-  `feral-vision/conf/` contains configurations previously tried. The contracts
+  do not fix a bucket, filename, dataset, model or task.
+  `feral-vision/conf/` holds the parameter files for the current options. The contracts
   are defined in `src/sightkit_learn/config/` and loaded as OmegaConf `DictConfig`.
 - Use the selected Hydra configuration as written. The training script does
   not supply overrides or forward extra arguments to change its values.
@@ -29,8 +29,7 @@ plans, and lifecycle ownership, see [Terraform](terraform.md). See
 The generic runner is
 [`cloud_train.sh`](../../feral-vision/scripts/runs/cloud_train.sh), mirrored in
 starter assets. Use the [training guide](../guide/training.rst) for the operator
-workflow, or the [runner reference](../google_cloud_review/2026-10-17-google-cloud-review.md)
-for the full output inventory and validation evidence.
+workflow.
 
 It captures stdout/stderr and exports outputs using the Storage SDK, with a
 30-second pause between periodic exports and a verified final export after
@@ -54,17 +53,26 @@ assumptions do not constrain the generic template.
 
 ## Cloud identity
 
-`PROJECT_NAME` in `.env.local` is the project's display name. Resolve it to
-the Resource Manager `projectId` before passing `--project` to a cloud command.
-Do not compare that display name directly with Terraform's `project_id`.
-`TRAINING_DATA_BUCKET_URI` supplies the training data bucket URI; checking a
-bucket by that URI does not validate the project identifier passed to the CLI.
+Load the four shared training settings before running an operator command:
 
-Load `.env.local` only into the invoking process. Do not print, commit, or copy
-its values into Terraform variables, plans, logs, or documentation. Cloud
-operations require authenticated Application Default Credentials or an
-equivalent `gcloud` identity with the required IAM roles; `GCP_API_KEY` is not
-an identity credential for Terraform or Compute Engine.
+```bash
+source feral-vision/scripts/cloud/load_training_parameters.sh
+load_training_parameters
+```
+
+The local provider must export non-empty string values for
+`TRAINING_DATA_BUCKET_URI`, `PROJECT_NAME`, `GCS_URI_PREFIX`, and `GCS_REGION`.
+`GCS_REGION` describes the Cloud Storage bucket location; Artifact Registry
+commands use their separately configured location.
+`PROJECT_NAME` is the project's display name; resolve it to the Resource
+Manager `projectId` before passing `--project` to a cloud command. Do not
+compare that display name directly with Terraform's `project_id`. Checking a
+bucket by `TRAINING_DATA_BUCKET_URI` does not validate the project identifier
+passed to the CLI.
+
+Cloud operations require authenticated Application Default Credentials or an
+equivalent `gcloud` identity with the required service roles; `GCP_API_KEY` is
+not an identity credential for Terraform or Compute Engine.
 
 ## Canonical GPU training path
 
@@ -148,16 +156,14 @@ training begins; documentation is not a substitute for that runtime gate.
 ### Check for an existing image first
 
 **STOP. Before you write "the image is not built", and before you start a build,
-run the check.** Earlier agents built the image, forgot it, and claimed it did
-not exist. Artifact Registry is the only source of truth; memory, notes, and
-local files are not.
+run the check.** Artifact Registry is the only source of truth; memory, notes,
+and local files are not.
 
 ```bash
-set -a
-source <(sed 's/\r$//' .env.local)
-set +a
+source feral-vision/scripts/cloud/load_training_parameters.sh
+load_training_parameters
 resolved_project_id="$(gcloud projects list \
-  --filter="name=${PROJECT_NAME:?Set PROJECT_NAME in .env.local}" \
+  --filter="name=${PROJECT_NAME:?Load Parameter Manager settings first}" \
   --limit=2 --format='value(projectId)' --quiet)"
 if [[ -z "$resolved_project_id" || "$resolved_project_id" == *$'\n'* ]]; then
   echo 'PROJECT_NAME must resolve to exactly one accessible project.' >&2
@@ -183,7 +189,9 @@ request merely because repository files changed later.
 Build the image only through
 [`feral-vision/scripts/cloud/build_training_image.sh`](../../feral-vision/scripts/cloud/build_training_image.sh),
 which submits [`feral-vision/deploy/cloudbuild.training-image.yaml`](../../feral-vision/deploy/cloudbuild.training-image.yaml).
-Cloud Build must confirm the required image files exist before push. The GPU
+Cloud Build must confirm the required image files exist before push. The build
+also runs `docker image inspect` before the push to confirm Linux/amd64 and the
+canonical entrypoint. The GPU
 training suite `scripts/runs/check_training_e2e.sh` runs in the pre-push Docker
 build (`tools/docker_container_tests.sh`). It uses the canonical
 entrypoint/recipe and checks COCO loading, training losses, a checkpoint, and

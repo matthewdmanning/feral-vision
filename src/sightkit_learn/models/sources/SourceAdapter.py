@@ -7,11 +7,12 @@ in this package. The training loop and registry workflow use the concrete class 
 - ``fetch(cfg) -> nn.Module``
 
 ### Model Registering
-- ``inspect(cfg, *, fetch_if_needed=False) -> ModelProperties``
+- ``inspect(cfg) -> (ModelProperties, metadata)``
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from omegaconf import DictConfig
 from torch import nn
 
@@ -19,24 +20,33 @@ from sightkit_learn.models.ModelProperties import ModelProperties
 
 
 class SourceAdapter:
+    discovery_filters = frozenset({"model_id", "architecture_location"})
+
+    def list_models(
+        self,
+        *,
+        query: str | None = None,
+        repository: str | None = None,
+        pipeline_tag: str | None = None,
+    ) -> Iterable[dict]:
+        """Use this function to discover provider model identifiers and inspection locations.
+
+        Returns
+        -------
+        Iterable[dict]
+            Candidates containing model_id and architecture_location. Discovery
+            does not choose starting weights or save registry entries.
+        """
+        raise NotImplementedError("this adapter does not implement model discovery")
+
     def fetch(self, cfg: DictConfig) -> nn.Module:
         raise NotImplementedError
 
-    def inspect(
-        self, cfg: DictConfig, *, fetch_if_needed: bool = False
-    ) -> tuple[ModelProperties, dict]:
+    def inspect(self, cfg: DictConfig) -> tuple[ModelProperties, dict]:
         """Return (ModelProperties, extra_metadata).
 
-        extra_metadata holds anything the source exposes beyond the standard
-        ModelProperties fields (class names, variant info, nc, etc.).
+        extra_metadata holds provider facts useful for training setup, such as
+        class information, available weights and constructor documentation.
+        Inspection must not construct models, execute repository code or load weights.
         """
         raise NotImplementedError
-
-
-def _inspect_loaded(model: nn.Module) -> tuple[ModelProperties, dict]:
-    for _, mod in reversed(list(model.named_modules())):
-        if isinstance(mod, nn.Linear):
-            return ModelProperties(), {}
-        if isinstance(mod, nn.Conv2d):
-            return ModelProperties(), {}
-    return ModelProperties(), {}

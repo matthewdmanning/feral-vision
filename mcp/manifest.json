@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "model-inspector",
   "version": "0.1.0",
-  "description": "Inspect AI model metadata and manage source adapters for feral-vision.",
+  "description": "Discover model metadata and prepare offline model definitions for feral-vision.",
   "author": { "name": "Matthew Manning" },
   "server": {
     "type": "python",

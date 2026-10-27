@@ -54,13 +54,15 @@ Requirements:
   No bucket URI is stored as an unexpanded environment variable in tracked
   configuration. Local remote configuration stays in ``.dvc/config.local``.
 
-Export ``TRAINING_DATA_BUCKET_URI`` with the existing dataset-only bucket URI.
-Run this from the repository root to configure the remote; it does not create a
-bucket or upload data:
+Load the dataset-only bucket URI from the shared Parameter Manager settings.
+Run this from the repository root to configure the remote; it does not create
+a bucket or upload data:
 
 .. code-block:: bash
 
    bash -euc '
+   source feral-vision/scripts/cloud/load_training_parameters.sh
+   load_training_parameters
    : "${TRAINING_DATA_BUCKET_URI:?Export the dataset-only bucket URI}"
    uv tool run --from "dvc[gs]==3.67.1" dvc remote add --local --default --force gcs "${TRAINING_DATA_BUCKET_URI%/}/dvc"
    '

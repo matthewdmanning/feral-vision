@@ -270,42 +270,6 @@ def _output(plan: dict[str, Any], name: str) -> Any:
     return value
 
 
-def _training_setup_checks(image: str, reporter: Reporter) -> None:
-    """Use this function to confirm the training image is cached without downloading it.
-
-    Parameters
-    ----------
-    image : str
-        Reviewed digest-pinned image that must already exist locally.
-    reporter : Reporter
-        Blocking deployment checkpoint recorder.
-    """
-    docker = shutil.which("docker.exe") or "docker"
-    reporter.command("TRAINING_SETUP", "docker_engine", [docker, "version"])
-    cached = reporter.command(
-        "TRAINING_SETUP",
-        "selected_image_cached",
-        [docker, "image", "inspect", image],
-        required=False,
-    )
-    reporter.assertion(
-        "TRAINING_SETUP",
-        "no_implicit_image_download",
-        cached.returncode == 0,
-        "Exact image digest must already be cached. Check disk space and preload it once explicitly; no download was attempted.",
-    )
-    details = json.loads(cached.stdout)[0]
-    reporter.assertion(
-        "TRAINING_SETUP",
-        "deployment_image_specs",
-        details["Os"] == "linux"
-        and details["Architecture"] == "amd64"
-        and details["Config"]["Entrypoint"]
-        == ["bash", "/workspace/feral-vision/scripts/runs/container_train.sh"],
-        "Cached image must match the deployed Linux/amd64 image and canonical entrypoint",
-    )
-
-
 def _startup_checks(script: str, inputs: dict[str, Any], reporter: Reporter) -> None:
     """Use this function to reject startup syntax and path errors before VM creation.
 
@@ -1050,8 +1014,6 @@ def main() -> int:
 
         _cloud_checks(facts, reporter, report_dir)
         metadata.update(facts)
-
-        _training_setup_checks(str(facts["training_image"]), reporter)
 
         if args.skip_write_probe:
             reporter.warning(

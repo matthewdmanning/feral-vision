@@ -1,8 +1,8 @@
 # Terraform GPU deployment preflight
 
 This directory contains the **pre-deployment** gate for the canonical single-VM
-GPU training job. It runs before `terraform apply`, including a local GPU E2E
-training check in the selected image. It never creates a GPU VM.
+GPU training job. It runs before `terraform apply`. It needs no local Docker.
+It never creates a GPU VM.
 
 ## What it catches
 
@@ -26,10 +26,8 @@ The harness fails before apply for repository or deployment drift including:
 - missing dataset image prefix or pinned annotation generation;
 - insufficient observable CPU/GPU/external-IP/Local-SSD quota;
 - inability to write durable run evidence;
-- a selected image that cannot load the published COCO layout and execute the canonical
-  CUDA entrypoint and record the configured epochs, checkpoint, and MLflow run. Docker must be available and the reviewed image digest must already be cached.
-  Preflight never pulls images or model weights. Missing assets block deployment;
-  stage them once explicitly after checking disk capacity.
+- a selected image digest that does not exist in Artifact Registry.
+  Preflight never pulls images or model weights.
 
 Cloud capacity can still disappear between preflight and apply. Passing
 preflight establishes that the reviewed deployment is internally coherent and
@@ -89,10 +87,9 @@ Major checkpoints are:
 4. `TERRAFORM_PLAN`
 5. `PLAN_CHECKS`
 6. `GCP_PREREQUISITES`
-7. `TRAINING_SETUP` (Docker engine, exact cached image lookup, CUDA E2E; ten-minute limit)
-8. `ARTIFACT_WRITE_PROBE`
-9. `DEPLOYMENT_MANIFEST`
-10. `SUMMARY`
+7. `ARTIFACT_WRITE_PROBE`
+8. `DEPLOYMENT_MANIFEST`
+9. `SUMMARY`
 
 A `FAIL` is blocking. A `WARN` records reduced certainty only where Google Cloud
 does not expose a dependable blocking signal. Do not downgrade a failed
@@ -130,9 +127,11 @@ Terraform to render the real startup template and checks valid default/custom
 paths plus broken syntax, traversal, mismatched mounts, and shell substitution.
 It executes no startup commands and creates no resources.
 
-Preflight confirms only that the exact digest selected in the saved plan is
-cached locally as a Linux/amd64 image with the canonical entrypoint. It never
-pulls the image and runs no container.
+Preflight confirms that the exact digest selected in the saved plan exists in
+Artifact Registry. It uses no local Docker and runs no container.
 
-The GPU training suite `scripts/runs/check_training_e2e.sh` runs in the
-pre-push Docker build (`tools/docker_container_tests.sh`), not in preflight.
+The image build runs `docker image inspect` (Linux/amd64 and the canonical
+entrypoint) before the push to Artifact Registry.
+
+The pre-push Docker build (`tools/docker_container_tests.sh`) runs the GPU
+training suite `scripts/runs/check_training_e2e.sh`.

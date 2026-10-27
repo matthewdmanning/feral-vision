@@ -5,11 +5,19 @@ build/
 dist/
 wheels/
 *.egg-info
+
+# Keep Dataset payloads local while retaining DVC metadata.
+/data/**
+!/data/**/
+!/data/**/*.dvc
+!/data/**/.gitignore
 outputs/
 coverage.json
 coverage.xml
 metrics.json
 mlflow.db
+
+
 
 # Virtual environments
 .venv
@@ -45,13 +53,13 @@ terraform/.terraform/
 **/*.tfstate.*
 **/*.tfplan
 feral-vision/terraform/preflight/reports/
+
 # Run inputs name the project, service account, buckets, and image digest.
 *.tfvars
 
 # Private inventory of sensitive values and where they live.
 .agents/secrets.md
 
-CLAUDE.md
 bash.exe.stackdump
 .coverage
 coverage.xml
