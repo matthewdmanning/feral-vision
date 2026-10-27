@@ -6,6 +6,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from typing import Any, cast
 
 from omegaconf import DictConfig, OmegaConf
 
@@ -17,7 +18,10 @@ from sightkit_learn.tasks import CVTask
 def model_definition(config: dict, model_outputs: list[str], metadata: dict) -> dict:
     """Use this function to validate gathered information before saving a prep definition."""
     cfg = OmegaConf.merge(OmegaConf.structured(ModelConfig), config)
-    resolved = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    resolved = cast(
+        dict[str, Any],
+        OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True),
+    )
     for field in ("source", "id", "location"):
         if (
             not isinstance(resolved["architecture"][field], str)

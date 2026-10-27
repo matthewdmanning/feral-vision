@@ -6,7 +6,11 @@ dist/
 wheels/
 *.egg-info
 
-data/
+# Keep Dataset payloads local while retaining DVC metadata.
+/data/**
+!/data/**/
+!/data/**/*.dvc
+!/data/**/.gitignore
 outputs/
 coverage.json
 coverage.xml

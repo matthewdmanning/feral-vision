@@ -268,13 +268,32 @@ def test_offline_registry_preserves_saved_data_when_replacement_fails(
     assert list(tmp_path.iterdir()) == [path]
 
 
-def test_offline_registry_reads_existing_model_metadata():
+def test_offline_registry_reads_existing_model_metadata(tmp_path: Path):
     """Use this function to keep existing prep entries readable without losing provider metadata."""
     from sightkit_learn.models.offline_registry import load_model_definition
 
-    path = Path(__file__).resolve().parents[1] / "models/registry/model_registry.json"
+    path = tmp_path / "model_registry.json"
+    path.write_text(
+        json.dumps(
+            {
+                "yolo11n-seg": {
+                    "config": {
+                        "architecture": {
+                            "source": "ultralytics",
+                            "id": "yolo11n-seg.pt",
+                            "location": "ultralytics.YOLO",
+                        }
+                    },
+                    "model_outputs": ["seg_instance"],
+                    "nc": 2,
+                    "names": {"0": "cat", "1": "dog"},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
     cfg, props, metadata = load_model_definition(path, "yolo11n-seg")
     assert cfg.architecture.id == "yolo11n-seg.pt"
     assert [task.value for task in props.model_outputs] == ["seg_instance"]
-    assert metadata["nc"] == 80
+    assert metadata["nc"] == 2
     assert len(metadata["names"]) == metadata["nc"]
