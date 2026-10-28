@@ -142,5 +142,4 @@ listen unix /tmp/plugin...: setsockopt: operation not permitted
 ~~~
 
 That is an execution-environment restriction, not evidence of a Google Cloud
-authentication or resource-schema problem. Re-run validation on a normal
-host/CI runner before changing provider versions or Terraform configuration.
+authentication or resource-schema problem. Re-run validation manually on a normal operator host before changing provider versions or Terraform configuration.
